@@ -25,7 +25,7 @@ extern "C" {
 
 datapath::error datapath::waitable::wait(datapath::waitable* obj, std::chrono::nanoseconds duration)
 {
-	assert(obj == nullptr);
+	assert(obj != nullptr);
 
 	HANDLE  handle  = (HANDLE)obj->get_waitable();
 	int64_t timeout = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
@@ -61,9 +61,8 @@ datapath::error datapath::waitable::wait(datapath::waitable* obj, std::chrono::n
 
 datapath::error datapath::waitable::wait(datapath::waitable** objs, size_t count, std::chrono::nanoseconds duration)
 {
-	assert(objs == nullptr);
-	assert(count == 0);
-	assert(count > MAXIMUM_WAIT_OBJECTS);
+	assert(objs != nullptr);
+	assert((count > 0) && (count <= MAXIMUM_WAIT_OBJECTS));
 
 	int64_t timeout = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 
@@ -115,9 +114,8 @@ datapath::error datapath::waitable::wait(datapath::waitable** objs, size_t count
 datapath::error datapath::waitable::wait_any(datapath::waitable** objs, size_t count, size_t& index,
                                              std::chrono::nanoseconds duration)
 {
-	assert(objs == nullptr);
-	assert(count == 0);
-	assert(count > MAXIMUM_WAIT_OBJECTS);
+	assert(objs != nullptr);
+	assert((count > 0) && (count <= MAXIMUM_WAIT_OBJECTS));
 
 	int64_t timeout = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 
