@@ -18,9 +18,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "task.hpp"
 
+#define SIZE_ELEMENT uint32_t
+
 void datapath::windows::task::_assign(const std::vector<char>& data, std::shared_ptr<datapath::windows::overlapped> ov){
-	this->buffer.resize(data.size());
-	std::memcpy(buffer.data(), data.data(), data.size());
+	this->buffer.resize(data.size() + sizeof(SIZE_ELEMENT));
+	std::memcpy(buffer.data() + sizeof(SIZE_ELEMENT), data.data(), data.size());
+	reinterpret_cast<SIZE_ELEMENT&>(buffer[0]) = SIZE_ELEMENT(data.size());
 	this->overlapped = ov;
 }
 
