@@ -56,7 +56,7 @@ datapath::error datapath::waitable::wait(datapath::waitable* obj, std::chrono::n
 		}
 	} while (timeout > 0);
 
-	return datapath::error::Failure;
+	return datapath::error::TimedOut;
 }
 
 datapath::error datapath::waitable::wait(datapath::waitable** objs, size_t count, std::chrono::nanoseconds duration)
@@ -108,7 +108,7 @@ datapath::error datapath::waitable::wait(datapath::waitable** objs, size_t count
 		}
 	} while (timeout > 0);
 
-	return datapath::error::Failure;
+	return datapath::error::TimedOut;
 }
 
 datapath::error datapath::waitable::wait_any(datapath::waitable** objs, size_t count, size_t& index,
@@ -159,5 +159,5 @@ datapath::error datapath::waitable::wait_any(datapath::waitable** objs, size_t c
 		}
 	} while (timeout > 0);
 
-	return datapath::error::Failure;
+	return datapath::error::TimedOut;
 }
