@@ -38,7 +38,7 @@ namespace datapath {
 
 		// Not valid without the extra template.
 		template<typename... _largs>
-		void operator()(_largs... args)
+		void operator()(_args... args)
 		{
 			for (auto& l : listeners) {
 				l(args...);
