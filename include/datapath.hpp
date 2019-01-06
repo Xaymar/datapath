@@ -17,15 +17,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 #pragma once
+#include <string>
 #include "error.hpp"
 #include "iserver.hpp"
 #include "isocket.hpp"
-#include "itask.hpp"
 #include "permissions.hpp"
-#include <string>
 
 namespace datapath {
 	datapath::error connect(std::shared_ptr<datapath::isocket>& socket, std::string path);
 
-	datapath::error host(std::shared_ptr<datapath::iserver>& server, std::string path, datapath::permissions permissions, size_t max_clients);
-}
+	datapath::error host(std::shared_ptr<datapath::iserver>& server, std::string path,
+	                     datapath::permissions permissions, size_t max_clients);
+} // namespace datapath
