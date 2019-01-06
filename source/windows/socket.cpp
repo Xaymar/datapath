@@ -40,7 +40,7 @@ void datapath::windows::socket::_connect(HANDLE handle)
 void datapath::windows::socket::_disconnect()
 {
 	if (this->on_close) {
-		this->on_close(datapath::error::Closed);
+		this->on_close();
 	}
 
 	{
@@ -127,7 +127,8 @@ void datapath::windows::socket::_watcher()
 
 			// Read content.
 			if (ReadFileEx(this->socket_handle, read_buffer.data(), DWORD(read_buffer.size()),
-			               read_header_ov->get_overlapped(), NULL)) {
+			               read_header_ov->get_overlapped(),
+			               &datapath::windows::utility::def_io_completion_routine)) {
 				state    = readstate::Header;
 				waitable = read_header_ov;
 
@@ -192,8 +193,8 @@ datapath::error datapath::windows::socket::write(std::shared_ptr<datapath::itask
 
 	obj->_assign(data, ov);
 
-	BOOL suc =
-	    WriteFileEx(socket_handle, obj->data().data(), DWORD(obj->data().size()), ov->get_overlapped(), NULL);
+	BOOL suc = WriteFileEx(socket_handle, obj->data().data(), DWORD(obj->data().size()), ov->get_overlapped(),
+	                       &datapath::windows::utility::def_io_completion_routine);
 	if (suc) {
 		return datapath::error::Success;
 	} else {

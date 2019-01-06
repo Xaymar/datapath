@@ -26,7 +26,7 @@ namespace datapath {
 		public /*events*/:
 		datapath::event<const std::vector<char>&> on_message;
 
-		datapath::event<datapath::error> on_close;
+		datapath::event<> on_close;
 
 		public:
 		virtual bool good() = 0;

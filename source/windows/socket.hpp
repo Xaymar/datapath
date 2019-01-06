@@ -32,7 +32,7 @@ extern "C" {
 
 namespace datapath {
 	namespace windows {
-		class socket : public isocket {
+		class socket : public isocket, public std::enable_shared_from_this<datapath::windows::socket> {
 			bool   is_connected;
 			HANDLE socket_handle;
 
