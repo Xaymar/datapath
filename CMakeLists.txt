@@ -1,5 +1,5 @@
 # Low Latency IPC Library for high-speed traffic
-# Copyright (C) 2019  Michael Fabian Dirks <info@xaymar.com>
+# Copyright (C) 2019 Michael Fabian Dirks <info@xaymar.com>
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
