@@ -217,7 +217,7 @@ datapath::error datapath::windows::server::close()
 }
 
 datapath::error datapath::windows::server::host(std::shared_ptr<datapath::iserver>& server, std::string path,
-                                                datapath::permissions permissions, size_t max_clients = -1)
+                                                datapath::permissions permissions, size_t max_clients)
 {
 	if (!server) {
 		server = std::dynamic_pointer_cast<datapath::iserver>(std::make_shared<datapath::windows::server>());

@@ -27,5 +27,5 @@ namespace datapath {
 	datapath::error connect(std::shared_ptr<datapath::isocket>& socket, std::string path);
 
 	datapath::error host(std::shared_ptr<datapath::iserver>& server, std::string path,
-	                     datapath::permissions permissions, size_t max_clients);
+	                     datapath::permissions permissions, size_t max_clients = 0);
 } // namespace datapath
