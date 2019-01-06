@@ -19,12 +19,23 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #pragma once
 #include <memory>
 #include "error.hpp"
+#include "event.hpp"
 #include "isocket.hpp"
 
 namespace datapath {
 	class iserver {
-		virtual datapath::error accept(std::shared_ptr<datapath::isocket>& socket) = 0;
+		public /*event*/:
 
+		/** Accepted Connection Event
+		 * This event is called if a new connection is pending evaluation. 
+		 * 
+		 * @param bool& Set to true to accept, false to decline.
+		 * @param std::shared_ptr<datapath::isocket> Socket.
+		 * @return void
+		 */
+		datapath::event<bool&, std::shared_ptr<datapath::isocket>> on_accept;
+
+		public:
 		virtual datapath::error close() = 0;
 	};
 } // namespace datapath

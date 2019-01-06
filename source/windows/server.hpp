@@ -31,7 +31,7 @@ extern "C" {
 
 namespace datapath {
 	namespace windows {
-		class server : public iserver {
+		class server : public iserver, public std::enable_shared_from_this<datapath::windows::server> {
 			bool        is_created  = false;
 			size_t      max_clients = -1;
 			std::string path;
@@ -61,8 +61,6 @@ namespace datapath {
 			void _watcher();
 
 			public /*virtual override*/:
-			virtual datapath::error accept(std::shared_ptr<datapath::isocket>& socket) override;
-
 			virtual datapath::error close() override;
 
 			public:
