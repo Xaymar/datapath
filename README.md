@@ -4,7 +4,7 @@ DataPath is a high performance low impact Inter-Process Communication (IPC) libr
 ## Features
 * Cross-Platform IPC API.
 * Lightweight on CPU and Memory usage.
-* High performance, Send->Recv->Send->Recv 99.9%ile is <10µs.
+* High performance, Send->Recv->Send->Recv 99.9%ile is <=100µs.
 * Asynchronous with Events.
 
 ## Platforms
