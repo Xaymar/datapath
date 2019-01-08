@@ -194,6 +194,7 @@ void datapath::windows::server::_watcher()
 
 		// Verify existing connections.
 		{
+			std::list<HANDLE>            to_kill;
 			std::unique_lock<std::mutex> ul(this->lock);
 			for (auto itr = this->active_sockets.begin(); itr != this->active_sockets.end(); itr++) {
 				if (itr->second.expired()) {
@@ -204,7 +205,7 @@ void datapath::windows::server::_watcher()
 					} else {
 						DisconnectNamedPipe(itr->first);
 						CloseHandle(itr->first);
-						this->sockets.remove(itr->first);
+						to_kill.push_back(itr->first);
 					}
 					this->active_sockets.erase(itr);
 					continue;
@@ -218,11 +219,14 @@ void datapath::windows::server::_watcher()
 					} else {
 						DisconnectNamedPipe(itr->first);
 						CloseHandle(itr->first);
-						this->sockets.remove(itr->first);
+						to_kill.push_back(itr->first);
 					}
 					this->active_sockets.erase(itr);
 					continue;
 				}
+			}
+			for (auto hnd : to_kill) {
+				this->active_sockets.erase(hnd);
 			}
 		}
 
