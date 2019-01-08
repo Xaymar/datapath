@@ -51,10 +51,15 @@ datapath::error datapath::waitable::wait(datapath::waitable* obj, std::chrono::n
 			return datapath::error::Closed;
 		case WAIT_IO_COMPLETION:
 			duration = (std::chrono::high_resolution_clock::now() - start);
-			timeout  = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+			timeout  -= std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+			if (timeout <= 0) {
+				timeout = 0;
+			}
 			continue;
+		default:
+			return datapath::error::Failure;
 		}
-	} while (timeout > 0);
+	} while (timeout >= 0);
 
 	return datapath::error::TimedOut;
 }
@@ -103,10 +108,15 @@ datapath::error datapath::waitable::wait(datapath::waitable** objs, size_t count
 			return datapath::error::TimedOut;
 		} else if (result == WAIT_IO_COMPLETION) {
 			duration = (std::chrono::high_resolution_clock::now() - start);
-			timeout  = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+			timeout  -= std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+			if (timeout <= 0) {
+				timeout = 0;
+			}
 			continue;
+		} else {
+			return datapath::error::Failure;
 		}
-	} while (timeout > 0);
+	} while (timeout >= 0);
 
 	return datapath::error::TimedOut;
 }
@@ -154,10 +164,15 @@ datapath::error datapath::waitable::wait_any(datapath::waitable** objs, size_t c
 			return datapath::error::TimedOut;
 		} else if (result == WAIT_IO_COMPLETION) {
 			duration = (std::chrono::high_resolution_clock::now() - start);
-			timeout  = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+			timeout  -= std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+			if (timeout <= 0) {
+				timeout = 0;
+			}
 			continue;
+		} else {
+			return datapath::error::Failure;
 		}
-	} while (timeout > 0);
+	} while (timeout >= 0);
 
 	return datapath::error::TimedOut;
 }
