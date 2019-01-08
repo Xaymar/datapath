@@ -105,50 +105,68 @@ void datapath::windows::server::_watcher()
 			}
 
 			size_t          index = 0;
-			datapath::error ec = datapath::waitable::wait_any(waits, index, std::chrono::milliseconds(1));
+			datapath::error ec = datapath::waitable::wait_any(waits, index, std::chrono::milliseconds(0));
+			if (ec != datapath::error::Success) {
+				datapath::waitable::wait_any(waits, index, std::chrono::milliseconds(1));
+			}
 		}
 
 		// Update list of overlappeds to track.
 		{
 			std::unique_lock<std::mutex> ul(this->lock);
+			std::list<HANDLE>            to_kill;
+
 			for (auto itr = this->waiting_sockets.begin(); itr != this->waiting_sockets.end(); itr++) {
 				if (ovmap.count(*itr) == 0) {
-					auto ov = std::make_shared<datapath::windows::overlapped>();
-					ov->set_handle(*itr);
+					HANDLE handle = *itr;
+					auto   ov     = std::make_shared<datapath::windows::overlapped>();
+					ov->set_handle(handle);
 					ov->set_data(this);
-					ov->on_wait_success.add([this, &ovmap, &itr](datapath::error ec) {
+					ov->on_wait_success.add([this, &ovmap, &itr, &handle](datapath::error ec) {
 						std::unique_lock<std::mutex> ul(this->lock);
-						this->waiting_sockets.remove(*itr);
-						this->pending_sockets.push_back(*itr);
-						ovmap.erase(*itr);
+						this->waiting_sockets.erase(itr);
+						this->pending_sockets.push_back(handle);
+						ovmap.erase(handle);
 					});
-					BOOL suc = ConnectNamedPipe(*itr, ov->get_overlapped());
+					SetLastError(ERROR_SUCCESS);
+					BOOL suc = ConnectNamedPipe(handle, ov->get_overlapped());
 					if (suc) {
-						ovmap.insert({*itr, ov});
+						ovmap.insert({handle, ov});
 					} else {
-						continue;
+						if (GetLastError() == ERROR_PIPE_CONNECTED) {
+							to_kill.push_back(handle);
+							this->pending_sockets.push_back(handle);
+						} else {
+							continue;
+						}
 					}
 				}
+			}
+			for (auto hnd : to_kill) {
+				this->waiting_sockets.remove(hnd);
 			}
 		}
 
 		// Notify of pending sockets.
 		{
 			std::unique_lock<std::mutex> ul(this->lock);
+			std::list<HANDLE>            to_kill;
+
 			if (this->on_accept) {
 				for (auto itr = this->pending_sockets.begin(); itr != this->pending_sockets.end();
 				     itr++) {
-					bool accept = true;
+					HANDLE handle = *itr;
+					bool   accept = true;
 
 					auto sock = std::make_shared<datapath::windows::socket>();
-					sock->_connect(*itr);
+					sock->_connect(handle);
 
 					auto isock = std::dynamic_pointer_cast<datapath::isocket>(sock);
 					this->on_accept(accept, isock);
 
 					if (accept) {
-						this->pending_sockets.erase(itr);
-						this->active_sockets.insert({*itr, sock});
+						to_kill.push_back(handle);
+						this->active_sockets.insert({handle, sock});
 
 						if ((this->waiting_sockets.size() + this->pending_sockets.size())
 						    < WIN_BACKLOG_NUM) {
@@ -164,10 +182,13 @@ void datapath::windows::server::_watcher()
 					} else {
 						// Force close and return to waiting.
 						sock->close();
-						this->pending_sockets.erase(itr);
-						this->waiting_sockets.push_back(*itr);
+						to_kill.push_back(handle);
+						this->waiting_sockets.push_back(handle);
 					}
 				}
+			}
+			for (auto hnd : to_kill) {
+				this->pending_sockets.remove(hnd);
 			}
 		}
 
