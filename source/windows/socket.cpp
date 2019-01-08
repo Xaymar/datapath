@@ -84,7 +84,7 @@ void datapath::windows::socket::_watcher()
 
 		    // Read content.
 		    if (ReadFileEx(this->socket_handle, read_buffer.data(), DWORD(read_buffer.size()),
-		                   read_content_ov->get_overlapped(), NULL)) {
+		                   read_content_ov->get_overlapped(), &datapath::windows::utility::def_io_completion_routine)) {
 			    state    = readstate::Content;
 			    waitable = read_content_ov;
 		    } else {
@@ -152,7 +152,10 @@ void datapath::windows::socket::_watcher()
 		if (!waitable) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		} else {
-			datapath::error err = waitable->wait(std::chrono::milliseconds(1));
+			datapath::error err = waitable->wait(std::chrono::milliseconds(0));
+			if (err != datapath::error::Success) {
+				err = waitable->wait(std::chrono::milliseconds(1));
+			}
 			if (err == datapath::error::Closed) {
 				_disconnect();
 				continue;
