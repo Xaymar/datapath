@@ -54,7 +54,7 @@ namespace datapath {
 				_In_ DWORD dwNumberOfBytesTransfered,
 				_Inout_ LPOVERLAPPED lpOverlapped)
 			{
-
+				SetEvent(lpOverlapped->hEvent);
 			}
 
 		} // namespace utility
