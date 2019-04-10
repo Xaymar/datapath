@@ -41,5 +41,8 @@ namespace datapath {
 
 		// Invalid Path
 		InvalidPath,
+
+		// Operation Not Supported
+		NotSupported,
 	};
 }
