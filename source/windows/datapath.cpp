@@ -17,26 +17,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 #include "datapath.hpp"
-#if defined(_WIN32)
 #include "windows/server.hpp"
 #include "windows/socket.hpp"
-#endif
 
 datapath::error datapath::connect(std::shared_ptr<datapath::isocket>& socket, std::string path)
 {
-#if defined(_WIN32)
 	return datapath::windows::socket::connect(socket, path);
-#else
-	return datapath::error::Unknown;
-#endif
 }
 
 datapath::error datapath::host(std::shared_ptr<datapath::iserver>& server, std::string path,
                                datapath::permissions permissions, size_t max_clients)
 {
-#if defined(_WIN32)
 	return datapath::windows::server::host(server, path, permissions, max_clients);
-#else
-	return datapath::error::Unknown;
-#endif
 }

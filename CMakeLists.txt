@@ -138,7 +138,6 @@ set(PROJECT_DATA
 
 # Private (only compiled/used locally)
 set(PROJECT_PRIVATE
-	"source/datapath.cpp"
 )
 
 # Libraries
@@ -203,6 +202,7 @@ if(WIN32)
 	)
 
 	list(APPEND PROJECT_PRIVATE
+		"source/windows/datapath.cpp"
 		"source/windows/overlapped.hpp"
 		"source/windows/overlapped.cpp"
 		"source/windows/socket.hpp"
