@@ -125,6 +125,7 @@ set(PROJECT_PUBLIC
 	"include/itask.hpp"
 	"include/waitable.hpp"
 	"include/permissions.hpp"
+	"include/threadpool.hpp"
 )
 
 set(PROJECT_PUBLIC_GENERATED
@@ -138,6 +139,7 @@ set(PROJECT_DATA
 
 # Private (only compiled/used locally)
 set(PROJECT_PRIVATE
+	"source/threadpool.cpp"
 )
 
 # Libraries
