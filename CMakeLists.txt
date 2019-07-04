@@ -69,9 +69,6 @@ endif()
 
 # Modules
 include("util")
-if(IsStandalone)
-	include("cppcheck")
-endif()
 
 # Detect Build Type
 if(IsStandalone)
@@ -98,18 +95,13 @@ configure_file(
 # Options
 ################################################################################
 # Static or Dynamic?
-option(${OPTIONPREFIX}MAKE_STATIC "Make Static Library" ON)
-option(${OPTIONPREFIX}MAKE_DYNAMIC "Make Dynamic Library" OFF)
-option(${OPTIONPREFIX}MAKE_MODULE "Make Module Library" OFF)
+option(${PropertyPrefix}MAKE_STATIC "Make Static Library" ON)
+option(${PropertyPrefix}MAKE_DYNAMIC "Make Dynamic Library" OFF)
+option(${PropertyPrefix}MAKE_MODULE "Make Module Library" OFF)
 
 # Tests & Samples
 option(${PropertyPrefix}BUILD_TESTS "Build Tests" ON)
 option(${PropertyPrefix}BUILD_SAMPLES "Build Samples" ON)
-
-if(!IsStandalone)
-	CacheSet("${PropertyPrefix}BUILD_TESTS" OFF)
-	CacheSet("${PropertyPrefix}BUILD_SAMPLES" OFF)
-endif()
 
 ################################################################################
 # Source
@@ -243,7 +235,7 @@ source_group(TREE "${PROJECT_BINARY_DIR}" PREFIX "Generated" FILES ${PROJECT_PUB
 # Building
 ################################################################################
 # Library definition
-if(${OPTIONPREFIX}MAKE_STATIC)
+if(${PropertyPrefix}MAKE_STATIC)
 	add_library(${PROJECT_NAME} STATIC
 		${PROJECT_PRIVATE}
 		${PROJECT_PUBLIC}
@@ -257,7 +249,7 @@ elseif(${PropertyPrefix}MAKE_DYNAMIC)
 		${PROJECT_PUBLIC_GENERATED}
 		${PROJECT_DATA}
 	)
-elseif(${OPTIONPREFIX}MAKE_MODULE)
+elseif(${PropertyPrefix}MAKE_MODULE)
 	add_library(${PROJECT_NAME} MODULE
 		${PROJECT_PRIVATE}
 		${PROJECT_PUBLIC}
@@ -306,11 +298,6 @@ else()
 	)
 endif()
 
-# CPPCheck
-if(IsStandalone)
-	cppcheck()
-	cppcheck_add_project(${PROJECT_NAME})
-endif()
 
 ################################################################################
 # Samples
