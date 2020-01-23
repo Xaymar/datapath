@@ -1,6 +1,6 @@
 # Basic Formatting
-TabWidth: 8
-UseTab: ForIndentation
+TabWidth: 4
+UseTab: ForContinuationAndIndentation
 ColumnLimit: 120
  
 # Language
@@ -13,7 +13,7 @@ ConstructorInitializerIndentWidth: 4
 ContinuationIndentWidth: 4
 IndentCaseLabels: false
 #IndentPPDirectives: true
-IndentWidth: 8
+IndentWidth: 4
 IndentWrappedFunctionNames: true
 NamespaceIndentation: All
  
@@ -30,7 +30,7 @@ SortIncludes: true
 AlignAfterOpenBracket: true
 AlignConsecutiveAssignments: true
 AlignConsecutiveDeclarations: true
-AlignEscapedNewlines: DontAlign
+AlignEscapedNewlines: Left
 AlignOperands: true
 AlignTrailingComments: true
 DerivePointerAlignment: false

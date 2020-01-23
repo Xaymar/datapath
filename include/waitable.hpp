@@ -25,9 +25,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 namespace datapath {
 	class waitable {
 		public /*events*/:
-		datapath::event<datapath::error> on_wait_error;
+		datapath::event<datapath::error> _on_wait_error;
 
-		datapath::event<datapath::error> on_wait_success;
+		datapath::event<datapath::error> _on_wait_success;
 
 		public:
 		virtual void* get_waitable() = 0;
@@ -40,22 +40,22 @@ namespace datapath {
 		public /*static*/:
 
 		static datapath::error wait(datapath::waitable*      obj,
-		                            std::chrono::nanoseconds duration = std::chrono::nanoseconds(0));
+									std::chrono::nanoseconds duration = std::chrono::nanoseconds(0));
 
 		static datapath::error wait(datapath::waitable** objs, size_t count,
-		                            std::chrono::nanoseconds duration = std::chrono::nanoseconds(0));
+									std::chrono::nanoseconds duration = std::chrono::nanoseconds(0));
 
 		static inline datapath::error wait(std::vector<datapath::waitable*> objs,
-		                                   std::chrono::nanoseconds duration = std::chrono::nanoseconds(0))
+										   std::chrono::nanoseconds         duration = std::chrono::nanoseconds(0))
 		{
 			return datapath::waitable::wait(objs.data(), objs.size(), duration);
 		}
 
 		static datapath::error wait_any(datapath::waitable** objs, size_t count, size_t& index,
-		                                std::chrono::nanoseconds duration = std::chrono::nanoseconds(0));
+										std::chrono::nanoseconds duration = std::chrono::nanoseconds(0));
 
 		static inline datapath::error wait_any(std::vector<datapath::waitable*> objs, size_t& index,
-		                                       std::chrono::nanoseconds duration = std::chrono::nanoseconds(0))
+											   std::chrono::nanoseconds duration = std::chrono::nanoseconds(0))
 		{
 			return datapath::waitable::wait_any(objs.data(), objs.size(), index, duration);
 		}

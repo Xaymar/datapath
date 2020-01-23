@@ -60,7 +60,7 @@ namespace datapath {
 			virtual datapath::error close() override;
 
 			virtual datapath::error write(std::shared_ptr<datapath::itask>& task,
-			                              const std::vector<char>&          data) override;
+										  const std::vector<char>&          data) override;
 
 			public:
 			static datapath::error connect(std::shared_ptr<datapath::isocket>& socket, std::string path);

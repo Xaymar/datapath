@@ -38,8 +38,8 @@ typename std::enable_if<enable_bitmask_operators<Enum>::enable, Enum>::type oper
 	return static_cast<Enum>(static_cast<underlying>(lhs) & static_cast<underlying>(rhs));
 }
 
-#define ENABLE_BITMASK_OPERATORS(x) \
-	template<> \
+#define ENABLE_BITMASK_OPERATORS(x)      \
+	template<>                           \
 	struct enable_bitmask_operators<x> { \
 		static const bool enable = true; \
 	};

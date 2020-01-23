@@ -19,6 +19,7 @@
 
 #pragma once
 #include <condition_variable>
+#include <functional>
 #include <list>
 #include <map>
 #include <mutex>
@@ -28,7 +29,7 @@
 
 namespace datapath {
 	namespace threadpool {
-		typedef uint64_t     affinity_t;
+		typedef uint64_t affinity_t;
 
 		constexpr affinity_t default_mask = std::numeric_limits<affinity_t>::max();
 
@@ -58,7 +59,7 @@ namespace datapath {
 				void push(std::shared_ptr<task> task);
 			};
 
-			std::map<affinity_t, std::shared_ptr<worker>> workers;
+			std::map<affinity_t, std::shared_ptr<worker>> _workers;
 
 			public:
 			pool();

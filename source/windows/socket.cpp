@@ -39,8 +39,8 @@ void datapath::windows::socket::_connect(HANDLE handle)
 
 void datapath::windows::socket::_disconnect()
 {
-	if (this->on_close) {
-		this->on_close();
+	if (this->_on_close) {
+		this->_on_close();
 	}
 
 	{
@@ -62,45 +62,42 @@ void datapath::windows::socket::_watcher()
 
 	std::vector<char> read_buffer;
 
-	std::shared_ptr<datapath::windows::overlapped> read_header_ov =
-	    std::make_shared<datapath::windows::overlapped>();
-	std::shared_ptr<datapath::windows::overlapped> read_content_ov =
-	    std::make_shared<datapath::windows::overlapped>();
+	std::shared_ptr<datapath::windows::overlapped> read_header_ov  = std::make_shared<datapath::windows::overlapped>();
+	std::shared_ptr<datapath::windows::overlapped> read_content_ov = std::make_shared<datapath::windows::overlapped>();
 	std::shared_ptr<datapath::windows::overlapped> waitable;
 
-	read_header_ov->on_wait_error.add([&state, &waitable](datapath::error ec) {
+	read_header_ov->_on_wait_error.add([&state, &waitable](datapath::error ec) {
 		// There was an error waiting on the header.
 		state = readstate::Unknown;
 		waitable.reset();
 	});
-	read_header_ov->on_wait_success.add(
-	    [this, &read_buffer, &read_content_ov, &state, &waitable](datapath::error ec) {
-		    read_content_ov->set_handle(this->socket_handle);
-		    read_content_ov->set_data(this);
+	read_header_ov->_on_wait_success.add([this, &read_buffer, &read_content_ov, &state, &waitable](datapath::error ec) {
+		read_content_ov->set_handle(this->socket_handle);
+		read_content_ov->set_data(this);
 
-		    // ToDo: Add optional message size limit, messages above this size kill the connection for attempting DoS.
-		    size_t msg_size = reinterpret_cast<SIZE_ELEMENT&>(read_buffer[0]);
-		    read_buffer.resize(msg_size);
+		// ToDo: Add optional message size limit, messages above this size kill the connection for attempting DoS.
+		size_t msg_size = reinterpret_cast<SIZE_ELEMENT&>(read_buffer[0]);
+		read_buffer.resize(msg_size);
 
-		    // Read content.
-		    if (ReadFileEx(this->socket_handle, read_buffer.data(), DWORD(read_buffer.size()),
-		                   read_content_ov->get_overlapped(), &datapath::windows::utility::def_io_completion_routine)) {
-			    state    = readstate::Content;
-			    waitable = read_content_ov;
-		    } else {
-			    state = readstate::Unknown;
-			    waitable.reset();
-		    }
-	    });
-	read_content_ov->on_wait_error.add([&state, &waitable](datapath::error ec) {
+		// Read content.
+		if (ReadFileEx(this->socket_handle, read_buffer.data(), DWORD(read_buffer.size()),
+					   read_content_ov->get_overlapped(), &datapath::windows::utility::def_io_completion_routine)) {
+			state    = readstate::Content;
+			waitable = read_content_ov;
+		} else {
+			state = readstate::Unknown;
+			waitable.reset();
+		}
+	});
+	read_content_ov->_on_wait_error.add([&state, &waitable](datapath::error ec) {
 		// There was an error waiting on the content.
 		state = readstate::Unknown;
 		waitable.reset();
 	});
-	read_content_ov->on_wait_success.add([this, &read_buffer, &state, &waitable](datapath::error ec) {
+	read_content_ov->_on_wait_success.add([this, &read_buffer, &state, &waitable](datapath::error ec) {
 		// We have content!
-		if (this->on_message) {
-			this->on_message(read_buffer);
+		if (this->_on_message) {
+			this->_on_message(read_buffer);
 			state = readstate::Unknown;
 		} else {
 			// We're buffering the message in read_buffer until there is a hook to on_message.
@@ -127,8 +124,7 @@ void datapath::windows::socket::_watcher()
 
 			// Read content.
 			if (ReadFileEx(this->socket_handle, read_buffer.data(), DWORD(read_buffer.size()),
-			               read_header_ov->get_overlapped(),
-			               &datapath::windows::utility::def_io_completion_routine)) {
+						   read_header_ov->get_overlapped(), &datapath::windows::utility::def_io_completion_routine)) {
 				state    = readstate::Header;
 				waitable = read_header_ov;
 
@@ -142,8 +138,8 @@ void datapath::windows::socket::_watcher()
 			// This logic is in the on_wait_success handler, and continued here.
 			if (!waitable) {
 				// We currently have a message buffered, but there was no handler last time we checked.
-				if (this->on_message) {
-					this->on_message(read_buffer);
+				if (this->_on_message) {
+					this->_on_message(read_buffer);
 					state = readstate::Unknown;
 				}
 			}
@@ -197,7 +193,7 @@ datapath::error datapath::windows::socket::write(std::shared_ptr<datapath::itask
 	obj->_assign(data, ov);
 
 	BOOL suc = WriteFileEx(socket_handle, obj->data().data(), DWORD(obj->data().size()), ov->get_overlapped(),
-	                       &datapath::windows::utility::def_io_completion_routine);
+						   &datapath::windows::utility::def_io_completion_routine);
 	if (suc) {
 		return datapath::error::Success;
 	} else {
@@ -214,7 +210,7 @@ datapath::error datapath::windows::socket::connect(std::shared_ptr<datapath::iso
 
 	SetLastError(ERROR_SUCCESS);
 	HANDLE handle = CreateFileW(wpath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
-	                            FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH, NULL);
+								FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH, NULL);
 	if ((handle == INVALID_HANDLE_VALUE) || (GetLastError() != ERROR_SUCCESS)) {
 		return datapath::error::Failure;
 	}

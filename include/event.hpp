@@ -24,10 +24,10 @@
 namespace datapath {
 	template<typename... _args>
 	class event {
-		std::list<std::function<void(_args...)>> listeners;
+		std::list<std::function<void(_args...)>> _listeners;
 
-		std::function<void()> listen_cb;
-		std::function<void()> silence_cb;
+		std::function<void()> _listen_cb;
+		std::function<void()> _silence_cb;
 
 		public /* functions */:
 
@@ -40,20 +40,20 @@ namespace datapath {
 		// Add new listener.
 		inline void add(std::function<void(_args...)> listener)
 		{
-			if (listeners.size() == 0) {
-				if (listen_cb) {
-					listen_cb();
+			if (_listeners.size() == 0) {
+				if (_listen_cb) {
+					_listen_cb();
 				}
 			}
-			listeners.push_back(listener);
+			_listeners.push_back(listener);
 		}
 
 		// Remove existing listener.
 		inline void remove(std::function<void(_args...)> listener)
 		{
-			listeners.remove(listener);
-			if (listeners.size() == 0) {
-				if (silence_cb) {
+			_listeners.remove(listener);
+			if (_listeners.size() == 0) {
+				if (_silence_cb) {
 					silence_cb();
 				}
 			}
@@ -62,15 +62,15 @@ namespace datapath {
 		// Check if empty / no listeners.
 		inline bool empty()
 		{
-			return listeners.empty();
+			return _listeners.empty();
 		}
 
 		// Remove all listeners.
 		inline void clear()
 		{
-			listeners.clear();
-			if (silence_cb) {
-				silence_cb();
+			_listeners.clear();
+			if (_silence_cb) {
+				_silence_cb();
 			}
 		}
 
@@ -80,7 +80,7 @@ namespace datapath {
 		template<typename... _largs>
 		inline void operator()(_args... args)
 		{
-			for (auto& l : listeners) {
+			for (auto& l : _listeners) {
 				l(args...);
 			}
 		}
@@ -108,12 +108,12 @@ namespace datapath {
 		public /* events */:
 		void set_listen_callback(std::function<void()> cb)
 		{
-			this->listen_cb = cb;
+			this->_listen_cb = cb;
 		}
 
 		void set_silence_callback(std::function<void()> cb)
 		{
-			this->silence_cb = cb;
+			this->_silence_cb = cb;
 		}
 	};
 }; // namespace datapath

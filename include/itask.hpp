@@ -26,9 +26,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 namespace datapath {
 	class itask : public waitable {
 		public /*event*/:
-		datapath::event<datapath::error> on_failure;
+		datapath::event<datapath::error> _on_failure;
 
-		datapath::event<datapath::error, const std::vector<char>&> on_success;
+		datapath::event<datapath::error, const std::vector<char>&> _on_success;
 
 		public:
 		virtual datapath::error cancel() = 0;

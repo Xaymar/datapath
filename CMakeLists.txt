@@ -91,25 +91,26 @@ endif()
 # Options
 #================================================================================#
 # Static or Dynamic?
-option(${PropertyPrefix}MAKE_STATIC "Make Static Library" ON)
-option(${PropertyPrefix}MAKE_DYNAMIC "Make Dynamic Library" OFF)
-option(${PropertyPrefix}MAKE_MODULE "Make Module Library" OFF)
+option(${PropertyPrefix}MAKE_DYNAMIC "Create dynamically linked library instead of static library." OFF)
+option(${PropertyPrefix}MAKE_MODULE "Create dynamically linked module instead of dynamically linked library." OFF)
+option(${PropertyPrefix}BUILD_SAMPLES "Build Samples" ON)
 
 #================================================================================#
 # Sources
-option(${PropertyPrefix}BUILD_SAMPLES "Build Samples" ON)
+#================================================================================#
 
 # Configure Version Header
 configure_file(
 	"${PROJECT_SOURCE_DIR}/cmake/version.hpp.in"
-	"${PROJECT_BINARY_DIR}/include/version.hpp"
+	"${PROJECT_BINARY_DIR}/generated/version.hpp"
 )
 
-# Public (exported with module)
-set(PROJECT_PUBLIC
-	"include/bitmask.hpp"
+# Source Files
+set(PROJECT_PUBLIC "")
+list(APPEND PROJECT_PUBLIC
 	"include/datapath.hpp"
 	"include/error.hpp"
+	"include/bitmask.hpp"
 	"include/event.hpp"
 	"include/isocket.hpp"
 	"include/iserver.hpp"
@@ -119,27 +120,30 @@ set(PROJECT_PUBLIC
 	"include/threadpool.hpp"
 )
 
-set(PROJECT_PUBLIC_GENERATED
-	"${PROJECT_BINARY_DIR}/include/version.hpp"
+set(PROJECT_PRIVATE "")
+list(APPEND PROJECT_PRIVATE
+	"source/threadpool.cpp"
 )
 
-set(PROJECT_DATA
+set(PROJECT_TEMPLATES "")
+list(APPEND PROJECT_TEMPLATES
+	"${PROJECT_SOURCE_DIR}/cmake/version.hpp.in"
+)
+
+set(PROJECT_GENERATED "")
+list(APPEND PROJECT_GENERATED
+	"${PROJECT_BINARY_DIR}/generated/version.hpp"
+)
+
+set(PROJECT_DATA "")
+list(APPEND PROJECT_DATA
 	"README.md"
 	"LICENSE"
 )
 
-# Private (only compiled/used locally)
-set(PROJECT_PRIVATE
-	"source/threadpool.cpp"
-)
+set(PROJECT_LIBRARIES "")
 
-# Libraries
-set(PROJECT_LIBRARIES
-)
-
-# Defines
-set(PROJECT_DEFINES
-)
+set(PROJECT_DEFINES "")
 
 # Platforms
 if(WIN32)
@@ -150,48 +154,48 @@ if(WIN32)
 
 	list(APPEND PROJECT_DEFINES
 		_CRT_SECURE_NO_WARNINGS
-			WIN32_LEAN_AND_MEAN
-			NOGPICAPMASKS
-			NOVIRTUALKEYCODES
-			NOWINMESSAGES
-			NOWINSTYLES
-			NOSYSMETRICS
-			NOMENUS
-			NOICONS
-			NOKEYSTATES
-			NOSYSCOMMANDS
-			NORASTEROPS
-			NOSHOWWINDOW
-			NOATOM
-			NOCLIPBOARD
-			NOCOLOR
-			NOCTLMGR
-			NODRAWTEXT
-			NOGDI
-			NOKERNEL
-			#NOUSER
-			#NONLS
-			NOMB
-			NOMEMMGR
-			NOMETAFILE
-			NOMINMAX
-			NOMSG
-			NOOPENFILE
-			NOSCROLL
-			NOSERVICE
-			NOSOUND
-			NOTEXTMETRIC
-			NOWH
-			NOWINOFFSETS
-			NOCOMM
-			NOKANJI
-			NOHELP
-			NOPROFILER
-			NODEFERWINDOWPOS
-			NOMCX
-			NOIME
-			NOMDI
-			NOINOUT
+		WIN32_LEAN_AND_MEAN
+		NOGPICAPMASKS
+		NOVIRTUALKEYCODES
+		NOWINMESSAGES
+		NOWINSTYLES
+		NOSYSMETRICS
+		NOMENUS
+		NOICONS
+		NOKEYSTATES
+		NOSYSCOMMANDS
+		NORASTEROPS
+		NOSHOWWINDOW
+		NOATOM
+		NOCLIPBOARD
+		NOCOLOR
+		NOCTLMGR
+		NODRAWTEXT
+		NOGDI
+		NOKERNEL
+		#NOUSER
+		#NONLS
+		NOMB
+		NOMEMMGR
+		NOMETAFILE
+		NOMINMAX
+		NOMSG
+		NOOPENFILE
+		NOSCROLL
+		NOSERVICE
+		NOSOUND
+		NOTEXTMETRIC
+		NOWH
+		NOWINOFFSETS
+		NOCOMM
+		NOKANJI
+		NOHELP
+		NOPROFILER
+		NODEFERWINDOWPOS
+		NOMCX
+		NOIME
+		NOMDI
+		NOINOUT
 	)
 
 	list(APPEND PROJECT_PRIVATE
@@ -225,45 +229,58 @@ elseif("${CMAKE_SYSTEM_NAME}" MATCHES "FreeBSD")
 endif()
 
 # Grouping
-source_group("Data Files" FILES $PROJECT_DATA)
-source_group(TREE "${PROJECT_SOURCE_DIR}/source" PREFIX "Source" FILES ${PROJECT_PRIVATE})
-source_group(TREE "${PROJECT_SOURCE_DIR}/include" PREFIX "Include" FILES ${PROJECT_PUBLIC})
-source_group(TREE "${PROJECT_BINARY_DIR}" PREFIX "Generated" FILES ${PROJECT_PUBLIC_GENERATED})
+source_group(TREE "${PROJECT_SOURCE_DIR}" PREFIX "Data Files" FILES ${PROJECT_DATA})
+source_group(TREE "${PROJECT_SOURCE_DIR}/cmake" PREFIX "Template Files" FILES ${PROJECT_TEMPLATES})
+source_group(TREE "${PROJECT_BINARY_DIR}/generated" PREFIX "Generated Files" FILES ${PROJECT_GENERATED})
+source_group(TREE "${PROJECT_SOURCE_DIR}/include" PREFIX "Exported Files" FILES ${PROJECT_PUBLIC})
+
+# Filter Sources
+set(_TMP_SOURCE ${PROJECT_PRIVATE})
+list(FILTER _TMP_SOURCE INCLUDE REGEX "\.(c|cpp)$")
+source_group(TREE "${PROJECT_SOURCE_DIR}/source" PREFIX "Source Files" FILES ${_TMP_SOURCE})
+
+# Filter Headers
+set(_TMP_HEADER ${PROJECT_PRIVATE})
+list(FILTER _TMP_HEADER INCLUDE REGEX "\.(h|hpp)$")
+source_group(TREE "${PROJECT_SOURCE_DIR}/source" PREFIX "Header Files" FILES ${_TMP_HEADER})
 
 #================================================================================#
 # Building
 #================================================================================#
+
 # Library definition
-if(${PropertyPrefix}MAKE_STATIC)
-	add_library(${PROJECT_NAME} STATIC
-		${PROJECT_PRIVATE}
-		${PROJECT_PUBLIC}
-		${PROJECT_PUBLIC_GENERATED}
-		${PROJECT_DATA}
-	)
-elseif(${PropertyPrefix}MAKE_DYNAMIC)
-	add_library(${PROJECT_NAME} SHARED
-		${PROJECT_PRIVATE}
-		${PROJECT_PUBLIC}
-		${PROJECT_PUBLIC_GENERATED}
-		${PROJECT_DATA}
-	)
-elseif(${PropertyPrefix}MAKE_MODULE)
-	add_library(${PROJECT_NAME} MODULE
-		${PROJECT_PRIVATE}
-		${PROJECT_PUBLIC}
-		${PROJECT_PUBLIC_GENERATED}
-		${PROJECT_DATA}
-	)
+set(_BUILD_TYPE)
+if(${PropertyPrefix}MAKE_DYNAMIC)
+	if(${PropertyPrefix}MAKE_MODULE)
+		set(_BUILD_TYPE MODULE)
+	else()
+		set(_BUILD_TYPE SHARED)
+	endif()
 else()
-	message(CRITICAL "Building nothing completed, aborting. Check MAKE_STATIC, MAKE_DYNAMIC and MAKE_DYNAMIC.")
-	return()
+	set(_BUILD_TYPE STATIC)
+endif()
+
+add_library(${PROJECT_NAME} ${_BUILD_TYPE}
+	${PROJECT_PUBLIC}
+	${PROJECT_PRIVATE}
+	${PROJECT_GENERATED}
+	${PROJECT_TEMPLATES}
+	${PROJECT_DATA}
+)
+
+# Clang
+if("${PropertyPrefix}" STREQUAL "")
+	clang_format(
+		TARGETS ${PROJECT_NAME}
+		DEPENDENCY
+		VERSION 9.0.0
+	)
 endif()
 
 # Includes
 target_include_directories(${PROJECT_NAME}
-	PRIVATE source
-	PUBLIC include
+	PRIVATE "source"
+	PUBLIC "include"
 )
 
 # Defines
@@ -297,10 +314,9 @@ else()
 	)
 endif()
 
-
-################################################################################
+#================================================================================#
 # Samples
-################################################################################
+#================================================================================#
 if(${PropertyPrefix}BUILD_SAMPLES)
 	add_subdirectory(${PROJECT_SOURCE_DIR}/samples)
 endif()

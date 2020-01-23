@@ -26,7 +26,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #define WIN_BACKLOG_NUM 8
 
 datapath::error datapath::windows::server::create(std::string path, datapath::permissions permissions,
-                                                  size_t max_clients)
+												  size_t max_clients)
 {
 	// If old sockets are available, close them.
 	this->close();
@@ -84,8 +84,8 @@ HANDLE datapath::windows::server::_create_socket(std::string path, bool initial)
 
 	DWORD pipe_flags = PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT;
 
-	HANDLE handle = CreateNamedPipeW(wpath.c_str(), file_flags, pipe_flags, PIPE_UNLIMITED_INSTANCES,
-	                                 WIN_BUFFER_SIZE, WIN_BUFFER_SIZE, WIN_WAIT_TIME, &this->security_attributes);
+	HANDLE handle = CreateNamedPipeW(wpath.c_str(), file_flags, pipe_flags, PIPE_UNLIMITED_INSTANCES, WIN_BUFFER_SIZE,
+									 WIN_BUFFER_SIZE, WIN_WAIT_TIME, &this->security_attributes);
 	return handle;
 }
 
@@ -105,7 +105,7 @@ void datapath::windows::server::_watcher()
 			}
 
 			size_t          index = 0;
-			datapath::error ec = datapath::waitable::wait_any(waits, index, std::chrono::milliseconds(0));
+			datapath::error ec    = datapath::waitable::wait_any(waits, index, std::chrono::milliseconds(0));
 			if (ec != datapath::error::Success) {
 				datapath::waitable::wait_any(waits, index, std::chrono::milliseconds(1));
 			}
@@ -122,7 +122,7 @@ void datapath::windows::server::_watcher()
 					auto   ov     = std::make_shared<datapath::windows::overlapped>();
 					ov->set_handle(handle);
 					ov->set_data(this);
-					ov->on_wait_success.add([this, &ovmap, &itr, &handle](datapath::error ec) {
+					ov->_on_wait_success.add([this, &ovmap, &itr, &handle](datapath::error ec) {
 						std::unique_lock<std::mutex> ul(this->lock);
 						this->waiting_sockets.erase(itr);
 						this->pending_sockets.push_back(handle);
@@ -152,9 +152,8 @@ void datapath::windows::server::_watcher()
 			std::unique_lock<std::mutex> ul(this->lock);
 			std::list<HANDLE>            to_kill;
 
-			if (this->on_accept) {
-				for (auto itr = this->pending_sockets.begin(); itr != this->pending_sockets.end();
-				     itr++) {
+			if (this->_on_accept) {
+				for (auto itr = this->pending_sockets.begin(); itr != this->pending_sockets.end(); itr++) {
 					HANDLE handle = *itr;
 					bool   accept = true;
 
@@ -162,16 +161,14 @@ void datapath::windows::server::_watcher()
 					sock->_connect(handle);
 
 					auto isock = std::dynamic_pointer_cast<datapath::isocket>(sock);
-					this->on_accept(accept, isock);
+					this->_on_accept(accept, isock);
 
 					if (accept) {
 						to_kill.push_back(handle);
 						this->active_sockets.insert({handle, sock});
 
-						if ((this->waiting_sockets.size() + this->pending_sockets.size())
-						    < WIN_BACKLOG_NUM) {
-							if ((this->sockets.size() <= this->max_clients)
-							    && (this->max_clients > 0)) {
+						if ((this->waiting_sockets.size() + this->pending_sockets.size()) < WIN_BACKLOG_NUM) {
+							if ((this->sockets.size() <= this->max_clients) && (this->max_clients > 0)) {
 								HANDLE handle = _create_socket(this->path, false);
 								if (handle != INVALID_HANDLE_VALUE) {
 									this->sockets.push_back(handle);
@@ -199,8 +196,7 @@ void datapath::windows::server::_watcher()
 			for (auto itr = this->active_sockets.begin(); itr != this->active_sockets.end(); itr++) {
 				if (itr->second.expired()) {
 					// Enforce backlog size
-					if ((this->waiting_sockets.size() + this->pending_sockets.size())
-					    < WIN_BACKLOG_NUM) {
+					if ((this->waiting_sockets.size() + this->pending_sockets.size()) < WIN_BACKLOG_NUM) {
 						this->waiting_sockets.push_back(itr->first);
 					} else {
 						DisconnectNamedPipe(itr->first);
@@ -213,8 +209,7 @@ void datapath::windows::server::_watcher()
 				auto obj = itr->second.lock();
 				if (!obj->good()) {
 					// Enforce backlog size
-					if ((this->waiting_sockets.size() + this->pending_sockets.size())
-					    < WIN_BACKLOG_NUM) {
+					if ((this->waiting_sockets.size() + this->pending_sockets.size()) < WIN_BACKLOG_NUM) {
 						this->waiting_sockets.push_back(itr->first);
 					} else {
 						DisconnectNamedPipe(itr->first);
@@ -299,7 +294,7 @@ datapath::error datapath::windows::server::close()
 }
 
 datapath::error datapath::windows::server::host(std::shared_ptr<datapath::iserver>& server, std::string path,
-                                                datapath::permissions permissions, size_t max_clients)
+												datapath::permissions permissions, size_t max_clients)
 {
 	if (!server) {
 		server = std::dynamic_pointer_cast<datapath::iserver>(std::make_shared<datapath::windows::server>());

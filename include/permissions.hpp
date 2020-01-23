@@ -21,12 +21,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "bitmask.hpp"
 
 namespace datapath {
-	enum class permissions : int8_t {
-		None,
-		User,
-		Group,
-		World,
-		Reserved
-	};
+	enum class permissions : int8_t { None, User, Group, World, Reserved };
 	ENABLE_BITMASK_OPERATORS(datapath::permissions);
 } // namespace datapath

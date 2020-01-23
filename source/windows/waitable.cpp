@@ -42,16 +42,16 @@ datapath::error datapath::waitable::wait(datapath::waitable* obj, std::chrono::n
 		DWORD result = WaitForSingleObjectEx(handle, DWORD(timeout), TRUE);
 		switch (result) {
 		case WAIT_OBJECT_0:
-			obj->on_wait_success(datapath::error::Success);
+			obj->_on_wait_success(datapath::error::Success);
 			return datapath::error::Success;
 		case WAIT_TIMEOUT:
 			return datapath::error::TimedOut;
 		case WAIT_ABANDONED:
-			obj->on_wait_error(datapath::error::Closed);
+			obj->_on_wait_error(datapath::error::Closed);
 			return datapath::error::Closed;
 		case WAIT_IO_COMPLETION:
 			duration = (std::chrono::high_resolution_clock::now() - start);
-			timeout  -= std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+			timeout -= std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 			if (timeout <= 0) {
 				timeout = 0;
 			}
@@ -96,19 +96,19 @@ datapath::error datapath::waitable::wait(datapath::waitable** objs, size_t count
 		DWORD result = WaitForMultipleObjectsEx(handles.size(), handles.data(), TRUE, DWORD(timeout), TRUE);
 		if ((result >= WAIT_OBJECT_0) && (result < (WAIT_OBJECT_0 + MAXIMUM_WAIT_OBJECTS))) {
 			for (auto idx : indexes) {
-				objs[idx]->on_wait_success(datapath::error::Success);
+				objs[idx]->_on_wait_success(datapath::error::Success);
 			}
 			return datapath::error::Success;
 		} else if ((result >= WAIT_ABANDONED_0) && (result < (WAIT_ABANDONED_0 + MAXIMUM_WAIT_OBJECTS))) {
 			for (auto idx : indexes) {
-				objs[idx]->on_wait_error(datapath::error::Closed);
+				objs[idx]->_on_wait_error(datapath::error::Closed);
 			}
 			return datapath::error::Closed;
 		} else if (result == WAIT_TIMEOUT) {
 			return datapath::error::TimedOut;
 		} else if (result == WAIT_IO_COMPLETION) {
 			duration = (std::chrono::high_resolution_clock::now() - start);
-			timeout  -= std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+			timeout -= std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 			if (timeout <= 0) {
 				timeout = 0;
 			}
@@ -122,7 +122,7 @@ datapath::error datapath::waitable::wait(datapath::waitable** objs, size_t count
 }
 
 datapath::error datapath::waitable::wait_any(datapath::waitable** objs, size_t count, size_t& index,
-                                             std::chrono::nanoseconds duration)
+											 std::chrono::nanoseconds duration)
 {
 	assert(objs != nullptr);
 	assert((count > 0) && (count <= MAXIMUM_WAIT_OBJECTS));
@@ -154,17 +154,17 @@ datapath::error datapath::waitable::wait_any(datapath::waitable** objs, size_t c
 		DWORD result = WaitForMultipleObjectsEx(handles.size(), handles.data(), FALSE, DWORD(timeout), TRUE);
 		if ((result >= WAIT_OBJECT_0) && (result < (WAIT_OBJECT_0 + MAXIMUM_WAIT_OBJECTS))) {
 			index = indexes[result - WAIT_OBJECT_0];
-			objs[index]->on_wait_success(datapath::error::Success);
+			objs[index]->_on_wait_success(datapath::error::Success);
 			return datapath::error::Success;
 		} else if ((result >= WAIT_ABANDONED_0) && (result < (WAIT_ABANDONED_0 + MAXIMUM_WAIT_OBJECTS))) {
 			index = indexes[result - WAIT_OBJECT_0];
-			objs[index]->on_wait_error(datapath::error::Closed);
+			objs[index]->_on_wait_error(datapath::error::Closed);
 			return datapath::error::Closed;
 		} else if (result == WAIT_TIMEOUT) {
 			return datapath::error::TimedOut;
 		} else if (result == WAIT_IO_COMPLETION) {
 			duration = (std::chrono::high_resolution_clock::now() - start);
-			timeout  -= std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+			timeout -= std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 			if (timeout <= 0) {
 				timeout = 0;
 			}

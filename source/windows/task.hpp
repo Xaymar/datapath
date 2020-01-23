@@ -20,8 +20,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <memory>
 #include "itask.hpp"
 #include "overlapped.hpp"
-#include "socket.hpp"
 #include "server.hpp"
+#include "socket.hpp"
 
 extern "C" {
 #include <Windows.h>

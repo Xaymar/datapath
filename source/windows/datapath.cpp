@@ -26,7 +26,7 @@ datapath::error datapath::connect(std::shared_ptr<datapath::isocket>& socket, st
 }
 
 datapath::error datapath::host(std::shared_ptr<datapath::iserver>& server, std::string path,
-                               datapath::permissions permissions, size_t max_clients)
+							   datapath::permissions permissions, size_t max_clients)
 {
 	return datapath::windows::server::host(server, path, permissions, max_clients);
 }

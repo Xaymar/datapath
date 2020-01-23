@@ -50,13 +50,12 @@ namespace datapath {
 				return converter.from_bytes(string);
 			}
 
-			static VOID CALLBACK def_io_completion_routine(_In_ DWORD dwErrorCode,
-				_In_ DWORD dwNumberOfBytesTransfered,
-				_Inout_ LPOVERLAPPED lpOverlapped)
+			static VOID CALLBACK def_io_completion_routine(_In_ DWORD dwErrorCode, _In_ DWORD dwNumberOfBytesTransfered,
+														   _Inout_ LPOVERLAPPED lpOverlapped)
 			{
 				SetEvent(lpOverlapped->hEvent);
 			}
 
 		} // namespace utility
-	}         // namespace windows
+	}     // namespace windows
 } // namespace datapath

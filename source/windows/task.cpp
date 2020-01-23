@@ -20,17 +20,18 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #define SIZE_ELEMENT uint32_t
 
-void datapath::windows::task::_assign(const std::vector<char>& data, std::shared_ptr<datapath::windows::overlapped> ov){
+void datapath::windows::task::_assign(const std::vector<char>& data, std::shared_ptr<datapath::windows::overlapped> ov)
+{
 	this->buffer.resize(data.size() + sizeof(SIZE_ELEMENT));
 	std::memcpy(buffer.data() + sizeof(SIZE_ELEMENT), data.data(), data.size());
 	reinterpret_cast<SIZE_ELEMENT&>(buffer[0]) = SIZE_ELEMENT(data.size());
-	this->overlapped = ov;
+	this->overlapped                           = ov;
 }
 
 datapath::windows::task::task()
 {
-	this->on_wait_error.add([this](datapath::error ec) { this->on_failure(ec); });
-	this->on_wait_success.add([this](datapath::error ec) { this->on_success(ec, this->data()); });
+	this->_on_wait_error.add([this](datapath::error ec) { this->_on_failure(ec); });
+	this->_on_wait_success.add([this](datapath::error ec) { this->_on_success(ec, this->data()); });
 }
 
 datapath::windows::task::~task()

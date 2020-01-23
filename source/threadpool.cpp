@@ -65,8 +65,7 @@ void datapath::threadpool::pool::worker::runner()
 				my_task.reset();
 			}
 			if (this->queue.size() == 0) {
-				this->signal.wait(slock,
-				                  [this]() { return (this->should_stop) || (this->queue.size() > 0); });
+				this->signal.wait(slock, [this]() { return (this->should_stop) || (this->queue.size() > 0); });
 			}
 		}
 	}
@@ -94,13 +93,13 @@ datapath::threadpool::pool::pool()
 	uint64_t num_hw_concurrency = std::thread::hardware_concurrency();
 	for (uint64_t idx = 0; idx < num_hw_concurrency; idx++) {
 		auto worker = std::make_shared<datapath::threadpool::pool::worker>(1 << idx);
-		this->workers.insert({idx, worker});
+		this->_workers.insert({idx, worker});
 	}
 }
 
 datapath::threadpool::pool::~pool()
 {
-	this->workers.clear();
+	this->_workers.clear();
 }
 
 bool datapath::threadpool::pool::push(std::shared_ptr<task> task)
@@ -114,13 +113,13 @@ bool datapath::threadpool::pool::push(std::shared_ptr<task> task)
 		throw std::invalid_argument("task->function must not be nullptr");
 	}
 	/// Check for invalid affinity masks.
-	if ((task->mask & (this->workers.size() - 1)) == 0) {
+	if ((task->mask & (this->_workers.size() - 1)) == 0) {
 		throw std::invalid_argument("mask does not fit any thread");
 	}
 
 	affinity_t lowest_id;
 	size_t     lowest_count = std::numeric_limits<size_t>::max();
-	for (auto kv : workers) {
+	for (auto kv : _workers) {
 		if ((kv.second->affinity & task->mask) == 0) {
 			continue;
 		}
@@ -135,18 +134,18 @@ bool datapath::threadpool::pool::push(std::shared_ptr<task> task)
 		return false;
 	}
 
-	this->workers[lowest_id]->push(task);
+	this->_workers[lowest_id]->push(task);
 	return true;
 }
 
 void datapath::threadpool::pool::clear(affinity_t mask)
 {
 	// Early-Exit tests.
-	if ((mask & (this->workers.size() - 1)) == 0) {
+	if ((mask & (this->_workers.size() - 1)) == 0) {
 		throw std::invalid_argument("mask does not fit any thread");
 	}
 
-	for (auto kv : workers) {
+	for (auto kv : _workers) {
 		if ((kv.second->affinity & mask) == 0) {
 			continue;
 		}

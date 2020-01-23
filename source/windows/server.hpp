@@ -65,7 +65,7 @@ namespace datapath {
 
 			public:
 			static datapath::error host(std::shared_ptr<datapath::iserver>& server, std::string path,
-			                            datapath::permissions permissions, size_t max_clients);
+										datapath::permissions permissions, size_t max_clients);
 		};
 	} // namespace windows
 } // namespace datapath
