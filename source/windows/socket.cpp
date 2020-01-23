@@ -39,8 +39,8 @@ void datapath::windows::socket::_connect(HANDLE handle)
 
 void datapath::windows::socket::_disconnect()
 {
-	if (this->_on_close) {
-		this->_on_close();
+	if (this->on_close) {
+		this->on_close();
 	}
 
 	{
@@ -96,8 +96,8 @@ void datapath::windows::socket::_watcher()
 	});
 	read_content_ov->_on_wait_success.add([this, &read_buffer, &state, &waitable](datapath::error ec) {
 		// We have content!
-		if (this->_on_message) {
-			this->_on_message(read_buffer);
+		if (this->on_message) {
+			this->on_message(read_buffer);
 			state = readstate::Unknown;
 		} else {
 			// We're buffering the message in read_buffer until there is a hook to on_message.
@@ -138,8 +138,8 @@ void datapath::windows::socket::_watcher()
 			// This logic is in the on_wait_success handler, and continued here.
 			if (!waitable) {
 				// We currently have a message buffered, but there was no handler last time we checked.
-				if (this->_on_message) {
-					this->_on_message(read_buffer);
+				if (this->on_message) {
+					this->on_message(read_buffer);
 					state = readstate::Unknown;
 				}
 			}

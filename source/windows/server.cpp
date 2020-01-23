@@ -152,7 +152,7 @@ void datapath::windows::server::_watcher()
 			std::unique_lock<std::mutex> ul(this->lock);
 			std::list<HANDLE>            to_kill;
 
-			if (this->_on_accept) {
+			if (this->on_accept) {
 				for (auto itr = this->pending_sockets.begin(); itr != this->pending_sockets.end(); itr++) {
 					HANDLE handle = *itr;
 					bool   accept = true;
@@ -161,7 +161,7 @@ void datapath::windows::server::_watcher()
 					sock->_connect(handle);
 
 					auto isock = std::dynamic_pointer_cast<datapath::isocket>(sock);
-					this->_on_accept(accept, isock);
+					this->on_accept(accept, isock);
 
 					if (accept) {
 						to_kill.push_back(handle);
