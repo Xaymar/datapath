@@ -24,7 +24,8 @@ set(VERSION_MAJOR 0)
 set(VERSION_MINOR 1)
 set(VERSION_PATCH 0)
 set(VERSION_TWEAK 0)
-set(PROJECT_COMMIT "N/A")
+set(VERSION_COMMIT "")
+set(VERSION_SUFFIX "")
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/.git")
 	set(GIT_RESULT "")
 	set(GIT_OUTPUT "")
@@ -46,13 +47,14 @@ if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/.git")
 		OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_STRIP_TRAILING_WHITESPACE ERROR_QUIET
 	)
 	if(GIT_RESULT EQUAL 0)
-		set(PROJECT_COMMIT ${GIT_OUTPUT})
+		set(VERSION_COMMIT ${GIT_OUTPUT})
 	endif()
 endif()
 
 # Define Project
 project(
-	datapath
+	DataPath
+	LANGUAGES CXX
 	VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.${VERSION_TWEAK}
 )
 set(PROJECT_FULL_NAME "DataPath IPC Library")
@@ -91,59 +93,67 @@ endif()
 # Options
 #================================================================================#
 # Static or Dynamic?
-option(${PropertyPrefix}MAKE_DYNAMIC "Create dynamically linked library instead of static library." OFF)
-option(${PropertyPrefix}MAKE_MODULE "Create dynamically linked module instead of dynamically linked library." OFF)
-option(${PropertyPrefix}BUILD_SAMPLES "Build Samples" ON)
+option(${PropertyPrefix}BUILD_SHARED "Create dynamically linked library instead of statically linked library." ON)
+option(${PropertyPrefix}BUILD_SAMPLES "Build Samples" OFF)
 
 #================================================================================#
 # Sources
 #================================================================================#
-
-# Configure Version Header
-configure_file(
-	"${PROJECT_SOURCE_DIR}/cmake/version.hpp.in"
-	"${PROJECT_BINARY_DIR}/generated/version.hpp"
-)
-
-# Source Files
 set(PROJECT_PUBLIC "")
-list(APPEND PROJECT_PUBLIC
-	"include/datapath.hpp"
-	"include/error.hpp"
-	"include/bitmask.hpp"
-	"include/event.hpp"
-	"include/isocket.hpp"
-	"include/iserver.hpp"
-	"include/itask.hpp"
-	"include/waitable.hpp"
-	"include/permissions.hpp"
-	"include/threadpool.hpp"
-)
-
+set(PROJECT_PUBLIC_INCLUDES "")
 set(PROJECT_PRIVATE "")
-list(APPEND PROJECT_PRIVATE
-	"source/threadpool.cpp"
-)
-
+set(PROJECT_PRIVATE_INCLUDES "")
 set(PROJECT_TEMPLATES "")
-list(APPEND PROJECT_TEMPLATES
-	"${PROJECT_SOURCE_DIR}/cmake/version.hpp.in"
-)
-
 set(PROJECT_GENERATED "")
-list(APPEND PROJECT_GENERATED
-	"${PROJECT_BINARY_DIR}/generated/version.hpp"
-)
-
 set(PROJECT_DATA "")
+set(PROJECT_LIBRARIES "")
+set(PROJECT_DEFINES "")
+
+# Generic Source files
+list(APPEND PROJECT_PUBLIC
+	"include/datapath/datapath.hpp"
+	"include/datapath/error.hpp"
+	"include/datapath/event.hpp"
+	"include/datapath/server.hpp"
+	"include/datapath/socket.hpp"
+)
+list(APPEND PROJECT_PUBLIC_INCLUDES
+	"${PROJECT_SOURCE_DIR}/include"
+	"${PROJECT_BINARY_DIR}/generated"
+)
+list(APPEND PROJECT_PRIVATE_INCLUDES
+	"${PROJECT_SOURCE_DIR}/include/datapath"
+	"${PROJECT_BINARY_DIR}/generated/datapath"
+	"${PROJECT_SOURCE_DIR}/source"
+)
+list(APPEND PROJECT_TEMPLATES
+	"cmake/config.hpp.in"
+)
+list(APPEND PROJECT_GENERATED
+	"${PROJECT_BINARY_DIR}/generated/datapath/config.hpp"
+)
 list(APPEND PROJECT_DATA
 	"README.md"
 	"LICENSE"
 )
 
-set(PROJECT_LIBRARIES "")
-
-set(PROJECT_DEFINES "")
+# Create config file.
+set(GEN_VERSION_MAJOR ${VERSION_MAJOR})
+set(GEN_VERSION_MINOR ${VERSION_MINOR})
+set(GEN_VERSION_PATCH ${VERSION_PATCH})
+set(GEN_VERSION_TWEAK ${VERSION_TWEAK})
+set(GEN_VERSION_SUFFIX ${VERSION_SUFFIX})
+set(GEN_VERSION_COMMIT ${VERSION_COMMIT})
+if(BUILD_SHARED)
+	set(DATAPATH_SHARED_LIBRARY TRUE)
+else()
+	set(DATAPATH_SHARED_LIBRARY FALSE)
+endif()
+configure_file(
+	"${PROJECT_SOURCE_DIR}/cmake/config.hpp.in"
+	"${PROJECT_BINARY_DIR}/generated/datapath/config.hpp"
+	@ONLY
+)
 
 # Platforms
 if(WIN32)
@@ -199,21 +209,21 @@ if(WIN32)
 	)
 
 	list(APPEND PROJECT_PRIVATE
-		"source/windows/datapath.cpp"
-		"source/windows/overlapped.hpp"
-		"source/windows/overlapped.cpp"
-		"source/windows/socket.hpp"
-		"source/windows/socket.cpp"
-		"source/windows/server.hpp"
-		"source/windows/server.cpp"
-		"source/windows/task.hpp"
-		"source/windows/task.cpp"
-		"source/windows/utility.hpp"
-		"source/windows/waitable.cpp"
+		"source/windows/windows-overlapped.hpp"
+		"source/windows/windows-overlapped.cpp"
+		"source/windows/windows-socket.hpp"
+		"source/windows/windows-socket.cpp"
+		"source/windows/windows-client-socket.hpp"
+		"source/windows/windows-client-socket.cpp"
+		"source/windows/windows-server.hpp"
+		"source/windows/windows-server.cpp"
+		"source/windows/windows-server-socket.hpp"
+		"source/windows/windows-server-socket.cpp"
+		"source/windows/windows-utility.hpp"
 	)
 elseif(APPLE)
 	# MacOSX
-
+	
 	list(APPEND PROJECT_PRIVATE
 	)
 elseif("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
@@ -232,32 +242,28 @@ endif()
 source_group(TREE "${PROJECT_SOURCE_DIR}" PREFIX "Data Files" FILES ${PROJECT_DATA})
 source_group(TREE "${PROJECT_SOURCE_DIR}/cmake" PREFIX "Template Files" FILES ${PROJECT_TEMPLATES})
 source_group(TREE "${PROJECT_BINARY_DIR}/generated" PREFIX "Generated Files" FILES ${PROJECT_GENERATED})
-source_group(TREE "${PROJECT_SOURCE_DIR}/include" PREFIX "Exported Files" FILES ${PROJECT_PUBLIC})
-
-# Filter Sources
-set(_TMP_SOURCE ${PROJECT_PRIVATE})
-list(FILTER _TMP_SOURCE INCLUDE REGEX "\.(c|cpp)$")
-source_group(TREE "${PROJECT_SOURCE_DIR}/source" PREFIX "Source Files" FILES ${_TMP_SOURCE})
-
-# Filter Headers
-set(_TMP_HEADER ${PROJECT_PRIVATE})
-list(FILTER _TMP_HEADER INCLUDE REGEX "\.(h|hpp)$")
-source_group(TREE "${PROJECT_SOURCE_DIR}/source" PREFIX "Header Files" FILES ${_TMP_HEADER})
+source_group(TREE "${PROJECT_SOURCE_DIR}/include" PREFIX "Public Files" FILES ${PROJECT_PUBLIC})
+source_group(TREE "${PROJECT_SOURCE_DIR}/source" PREFIX "Private Files" FILES ${PROJECT_PRIVATE})
 
 #================================================================================#
 # Building
 #================================================================================#
 
-# Library definition
-set(_BUILD_TYPE)
-if(${PropertyPrefix}MAKE_DYNAMIC)
-	if(${PropertyPrefix}MAKE_MODULE)
-		set(_BUILD_TYPE MODULE)
+# Define the target
+set(_BUILD_TYPE "STATIC")
+if(${PropertyPrefix}BUILD_SHARED)
+	set(_BUILD_TYPE "SHARED")
+	if(MSVC)
+		list(APPEND PROJECT_DEFINES
+			"DATAPATH_INTERFACE=__declspec(dllexport)"
+		)
 	else()
-		set(_BUILD_TYPE SHARED)
+		list(APPEND PROJECT_DEFINES
+			"DATAPATH_INTERFACE=__attribute__((dllexport))"
+		)
 	endif()
 else()
-	set(_BUILD_TYPE STATIC)
+
 endif()
 
 add_library(${PROJECT_NAME} ${_BUILD_TYPE}
@@ -267,38 +273,23 @@ add_library(${PROJECT_NAME} ${_BUILD_TYPE}
 	${PROJECT_TEMPLATES}
 	${PROJECT_DATA}
 )
-
-# Clang
-if("${PropertyPrefix}" STREQUAL "")
-	clang_format(
-		TARGETS ${PROJECT_NAME}
-		DEPENDENCY
-		VERSION 9.0.0
-	)
-endif()
-
-# Includes
 target_include_directories(${PROJECT_NAME}
-	INTERFACE
-		"${PROJECT_SOURCE_DIR}/include"
 	PUBLIC
-		"${PROJECT_SOURCE_DIR}/include"
+		${PROJECT_PUBLIC_INCLUDES}
 	PRIVATE
-		"${PROJECT_SOURCE_DIR}/source"
+		${PROJECT_PRIVATE_INCLUDES}
 )
-
-# Defines
 target_compile_definitions(${PROJECT_NAME}
 	PRIVATE ${PROJECT_DEFINES}
 )
-
-# Linking Directories
-link_directories(
-)
-
-# Linking
 target_link_libraries(${PROJECT_NAME}
 	${PROJECT_LIBRARIES}
+)
+set_target_properties(
+	${PROJECT_NAME}
+	PROPERTIES
+		CXX_STANDARD 17
+		CXX_EXTENSIONS OFF
 )
 
 # File Version
@@ -309,7 +300,7 @@ if(WIN32)
 		VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}.${PROJECT_VERSION_TWEAK}
 		SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}.${PROJECT_VERSION_TWEAK}
 	)
-else()
+elseif(UNIX AND NOT APPLE)
 	set_target_properties(
 		${PROJECT_NAME}
 		PROPERTIES
@@ -318,9 +309,22 @@ else()
 	)
 endif()
 
+# Clang
+if("${PropertyPrefix}" STREQUAL "")
+	clang_format(
+		TARGETS ${PROJECT_NAME}
+		DEPENDENCY
+		VERSION 9.0.0
+	)
+endif()
+
 #================================================================================#
 # Samples
 #================================================================================#
+if(${PropertyPrefix}BUILD_TESTS)
+	add_subdirectory(tests)
+endif()
+
 if(${PropertyPrefix}BUILD_SAMPLES)
-	add_subdirectory(${PROJECT_SOURCE_DIR}/samples)
+	add_subdirectory(samples)
 endif()

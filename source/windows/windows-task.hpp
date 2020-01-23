@@ -20,8 +20,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <memory>
 #include "itask.hpp"
 #include "overlapped.hpp"
-#include "server.hpp"
-#include "socket.hpp"
 
 extern "C" {
 #include <Windows.h>
@@ -30,15 +28,18 @@ extern "C" {
 namespace datapath {
 	namespace windows {
 		class task : public itask {
-			std::shared_ptr<datapath::windows::overlapped> overlapped;
-			std::vector<char>                              buffer;
-
-			protected:
-			void _assign(const std::vector<char>& data, std::shared_ptr<datapath::windows::overlapped> ov);
+			::datapath::windows::overlapped _overlapped;
+			std::vector<char>               _data;
 
 			public:
 			task();
 			~task();
+
+			::datapath::windows::overlapped& overlapped();
+
+			std::vector<char>& get_data();
+
+			void handle_overlapped(::datapath::windows::overlapped& ov, size_t bytes, void* ptr);
 
 			public /*virtual override*/ /*itask*/:
 			virtual datapath::error cancel() override;
@@ -48,12 +49,6 @@ namespace datapath {
 			virtual size_t length() override;
 
 			virtual const std::vector<char>& data() override;
-
-			public /*virtual override*/ /*waitable*/:
-			virtual void* get_waitable() override;
-
-			friend class datapath::windows::socket;
-			friend class datapath::windows::server;
 		};
 	} // namespace windows
 } // namespace datapath

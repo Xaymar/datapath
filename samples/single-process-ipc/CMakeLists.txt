@@ -6,7 +6,7 @@ SET(PROJECT_SOURCES
 )
 
 SET(PROJECT_LIBRARIES
-	datapath
+	DataPath
 )
 
 # Includes

@@ -1,0 +1,54 @@
+/*
+ * Ultra fast IPC library written in C++
+ * Copyright (C) 2017 Michael Fabian Dirks
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
+*/
+
+#pragma once
+#include <cstdint>
+
+// Flags
+#cmakedefine DATAPATH_SHARED_LIBRARY
+
+// Interface
+#if !defined(DATAPATH_INTERFACE) && defined(DATAPATH_SHARED_LIBRARY)
+  #if defined(_MSC_VER)
+    #define DATAPATH_INTERFACE __declspec(dllimport)
+  #else
+    #define DATAPATH_INTERFACE __attribute__((dllimport))
+  #endif
+#endif
+#if !defined(DATAPATH_INTERFACE)
+  #define DATAPATH_INTERFACE 
+#endif
+
+// Version
+#define DATAPATH_VERSION_MAJOR		std::uint8_least8_t(@GEN_VERSION_MAJOR@)
+#define DATAPATH_VERSION_MINOR		std::uint8_least8_t(@GEN_VERSION_MINOR@)
+#define DATAPATH_VERSION_PATCH		std::uint8_least8_t(@GEN_VERSION_PATCH@)
+#define DATAPATH_VERSION_TWEAK		std::uint8_least8_t(@GEN_VERSION_TWEAK@)
+#define DATAPATH_VERSION_SUFFIX     "@GEN_VERSION_SUFFIX@"
+#define DATAPATH_VERSION_COMMIT		"@GEN_VERSION_COMMIT@"
+#define DATAPATH_VERSION_STRING		"@GEN_VERSION_MAJOR@.@GEN_VERSION_MINOR@.@GEN_VERSION_PATCH@.@GEN_VERSION_TWEAK@@GEN_VERSION_SUFFIX@@GEN_VERSION_COMMIT@"
+#define DATAPATH_VERSION			(std::uint8_least32_t(DATAPATH_VERSION_MAJOR) << 24) | (std::uint8_least32_t(DATAPATH_VERSION_MINOR) << 16) | (std::uint8_least32_t(DATAPATH_VERSION_PATCH) << 8) | (std::uint8_least32_t(DATAPATH_VERSION_TWEAK))
+
+// Version Masks
+//   Detect compatibility changes (1.0 -> 2.0)
+#define DATAPATH_VERSION_MASK_REALEASE	0xFF000000
+//   Detect release changes that may have added features (1.0 -> 1.1)
+#define DATAPATH_VERSION_MASK_FEATURES	0xFFFF0000
+//   Detect release changes that may have fixed features (1.0.0 -> 1.0.1)
+#define DATAPATH_VERSION_MASK_FIXES		0xFFFFFF00

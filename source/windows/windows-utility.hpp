@@ -28,6 +28,8 @@ extern "C" {
 namespace datapath {
 	namespace windows {
 		namespace utility {
+			typedef uint64_t packet_size_t;
+
 			static inline bool make_pipe_path(std::string& string)
 			{
 				// Convert path to WinAPI compatible string.
@@ -54,6 +56,18 @@ namespace datapath {
 														   _Inout_ LPOVERLAPPED lpOverlapped)
 			{
 				SetEvent(lpOverlapped->hEvent);
+			}
+
+			static void shared_ptr_handle_deleter(HANDLE v)
+			{
+				CloseHandle(v);
+			}
+
+			inline void build_packet(const std::vector<char>& source, std::vector<char>& target)
+			{
+				target.resize(sizeof(packet_size_t) + source.size());
+				memcpy(target.data() + sizeof(packet_size_t), source.data(), source.size());
+				reinterpret_cast<packet_size_t&>(*target.data()) = source.size();
 			}
 
 		} // namespace utility

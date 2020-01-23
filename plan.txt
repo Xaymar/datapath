@@ -1,0 +1,102 @@
+# Implementations
+## Windows 
+Client/Server Socket:
+- Constant reads on a thread?
+  - Solves the needs to queue up reads.
+  - Adds slight overhead and complexity.
+  - Doesn't work when there is no callback for reading.
+  - Not really the most optimal solution
+- Can writes be happening in parallel?
+  - In that case clients would benefit from IOCP with no limit.
+  - Otherwise go with a queue approach (further reduces delay)
+- Allow queueing reads? (can't have more than one read at at time)
+- Allow multiple parallel writes?
+- Read & Write async?
+
+Client Socket:
+- IOCP with <Hardware Concurrency> Threads, or limit to 2?
+  - Hardware Concurrency is only useful when more than one write is happening (but that may not work anyway, needs testing
+- Async connect or sync connect?
+  - Former is modern and expected.
+
+Server & Socket:
+- IOCP with <Hardware Concurrency> Threads, shared with Sockets
+- Connect on Server
+  - Without callback, defaults to instantly disconnect clients.
+  - Callback overrides that behavior.
+- Should socket status be in Socket or Server? Or both?
+  - If in server or both, some sort of callback to the server has to be done.
+  - If only in socket, server still needs to track the backlog of sockets. 
+- Socket calls back into server on disconnect to update status?
+
+# Structures
+```
+Task {
+	Events {
+		completed(bytes, void* data)
+	}
+
+	static Task* create();
+}
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Basics:
+- Server-Client-Model, One to Many connection (one Server may have any number of Clients)
+- Everything is asynchronous, nothing should be synchronous to reduce CPU locks.
+- Multiplatform (Linux, Mac, Windows, Android?, iOS?)
+- Only handles data, there is no code for RPC.
+
+Reading and Writing:
+- These will return an object that is an asynchronous request, which may complete immediately or in the near future.
+- Main code will only keep a soft reference, and the user will be holding the hard reference.
+- Losing the hard reference means ignoring this request and simply using the next one, if there is one. If not, then different behavior is invoked depending on the task:
+	- If a read succeeded but the hard reference to the actual task was lost, store it temporarily for the next read call.
+	- If a write was being calculated, but hard reference is lost, we abort right there and continue with the next one.
+- Windows: Writing to the socket does not require any synchronization, reading however does due to the varying packet sizes and the need for a header.
+
+Server:
+- Can accept new connections (callback with bool return value?)
+- Can not connect by itself, can only accept connections.
+- Can't read or write data without a connection.
+- Doesn't care who or what is connected. 
+
+Client/Handler:
+- Can disconnect.
+- Can read and write data.
+- Can't reconnect.
+
+Client:
+- Can connect.
+
+Task Model:
+- read, write and accept all return "tasks".
+- Tasks can be cancelled, waited on and the result can be used later.
+- Read, Write use IOTasks.
+- Accept uses AcceptTask.
+- Due to the asynchronous model, no data is kept around on the socket or server if possible. All associated data with the task is lost on dereferencing it.
+- THIS WONT WORK if the task is killed while the OS is using it - it will cause segfaults. Need another solution!
+
+IOTask (Windows)
+- OVERLAPPED 
+- std::vector<char> data (buffer containing read/write data)
+- completed() returns status (Success, Unknown or Failure).
+- data() returns the data std::vector.
+- wait() for waiting endlessly.
+- wait_for() for waiting for a specific amount of time.
+- wait_until() for waiting until a specific moment in time.

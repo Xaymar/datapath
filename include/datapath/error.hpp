@@ -18,9 +18,37 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #pragma once
 #include <cinttypes>
-#include "bitmask.hpp"
 
 namespace datapath {
-	enum class permissions : int8_t { None, User, Group, World, Reserved };
-	ENABLE_BITMASK_OPERATORS(datapath::permissions);
-} // namespace datapath
+	enum class error : int32_t {
+		// Unknown error.
+		Unknown = -1,
+
+		// Operation was successful.
+		Success,
+
+		// Operation failed with one or more recoverable errors.
+		Failure,
+
+		// Operation failed with one or more unrecoverable errors. The object is now in an undetermined state.
+		CriticalFailure,
+
+		// Operation timed out.
+		TimedOut,
+
+		// Operation is not supported.
+		NotSupported,
+
+		// Socket Closed
+		SocketClosed,
+
+		// The given path is invalid.
+		InvalidPath,
+
+		// The header sent by the remote was malformed or corrupted.
+		BadHeader,
+
+		// The size included in the header is too big or invalid.
+		BadSize,
+	};
+}

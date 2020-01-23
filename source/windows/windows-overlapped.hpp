@@ -17,9 +17,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 #pragma once
-#include <cinttypes>
+#include <cstdint>
+#include <functional>
+#include <memory>
 #include <vector>
-#include "waitable.hpp"
+
+#include "datapath.hpp"
 
 extern "C" {
 #include <windows.h>
@@ -27,11 +30,13 @@ extern "C" {
 
 namespace datapath {
 	namespace windows {
-		class overlapped : public datapath::waitable {
-			std::vector<char> buffer;
-			OVERLAPPED*       overlapped_ptr;
-			HANDLE            handle;
-			void*             data;
+		class overlapped {
+			std::vector<char> _buffer;
+			OVERLAPPED*       _overlapped;
+			HANDLE            _handle;
+
+			std::shared_ptr<void>                           _data;
+			std::function<void(overlapped&, size_t, void*)> _callback;
 
 			public:
 			overlapped();
@@ -40,10 +45,13 @@ namespace datapath {
 			OVERLAPPED* get_overlapped();
 
 			HANDLE get_handle();
-			void   set_handle(HANDLE handle);
+			void   set_handle(HANDLE _handle);
 
-			void* get_data();
-			void  set_data(void* data);
+			std::shared_ptr<void> get_data();
+			void                  set_data(std::shared_ptr<void> _data);
+
+			void set_callback(std::function<void(overlapped&, size_t, void*)> cb);
+			void callback(size_t bytes, void* ptr);
 
 			void cancel();
 
@@ -51,8 +59,13 @@ namespace datapath {
 
 			void reset();
 
-			public /*virtual override*/:
-			virtual void* get_waitable() override;
+			::datapath::error status();
+
+			public:
+			static overlapped* from_overlapped(OVERLAPPED* ptr)
+			{
+				return *reinterpret_cast<overlapped**>(reinterpret_cast<int8_t*>(ptr) + sizeof(OVERLAPPED));
+			}
 		};
 	} // namespace windows
 } // namespace datapath

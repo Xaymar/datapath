@@ -16,17 +16,25 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "datapath.hpp"
-#include "windows/server.hpp"
-#include "windows/socket.hpp"
+#pragma once
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <vector>
 
-datapath::error datapath::connect(std::shared_ptr<datapath::isocket>& socket, std::string path)
-{
-	return datapath::windows::socket::connect(socket, path);
-}
+#include "datapath/config.hpp"
+#include "datapath/error.hpp"
 
-datapath::error datapath::host(std::shared_ptr<datapath::iserver>& server, std::string path,
-							   datapath::permissions permissions, size_t max_clients)
-{
-	return datapath::windows::server::host(server, path, permissions, max_clients);
-}
+namespace datapath {
+	constexpr std::size_t maximum_packet_size = 1048576;
+
+	class server;
+	class socket;
+
+	typedef std::vector<std::uint8_t> io_data_t;
+	typedef std::shared_ptr<void>     io_callback_data_t;
+
+	typedef std::function<void(std::shared_ptr<::datapath::socket>, ::datapath::error, const ::datapath::io_data_t&,
+							   ::datapath::io_callback_data_t)>
+		io_callback_t;
+} // namespace datapath

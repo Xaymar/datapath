@@ -21,6 +21,8 @@
 #include <functional>
 #include <list>
 
+#include "datapath.hpp"
+
 namespace datapath {
 	template<typename... _args>
 	class event {
@@ -53,6 +55,7 @@ namespace datapath {
 		event<_args...>& operator=(event<_args...>&& rhs)
 		{
 			std::swap(_listeners, rhs._listeners);
+			return *this;
 		};
 
 		public /* Status */:
