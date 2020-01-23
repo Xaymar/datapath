@@ -26,63 +26,40 @@ namespace datapath {
 	class event {
 		std::list<std::function<void(_args...)>> _listeners;
 
-		std::function<void()> _listen_cb;
-		std::function<void()> _silence_cb;
+		public:
+		std::function<void(event<_args...>& ptr, std::function<void(_args...)>& fn)> on_add;
+		std::function<void(event<_args...>& ptr, std::function<void(_args...)>& fn)> on_remove;
 
-		public /* functions */:
+		public:
+		event() : on_add(), on_remove()
+		{
+			_listeners.clear();
+		};
 
-		// Destructor
-		inline ~event()
+		~event()
 		{
 			this->clear();
 		}
 
-		// Add new listener.
-		inline void add(std::function<void(_args...)> listener)
-		{
-			if (_listeners.size() == 0) {
-				if (_listen_cb) {
-					_listen_cb();
-				}
-			}
-			_listeners.push_back(listener);
-		}
+		public /* Copy Constructor/Assignment */:
+		event(const event<_args...>&) = delete;
+		event<_args...>& operator=(const event<_args...>&) = delete;
 
-		// Remove existing listener.
-		inline void remove(std::function<void(_args...)> listener)
+		public /* Mode Constructor/Assignment */:
+		event(event<_args...>&& rhs)
 		{
-			_listeners.remove(listener);
-			if (_listeners.size() == 0) {
-				if (_silence_cb) {
-					silence_cb();
-				}
-			}
+			std::swap(_listeners, rhs._listeners);
 		}
+		event<_args...>& operator=(event<_args...>&& rhs)
+		{
+			std::swap(_listeners, rhs._listeners);
+		};
 
+		public /* Status */:
 		// Check if empty / no listeners.
 		inline bool empty()
 		{
 			return _listeners.empty();
-		}
-
-		// Remove all listeners.
-		inline void clear()
-		{
-			_listeners.clear();
-			if (_silence_cb) {
-				_silence_cb();
-			}
-		}
-
-		public /* operators */:
-		// Call Listeners with arguments.
-		/// Not valid without the extra template.
-		template<typename... _largs>
-		inline void operator()(_args... args)
-		{
-			for (auto& l : _listeners) {
-				l(args...);
-			}
 		}
 
 		// Convert to bool (true if not empty, false if empty).
@@ -91,7 +68,19 @@ namespace datapath {
 			return !this->empty();
 		}
 
+		inline size_t count()
+		{
+			return _listeners.size();
+		}
+
+		public /* Listeners */:
 		// Add new listener.
+		inline void add(std::function<void(_args...)> listener)
+		{
+			if (on_add)
+				on_add(*this, listener);
+			_listeners.push_back(listener);
+		}
 		inline event<_args...>& operator+=(std::function<void(_args...)> listener)
 		{
 			this->add(listener);
@@ -99,21 +88,33 @@ namespace datapath {
 		}
 
 		// Remove existing listener.
+		inline void remove(std::function<void(_args...)> listener)
+		{
+			_listeners.remove(listener);
+			if (on_remove)
+				on_remove(*this, listener);
+		}
 		inline event<_args...>& operator-=(std::function<void(_args...)> listener)
 		{
 			this->remove(listener);
 			return *this;
 		}
 
-		public /* events */:
-		void set_listen_callback(std::function<void()> cb)
+		// Remove all listeners.
+		inline void clear()
 		{
-			this->_listen_cb = cb;
+			_listeners.clear();
 		}
 
-		void set_silence_callback(std::function<void()> cb)
+		public /* Calling */:
+		// Call Listeners with arguments.
+		template<typename... _largs>
+		inline void operator()(_args... args)
 		{
-			this->_silence_cb = cb;
+			/// Not valid without the extra template.
+			for (auto& l : _listeners) {
+				l(args...);
+			}
 		}
 	};
 }; // namespace datapath
