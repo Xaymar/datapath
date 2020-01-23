@@ -33,7 +33,7 @@ namespace datapath {
 		 * @param std::shared_ptr<datapath::isocket> Socket.
 		 * @return void
 		 */
-		datapath::event<bool&, std::shared_ptr<datapath::isocket>> _on_accept;
+		datapath::event<bool&, std::shared_ptr<datapath::isocket>> on_accept;
 
 		public:
 		virtual datapath::error close() = 0;

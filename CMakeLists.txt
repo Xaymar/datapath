@@ -52,7 +52,7 @@ endif()
 
 # Define Project
 project(
-	DataPath
+	datapath
 	VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.${VERSION_TWEAK}
 )
 set(PROJECT_FULL_NAME "DataPath IPC Library")
@@ -279,8 +279,12 @@ endif()
 
 # Includes
 target_include_directories(${PROJECT_NAME}
-	PRIVATE "source"
-	PUBLIC "include"
+	INTERFACE
+		"${PROJECT_SOURCE_DIR}/include"
+	PUBLIC
+		"${PROJECT_SOURCE_DIR}/include"
+	PRIVATE
+		"${PROJECT_SOURCE_DIR}/source"
 )
 
 # Defines

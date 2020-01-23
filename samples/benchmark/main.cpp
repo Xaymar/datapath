@@ -25,7 +25,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <string>
 #include <thread>
 #include <vector>
-#include "datapath.hpp"
+#include <datapath.hpp>
 #include "measurer.hpp"
 
 static auto log_time = std::chrono::high_resolution_clock::now();

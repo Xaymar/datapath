@@ -24,9 +24,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 namespace datapath {
 	class isocket {
 		public /*events*/:
-		datapath::event<const std::vector<char>&> _on_message;
+		datapath::event<const std::vector<char>&> on_message;
 
-		datapath::event<> _on_close;
+		datapath::event<> on_close;
 
 		public:
 		virtual bool good() = 0;
