@@ -14,15 +14,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-################################################################################
-# CMake Bootstrap
-################################################################################
-# CMake Setup
-cmake_minimum_required(VERSION 3.1.0)
+#================================================================================#
+# Define Project
+#================================================================================#
+cmake_minimum_required(VERSION 3.15.0)
 
-################################################################################
-# Project Bootstrap
-################################################################################
 # Automatic Versioning
 set(VERSION_MAJOR 0)
 set(VERSION_MINOR 1)
@@ -56,25 +52,31 @@ endif()
 
 # Define Project
 project(
-	datapath
+	DataPath
 	VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.${VERSION_TWEAK}
 )
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/modules/")
+set(PROJECT_FULL_NAME "DataPath IPC Library")
+set(PROJECT_DESCRIPTION "High Performance Synchronous and Asynchronous IPC Library")
+set(PROJECT_AUTHORS "Michael Fabian 'Xaymar' Dirks <info@xaymar.com>")
+set(PROJECT_COPYRIGHT_YEARS "2018 - 2020")
 
-# Check if we are compiling standalone
-set(IsStandalone false)
-if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
-	set(IsStandalone true)
-endif()
+#================================================================================#
+# CMake Tools & Modules
+#================================================================================#
 
-# Modules
+# CMake Modules
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/clang")
+
 include("util")
+include("Clang")
 
 # Detect Build Type
-if(IsStandalone)
-	set(PropertyPrefix "")
-else()
+if(NOT "${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
 	set(PropertyPrefix "${PROJECT_NAME}_")
+else()
+	set(PropertyPrefix "")
 endif()
 
 # Detect Architecture
@@ -85,27 +87,24 @@ else()
 	set(ARCH "x64")
 endif()
 
+#================================================================================#
+# Options
+#================================================================================#
+# Static or Dynamic?
+option(${PropertyPrefix}MAKE_STATIC "Make Static Library" ON)
+option(${PropertyPrefix}MAKE_DYNAMIC "Make Dynamic Library" OFF)
+option(${PropertyPrefix}MAKE_MODULE "Make Module Library" OFF)
+
+#================================================================================#
+# Sources
+option(${PropertyPrefix}BUILD_SAMPLES "Build Samples" ON)
+
 # Configure Version Header
 configure_file(
 	"${PROJECT_SOURCE_DIR}/cmake/version.hpp.in"
 	"${PROJECT_BINARY_DIR}/include/version.hpp"
 )
 
-################################################################################
-# Options
-################################################################################
-# Static or Dynamic?
-option(${PropertyPrefix}MAKE_STATIC "Make Static Library" ON)
-option(${PropertyPrefix}MAKE_DYNAMIC "Make Dynamic Library" OFF)
-option(${PropertyPrefix}MAKE_MODULE "Make Module Library" OFF)
-
-# Tests & Samples
-option(${PropertyPrefix}BUILD_TESTS "Build Tests" ON)
-option(${PropertyPrefix}BUILD_SAMPLES "Build Samples" ON)
-
-################################################################################
-# Source
-################################################################################
 # Public (exported with module)
 set(PROJECT_PUBLIC
 	"include/bitmask.hpp"
@@ -231,9 +230,9 @@ source_group(TREE "${PROJECT_SOURCE_DIR}/source" PREFIX "Source" FILES ${PROJECT
 source_group(TREE "${PROJECT_SOURCE_DIR}/include" PREFIX "Include" FILES ${PROJECT_PUBLIC})
 source_group(TREE "${PROJECT_BINARY_DIR}" PREFIX "Generated" FILES ${PROJECT_PUBLIC_GENERATED})
 
-################################################################################
+#================================================================================#
 # Building
-################################################################################
+#================================================================================#
 # Library definition
 if(${PropertyPrefix}MAKE_STATIC)
 	add_library(${PROJECT_NAME} STATIC
@@ -304,11 +303,4 @@ endif()
 ################################################################################
 if(${PropertyPrefix}BUILD_SAMPLES)
 	add_subdirectory(${PROJECT_SOURCE_DIR}/samples)
-endif()
-
-################################################################################
-# Tests
-################################################################################
-if(${PropertyPrefix}BUILD_TESTS)
-	add_subdirectory(${PROJECT_SOURCE_DIR}/tests)
 endif()
