@@ -60,6 +60,13 @@ namespace datapath {
 
 			void _watcher();
 
+			public:
+			server();
+			virtual ~server();
+
+			server(const server&) = delete;
+			server& operator=(const server&) = delete;
+
 			public /*virtual override*/:
 			virtual datapath::error close() override;
 

@@ -232,6 +232,10 @@ void datapath::windows::server::_watcher()
 	}
 }
 
+datapath::windows::server::server() {}
+
+datapath::windows::server::~server() {}
+
 /*datapath::error datapath::windows::server::accept(std::shared_ptr<datapath::isocket>& socket)
 {
 	std::unique_lock<std::mutex> ul(this->lock);

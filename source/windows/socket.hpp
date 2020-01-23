@@ -54,6 +54,10 @@ namespace datapath {
 
 			virtual ~socket();
 
+			public:
+			socket(const socket&) = delete;
+			socket& operator=(const socket&) = delete;
+
 			public /*virtual override*/:
 			virtual bool good() override;
 
