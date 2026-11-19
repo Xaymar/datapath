@@ -38,8 +38,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //                                               local mode gives the server the cores after the client's
 //   --stress N                                  local mode: load all cores with N busy threads in a
 //                                               separate process (0 = one per logical core)
+//   --stress-nice N                             Linux: run the stress process at nice N (default 0)
 //   --mmcss / --no-mmcss                        Windows: register I/O threads with MMCSS (default on)
-//   --priority 0..3                             Windows: I/O thread priority (normal .. time critical, default 2)
+//   --priority 0..3                             I/O thread priority (normal .. time critical, default 2);
+//                                               Linux: nice -0/-4/-12/-19 where RLIMIT_NICE allows
 //   --pipe-buffer 0                             Windows kernel pipe buffer (0 = same as --buffer)
 //
 // Latency is the full round trip (send -> echo -> receive), measured with
@@ -52,6 +54,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
+#include <cerrno>
 #include <cstring>
 #include <mutex>
 #include <string>
@@ -66,6 +69,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #else
 #include <spawn.h>
 #include <sys/prctl.h>
+#include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
 extern char** environ;
@@ -112,7 +116,8 @@ namespace {
 			c.name = argv[2];
 			i      = 3;
 		} else if (c.mode == "stress") {
-			c.stress = argc > 2 ? int(std::strtol(argv[2], nullptr, 10)) : 0;
+			c.stress      = argc > 2 ? int(std::strtol(argv[2], nullptr, 10)) : 0;
+			c.stress_nice = argc > 3 ? int(std::strtol(argv[3], nullptr, 10)) : 0;
 			return true;
 		} else if (c.mode != "local") {
 			return false;
@@ -155,6 +160,8 @@ namespace {
 				c.ideal_core  = v == "off" ? -2 : v == "auto" ? -1 : int(std::strtol(v.c_str(), nullptr, 10));
 			} else if (a == "--stress") {
 				c.stress = int(std::strtol(next(), nullptr, 10));
+			} else if (a == "--stress-nice") {
+				c.stress_nice = int(std::strtol(next(), nullptr, 10));
 			} else if (a == "--runs") {
 				c.runs = std::max<size_t>(1, size_t(std::strtoull(next(), nullptr, 10)));
 			} else if (a == "--mmcss") {
@@ -364,7 +371,10 @@ namespace {
 
 		std::printf("IPC benchmark: transport=%s platform=%s spin=%ldus io_threads=%s clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s mmcss=%s priority=%d stress=%s ideal_core=%s load=%s\n",
 					tp->name(), platform_name(), c.spin, c.threads ? std::to_string(c.threads).c_str() : "auto", c.clients, c.buffer, c.pipe_buffer, c.yield ? "on" : "off", c.alertable ? "on" : "off", c.mmcss ? "on" : "off", c.priority,
-					c.stress < 0 ? "off" : (c.stress == 0 ? "all cores" : std::to_string(c.stress).c_str()),
+					c.stress < 0 ? "off"
+								 : ((c.stress == 0 ? std::string("all cores") : std::to_string(c.stress)) +
+									(c.stress_nice ? " nice " + std::to_string(c.stress_nice) : std::string()))
+									   .c_str(),
 					c.ideal_core == -2 ? "off" : c.ideal_core == -1 ? "auto" : std::to_string(c.ideal_core).c_str(), c.load ? "1MiB stream" : "off");
 		std::printf("Full round-trip latency in microseconds.\n");
 		if (c.runs > 1)
@@ -484,6 +494,9 @@ namespace {
 		prctl(PR_SET_PDEATHSIG, SIGKILL);
 		if (getppid() == 1)
 			return 0;
+		// Threads created below inherit the nice value.
+		if (c.stress_nice != 0 && setpriority(PRIO_PROCESS, 0, c.stress_nice) != 0)
+			std::fprintf(stderr, "stress: setpriority(%d) failed: %s\n", c.stress_nice, std::strerror(errno));
 #endif
 		unsigned n = c.stress > 0 ? unsigned(c.stress) : std::max(1u, std::thread::hardware_concurrency());
 		std::vector<std::thread> ts;
@@ -623,7 +636,8 @@ namespace {
 
 		std::unique_ptr<child_process> stress;
 		if (c.stress >= 0) {
-			stress = std::make_unique<child_process>(std::vector<std::string>{"stress", std::to_string(c.stress)});
+			stress = std::make_unique<child_process>(
+				std::vector<std::string>{"stress", std::to_string(c.stress), std::to_string(c.stress_nice)});
 			if (!stress->ok) {
 				std::fprintf(stderr, "failed to start stress process\n");
 				return 1;
@@ -647,7 +661,7 @@ int main(int argc, char** argv)
 	if (!parse(argc, argv, c)) {
 		std::fprintf(stderr,
 					 "usage: %s local|server <name>|client <name> [--sizes a,b,..] [--count n] [--clients n]\n"
-					 "       [--spin us] [--threads n|auto] [--buffer bytes] [--pipe-buffer bytes] [--yield|--no-yield] [--alertable] [--runs n] [--stress n] [--ideal-core off|auto|n] [--mmcss|--no-mmcss] [--priority 0..3] [--load]\n",
+					 "       [--spin us] [--threads n|auto] [--buffer bytes] [--pipe-buffer bytes] [--yield|--no-yield] [--alertable] [--runs n] [--stress n] [--stress-nice n] [--ideal-core off|auto|n] [--mmcss|--no-mmcss] [--priority 0..3] [--load]\n",
 					 argc > 0 ? argv[0] : "datapath-benchmark");
 		return 2;
 	}
