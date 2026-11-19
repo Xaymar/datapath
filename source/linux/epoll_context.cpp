@@ -12,6 +12,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <sys/eventfd.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 #include <algorithm>
 #include <cerrno>
@@ -43,7 +44,8 @@ namespace {
 		static const int steps[] = {0, -4, -12, -19};
 		if (level <= 0 || level > 3)
 			return;
-		pid_t tid = ::gettid(); // Linux: PRIO_PROCESS with a thread id affects only that thread
+		// syscall(), not gettid(): glibc < 2.30 (manylinux_2_28) has no wrapper.
+		pid_t tid = pid_t(::syscall(SYS_gettid)); // Linux: PRIO_PROCESS with a thread id affects only that thread
 		errno     = 0;
 		int base  = ::getpriority(PRIO_PROCESS, id_t(tid));
 		if (base == -1 && errno != 0)

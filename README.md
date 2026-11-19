@@ -146,6 +146,18 @@ target_link_libraries(my-app PRIVATE datapath::datapath)
 ```
 Requires CMake 3.16+ and a C++17 compiler (MSVC 2019+, GCC 9+, Clang 10+). To build the library, tests and benchmarks on their own, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
+### Python
+```bash
+pip install com.xaymar.datapath
+```
+```python
+import datapath
+with datapath.connect("my-service") as sock:
+    sock.send(b"hello")
+    print(sock.recv(timeout=1.0))
+```
+Wheels cover CPython 3.10+ (including free-threaded builds) on Windows and Linux. See [python/README.md](python/README.md) for the API, the two ways to receive and their latency.
+
 ## Known issues (work in progress)
 * No server-side handshake timeout: a local client that connects and never sends its hello holds a connection slot.
 
