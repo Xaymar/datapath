@@ -16,6 +16,8 @@ ctest --test-dir build -C Release --output-on-failure
 
 Options: `DATAPATH_SHARED` (shared library, default `OFF`), `DATAPATH_BUILD_TESTS` and `DATAPATH_BUILD_SAMPLES` (default `ON` for top-level builds). The `datapath::datapath` target can be used through `add_subdirectory`.
 
+The shared library exports only what public headers mark with `DATAPATH_API` (from the generated `datapath/export.h`); everything else stays hidden. Mark any new public function or class with it. Tests that reach into internals (`source/`) pass `INTERNAL` to `datapath_add_test` so they still link in a shared build.
+
 Cross-compiling for Windows from Linux with mingw-w64 (tests run through Wine if it's installed):
 ```bash
 cmake -S . -B build-mingw -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/mingw-w64.cmake

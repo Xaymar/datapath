@@ -8,6 +8,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <datapath/export.h>
 #include <functional>
 #include <memory>
 #include "error.hpp"
@@ -28,7 +29,13 @@ namespace datapath {
 	using close_handler = std::function<void(datapath::error reason)>;
 
 	// One end of a connection. Destroying the last reference closes the connection.
-	class socket {
+#ifdef _MSC_VER
+// C4251 (std::shared_ptr member without dll-interface) is harmless: a C++ API
+// already requires the library and program to share one C++ runtime.
+#pragma warning(push)
+#pragma warning(disable : 4251)
+#endif
+	class DATAPATH_API socket {
 		std::shared_ptr<detail::connection> _impl;
 
 		public:
@@ -53,4 +60,7 @@ namespace datapath {
 		// Negotiated message size limit of this connection.
 		uint64_t max_message_size() const;
 	};
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 } // namespace datapath

@@ -38,8 +38,19 @@ configure_file(
 	"${PROJECT_BINARY_DIR}/generated/include/datapath/version.hpp"
 	@ONLY
 )
+if(DATAPATH_SHARED)
+	set(DATAPATH_BUILT_STATIC 0)
+else()
+	set(DATAPATH_BUILT_STATIC 1)
+endif()
+configure_file(
+	"${PROJECT_SOURCE_DIR}/cmake/export.h.in"
+	"${PROJECT_BINARY_DIR}/generated/include/datapath/export.h"
+	@ONLY
+)
 
 set(DATAPATH_PUBLIC_HEADERS
+	"${PROJECT_BINARY_DIR}/generated/include/datapath/export.h"
 	"${PROJECT_BINARY_DIR}/generated/include/datapath/version.hpp"
 	include/datapath/context.hpp
 	include/datapath/datapath.hpp
@@ -89,44 +100,63 @@ else()
 	message(FATAL_ERROR "DataPath: unsupported platform ${CMAKE_SYSTEM_NAME}")
 endif()
 
-if(DATAPATH_SHARED)
-	add_library(datapath SHARED ${DATAPATH_PUBLIC_HEADERS} ${DATAPATH_SOURCES})
+# Everything is compiled once into datapath_objects. The library is built from
+# those objects; so is datapath_internal, which the unit tests link to reach
+# internals that a shared library does not export.
+add_library(datapath_objects OBJECT ${DATAPATH_PUBLIC_HEADERS} ${DATAPATH_SOURCES})
+target_include_directories(datapath_objects
+	PUBLIC
+		"$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
+		"$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/generated/include>"
+	PRIVATE
+		"${PROJECT_SOURCE_DIR}/source"
+)
+# Only symbols marked DATAPATH_API (include/datapath/export.h) are exported.
+target_compile_definitions(datapath_objects PRIVATE DATAPATH_BUILDING)
+set_target_properties(datapath_objects PROPERTIES
+	CXX_VISIBILITY_PRESET hidden
+	VISIBILITY_INLINES_HIDDEN ON
+	POSITION_INDEPENDENT_CODE ON
+)
+
+if(MSVC)
+	target_compile_options(datapath_objects PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
 else()
-	add_library(datapath STATIC ${DATAPATH_PUBLIC_HEADERS} ${DATAPATH_SOURCES})
+	target_compile_options(datapath_objects PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+if(WIN32)
+	target_compile_definitions(datapath_objects PRIVATE
+		WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00
+	)
+	set(DATAPATH_PLATFORM_LIBS advapi32 kernel32)
+else()
+	find_package(Threads REQUIRED)
+	set(DATAPATH_PLATFORM_LIBS Threads::Threads)
+endif()
+target_link_libraries(datapath_objects PRIVATE ${DATAPATH_PLATFORM_LIBS})
+
+if(DATAPATH_SHARED)
+	add_library(datapath SHARED $<TARGET_OBJECTS:datapath_objects>)
+	target_link_libraries(datapath PRIVATE ${DATAPATH_PLATFORM_LIBS})
+else()
+	add_library(datapath STATIC $<TARGET_OBJECTS:datapath_objects>)
+	# A static library carries its dependencies to whoever links it.
+	target_link_libraries(datapath PUBLIC ${DATAPATH_PLATFORM_LIBS})
 endif()
 add_library(datapath::datapath ALIAS datapath)
+target_sources(datapath PRIVATE ${DATAPATH_PUBLIC_HEADERS})
 
 target_include_directories(datapath
 	PUBLIC
 		"$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
 		"$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/generated/include>"
 		"$<INSTALL_INTERFACE:include>"
-	PRIVATE
-		"${PROJECT_SOURCE_DIR}/source"
 )
 set_target_properties(datapath PROPERTIES
-	CXX_VISIBILITY_PRESET hidden
-	POSITION_INDEPENDENT_CODE ON
-	WINDOWS_EXPORT_ALL_SYMBOLS ON
 	VERSION ${DATAPATH_VERSION_ABI}.${DATAPATH_VERSION_PATCH}
 	SOVERSION ${DATAPATH_VERSION_ABI}
 )
-
-if(MSVC)
-	target_compile_options(datapath PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
-else()
-	target_compile_options(datapath PRIVATE -Wall -Wextra -Wpedantic)
-endif()
-
-if(WIN32)
-	target_compile_definitions(datapath PRIVATE
-		WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00
-	)
-	target_link_libraries(datapath PRIVATE advapi32 kernel32)
-else()
-	find_package(Threads REQUIRED)
-	target_link_libraries(datapath PUBLIC Threads::Threads)
-endif()
 
 if(MINGW)
 	# Self-contained executables (no libstdc++/winpthread DLLs needed under Wine or on Windows).
@@ -140,7 +170,9 @@ install(TARGETS datapath EXPORT datapath-targets
 	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 install(DIRECTORY include/datapath DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(FILES "${PROJECT_BINARY_DIR}/generated/include/datapath/version.hpp"
+install(FILES
+	"${PROJECT_BINARY_DIR}/generated/include/datapath/export.h"
+	"${PROJECT_BINARY_DIR}/generated/include/datapath/version.hpp"
 	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/datapath
 )
 install(EXPORT datapath-targets NAMESPACE datapath:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/datapath)

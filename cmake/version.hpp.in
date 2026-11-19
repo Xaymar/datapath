@@ -9,6 +9,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 #pragma once
 #include <cstdint>
+#include <datapath/export.h>
 
 // ABI version: bumped on any change that breaks binary compatibility.
 #define DATAPATH_VERSION_ABI @DATAPATH_VERSION_ABI@
@@ -27,5 +28,5 @@ namespace datapath {
 	// Version of the library actually linked, which can differ from the
 	// DATAPATH_VERSION_* macros a program was compiled against. A program is
 	// compatible with the linked library when the ABI versions match.
-	version_info version() noexcept;
+	DATAPATH_API version_info version() noexcept;
 } // namespace datapath
