@@ -1,0 +1,5 @@
+/target
+# Filled by package.sh before `cargo package` / `cargo publish`.
+/datapath-sys/vendor
+/datapath-sys/LICENSE
+/datapath/LICENSE

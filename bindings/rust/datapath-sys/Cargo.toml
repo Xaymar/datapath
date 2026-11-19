@@ -1,0 +1,24 @@
+[package]
+name = "com-xaymar-datapath-sys"
+description = "Raw FFI bindings to the DataPath C API (low latency local IPC)"
+readme = "README.md"
+links = "datapath"
+build = "build.rs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories = ["external-ffi-bindings"]
+# `vendor/` is filled by package.sh before `cargo package`/`cargo publish`;
+# listing it here keeps it in the package even though git ignores it.
+include = ["/src", "/build.rs", "/README.md", "/LICENSE", "/vendor"]
+
+[lib]
+name = "datapath_sys"
+
+[build-dependencies]
+cmake = "0.1.50"
