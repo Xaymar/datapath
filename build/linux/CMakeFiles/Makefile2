@@ -81,6 +81,7 @@ clean: tests/clean
 
 # Recursive "all" directory target.
 tests/all: tests/CMakeFiles/test_api.dir/all
+tests/all: tests/CMakeFiles/test_framing.dir/all
 .PHONY : tests/all
 
 # Recursive "preinstall" directory target.
@@ -89,6 +90,7 @@ tests/preinstall:
 
 # Recursive "clean" directory target.
 tests/clean: tests/CMakeFiles/test_api.dir/clean
+tests/clean: tests/CMakeFiles/test_framing.dir/clean
 .PHONY : tests/clean
 
 #=============================================================================
@@ -142,6 +144,32 @@ test_api: tests/CMakeFiles/test_api.dir/rule
 tests/CMakeFiles/test_api.dir/clean:
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_api.dir/build.make tests/CMakeFiles/test_api.dir/clean
 .PHONY : tests/CMakeFiles/test_api.dir/clean
+
+#=============================================================================
+# Target rules for target tests/CMakeFiles/test_framing.dir
+
+# All Build rule for target.
+tests/CMakeFiles/test_framing.dir/all: CMakeFiles/datapath.dir/all
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_framing.dir/build.make tests/CMakeFiles/test_framing.dir/depend
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_framing.dir/build.make tests/CMakeFiles/test_framing.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=6,7 "Built target test_framing"
+.PHONY : tests/CMakeFiles/test_framing.dir/all
+
+# Build rule for subdir invocation for target.
+tests/CMakeFiles/test_framing.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 5
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_framing.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 0
+.PHONY : tests/CMakeFiles/test_framing.dir/rule
+
+# Convenience name for target.
+test_framing: tests/CMakeFiles/test_framing.dir/rule
+.PHONY : test_framing
+
+# clean rule for target.
+tests/CMakeFiles/test_framing.dir/clean:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_framing.dir/build.make tests/CMakeFiles/test_framing.dir/clean
+.PHONY : tests/CMakeFiles/test_framing.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.

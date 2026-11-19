@@ -12,3 +12,4 @@ function(datapath_add_test NAME)
 endfunction()
 
 datapath_add_test(test_api)
+datapath_add_test(test_framing)

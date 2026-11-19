@@ -1,4 +1,13 @@
-test_api.error_to_string 1 0.00327287
-test_api.options_defaults 1 0.0027907
-test_api.default_context_is_shared 1 0.00293173
+test_api.error_to_string 3 0.000994681
+test_api.options_defaults 3 0.00072676
+test_api.default_context_is_shared 3 0.000701468
+test_framing.parser_every_split_offset 1 0.00870302
+test_framing.parser_many_small_per_read 1 0.00359241
+test_framing.parser_large_frame_beyond_buffer 1 0.0199368
+test_framing.parser_rejects_oversize_header 1 0.00218759
+test_framing.hello_roundtrip 1 0.00208576
+test_framing.hello_bad_magic 1 0.00206212
+test_framing.hello_bad_version 1 0.00197383
+test_framing.spin_zero_budget_blocks_immediately 1 0.00206377
+test_framing.spin_work_defers_block 1 0.00391641
 ---

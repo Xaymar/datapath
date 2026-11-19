@@ -197,6 +197,19 @@ test_api/fast:
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_api.dir/build.make tests/CMakeFiles/test_api.dir/build
 .PHONY : test_api/fast
 
+#=============================================================================
+# Target rules for targets named test_framing
+
+# Build rule for target.
+test_framing: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_framing
+.PHONY : test_framing
+
+# fast build rule for target.
+test_framing/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_framing.dir/build.make tests/CMakeFiles/test_framing.dir/build
+.PHONY : test_framing/fast
+
 source/common/api.o: source/common/api.cpp.o
 .PHONY : source/common/api.o
 
@@ -260,6 +273,7 @@ help:
 	@echo "... test"
 	@echo "... datapath"
 	@echo "... test_api"
+	@echo "... test_framing"
 	@echo "... source/common/api.o"
 	@echo "... source/common/api.i"
 	@echo "... source/common/api.s"

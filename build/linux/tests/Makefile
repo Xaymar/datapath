@@ -185,6 +185,20 @@ test_api/fast:
 	cd /home/user/datapath/build/linux && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_api.dir/build.make tests/CMakeFiles/test_api.dir/build
 .PHONY : test_api/fast
 
+# Convenience name for target.
+tests/CMakeFiles/test_framing.dir/rule:
+	cd /home/user/datapath/build/linux && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_framing.dir/rule
+.PHONY : tests/CMakeFiles/test_framing.dir/rule
+
+# Convenience name for target.
+test_framing: tests/CMakeFiles/test_framing.dir/rule
+.PHONY : test_framing
+
+# fast build rule for target.
+test_framing/fast:
+	cd /home/user/datapath/build/linux && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_framing.dir/build.make tests/CMakeFiles/test_framing.dir/build
+.PHONY : test_framing/fast
+
 test_api.o: test_api.cpp.o
 .PHONY : test_api.o
 
@@ -209,6 +223,30 @@ test_api.cpp.s:
 	cd /home/user/datapath/build/linux && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_api.dir/build.make tests/CMakeFiles/test_api.dir/test_api.cpp.s
 .PHONY : test_api.cpp.s
 
+test_framing.o: test_framing.cpp.o
+.PHONY : test_framing.o
+
+# target to build an object file
+test_framing.cpp.o:
+	cd /home/user/datapath/build/linux && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_framing.dir/build.make tests/CMakeFiles/test_framing.dir/test_framing.cpp.o
+.PHONY : test_framing.cpp.o
+
+test_framing.i: test_framing.cpp.i
+.PHONY : test_framing.i
+
+# target to preprocess a source file
+test_framing.cpp.i:
+	cd /home/user/datapath/build/linux && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_framing.dir/build.make tests/CMakeFiles/test_framing.dir/test_framing.cpp.i
+.PHONY : test_framing.cpp.i
+
+test_framing.s: test_framing.cpp.s
+.PHONY : test_framing.s
+
+# target to generate assembly for a file
+test_framing.cpp.s:
+	cd /home/user/datapath/build/linux && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_framing.dir/build.make tests/CMakeFiles/test_framing.dir/test_framing.cpp.s
+.PHONY : test_framing.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -223,9 +261,13 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... test"
 	@echo "... test_api"
+	@echo "... test_framing"
 	@echo "... test_api.o"
 	@echo "... test_api.i"
 	@echo "... test_api.s"
+	@echo "... test_framing.o"
+	@echo "... test_framing.i"
+	@echo "... test_framing.s"
 .PHONY : help
 
 

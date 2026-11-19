@@ -1,4 +1,13 @@
-test_api.error_to_string 1 5.39288
-test_api.options_defaults 1 2.44545
-test_api.default_context_is_shared 1 2.45794
+test_api.error_to_string 3 1.5104
+test_api.options_defaults 3 0.980086
+test_api.default_context_is_shared 3 1.6714
+test_framing.parser_every_split_offset 1 0.48039
+test_framing.parser_many_small_per_read 1 0.0407489
+test_framing.parser_large_frame_beyond_buffer 1 0.0564693
+test_framing.parser_rejects_oversize_header 1 0.0415619
+test_framing.hello_roundtrip 1 0.0493493
+test_framing.hello_bad_magic 1 0.0364651
+test_framing.hello_bad_version 1 0.0330202
+test_framing.spin_zero_budget_blocks_immediately 1 0.0318896
+test_framing.spin_work_defers_block 1 0.0349665
 ---
