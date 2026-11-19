@@ -55,4 +55,4 @@ When you report numbers, lead with p99.9, say which machine, OS and power plan t
 ## Pull requests
 * Keep a pull request to one change, and say in the description what you measured before and after if it touches the data path.
 * Format C++ changes with the repository's `.clang-format`.
-* By contributing you agree that your contribution is licensed under the project's license, GNU AGPL v3.0 or later.
+* By contributing you agree that your contribution is licensed under the project's license, the BSD 3-Clause License.
