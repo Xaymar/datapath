@@ -31,10 +31,11 @@ namespace datapath {
 		// Number of I/O threads.
 		size_t io_threads = 1;
 		// Windows only: register I/O threads with the Multimedia Class Scheduler
-		// Service ("Pro Audio" task, critical priority). Default on: over 5-run
-		// medians it cut 64 KiB p99.9 from ~190 to ~83 us and shortened large-message
-		// and spin = 0 tails, with no cost for small messages.
-		bool mmcss = true;
+		// Service ("Pro Audio" task, critical priority). Off by default: on a busy
+		// system MMCSS throttles the threads once they use their CPU share, which
+		// measured as a fixed ~2 ms p99.9 stall (with or without spinning). On an
+		// idle system it made no measurable difference.
+		bool mmcss = false;
 		// Windows only: I/O thread priority, applied before MMCSS and kept if MMCSS
 		// registration fails. 0 = normal, 1 = above normal, 2 = highest,
 		// 3 = time critical. Normal priority made large-message tails 2x worse.

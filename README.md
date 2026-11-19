@@ -30,15 +30,18 @@ Full round trip (send → echo → receive), ping-pong between two processes, re
 
 While another connection streams 1 MiB messages at 4–5 GiB/s, small-message round trips stay at p99.9 ≈ 2 ms with one I/O thread, and ≈ 0.25 ms with two.
 
-| Windows, desktop PC (5-run medians, MMCSS on) | p50 | p99 | p99.9 (range) |
+| Windows 10 desktop PC, idle (5-run medians) | p50 | p99 | p99.9 (range) |
 |---|---|---|---|
-| 64 B | 3.3 µs | 5.2 µs | 12.7 µs (10.7–15.5) |
-| 4 KiB | 5.9 µs | 10.0 µs | 20.2 µs (19.3–40.8) |
-| 64 KiB | 26.4 µs | 37.3 µs | 83 µs (72–88) |
-| 1 MiB | 0.55 ms | 0.87 ms | 1.14 ms |
-| 16 MiB | 8.5 ms | 9.2 ms | 9.5 ms |
+| 8 B | 3.0 µs | 4.5 µs | 7.5 µs (6.6–8.5) |
+| 64 B | 3.0 µs | 4.5 µs | 7.3 µs (7.3–9.1) |
+| 4 KiB | 6.4 µs | 10.0 µs | 18.6 µs (17.7–19.5) |
+| 64 KiB | 19.9 µs | 33.8 µs | 75 µs (56–100) |
+| 1 MiB | 0.54 ms | 0.92 ms | 1.07 ms |
+| 16 MiB | 8.4 ms | 9.3 ms | 9.7 ms |
 
-Large messages move at about 3.6 GiB/s per direction on Windows. With a 1 MiB bulk stream running at 1.7 GiB/s on another connection (two I/O threads), small-message round trips stay at p99.9 28–58 µs. The original DataPath reached 11.9 µs round-trip p99.9 on Windows 10; this version reaches 11–16 µs (5-run medians) for small messages with a 3.3 µs median. Single runs vary a lot at this resolution, so compare with `--runs 5`.
+Under load (Prime95 plus `--stress 0` on every core) the defaults hold: p50 3.3 µs and p99.9 23 µs for 8 B, 60 µs for 4 KiB and 37 µs for 64 KiB.
+
+Large messages move at about 3.6 GiB/s per direction on Windows. With a 1 MiB bulk stream running at 2.1 GiB/s on another connection (two I/O threads), small-message round trips stay at p99.9 16–27 µs. The original DataPath reached 11.9 µs round-trip p99.9 on Windows 10; this version reaches 7–8 µs for small messages with a 3.0 µs median (5-run medians). Single runs vary a lot at this resolution, so compare with `--runs 5`.
 
 ## Usage
 ```cpp
@@ -71,7 +74,7 @@ See `samples/echo/main.cpp` for a complete program.
 * **Backpressure.** `send()` never blocks. It returns `TooLarge` above the connection's message size limit (`options::max_message_size`, default 64 MiB; the smaller of both peers' values applies). It returns `WouldBlock` when more than `options::max_queued_bytes` (default 64 MiB) is waiting. A message is either queued whole or rejected. Split very large payloads yourself.
 * **Closing.** `close()` drops unsent messages and fires `on_close` once, on an I/O thread. Destroying your last `shared_ptr` to a socket or server closes it too. That waits for a handler that is currently running on another thread, and no handler of that object runs afterwards (`on_close` doesn't fire either). So it's safe to destroy what your handlers capture right after the handle.
 * **Contexts.** All sockets share one process-wide context (I/O threads) by default. Create your own with `datapath::context::create({spin, io_threads})` and pass it to `connect`/`host` for separate tuning. Destroying a context closes everything on it.
-* **Windows scheduling.** By default the I/O threads register with the Multimedia Class Scheduler (`context_options::mmcss`, "Pro Audio" task) and run at `THREAD_PRIORITY_HIGHEST` (`context_options::priority`, 0–3), which stays in effect if MMCSS registration fails. Over 5-run medians, MMCSS cut 64 KiB p99.9 from ~190 µs to ~83 µs, and with `spin = 0` it cut 4 KiB p99.9 from ~120 µs to ~79 µs. Normal priority doubled large-message tails. Small messages measured the same (11–16 µs p99.9) with every option. `yield` and `alertable` showed no gain and are off.
+* **Windows scheduling.** I/O threads run at `THREAD_PRIORITY_HIGHEST` (`context_options::priority`, 0–3). Under full CPU load, normal priority let single round trips stall for up to 12 ms; highest kept p99.9 under 100 µs. `context_options::mmcss` (registering with the Multimedia Class Scheduler) is off: on a busy system MMCSS throttles threads that use their CPU share, which measured as a fixed ~2 ms p99.9 stall, and on an idle system it made no difference. `yield` and `alertable` showed no consistent gain and are off.
 * **Buffers.** `options::receive_buffer` (256 KiB) holds incoming frames; reads adapt their size to the traffic, so a large buffer doesn't slow down small messages. `options::pipe_buffer` (1 MiB) is the Windows kernel pipe buffer.
 * **Tuning.** `context_options::spin` (default 50 µs) is how long an I/O thread busy-polls after the last event before sleeping in the kernel. Higher values cut tail latency for bursty traffic and cost CPU only while traffic flows. `0` disables spinning. On Windows the I/O threads also opt out of EcoQoS power throttling.
 * **Paths.** A bare name maps to `\\.\pipe\<name>` on Windows and to the abstract socket `datapath.<name>` on Linux. On Linux, a path starting with `/` is a filesystem socket instead, created with mode `0600`/`0660`/`0666` for `User`/`Group`/`World` and removed on close.
@@ -127,6 +130,14 @@ First Linux results (4 vCPU VM, 3-run medians, round trip):
 | libuv as shipped (no spin) | 27.0 µs | 142 µs | 29.1 µs | 46 µs |
 
 On Linux both sit on epoll and Unix sockets, so the difference comes from the defaults (spinning, scheduling) and per-message overhead. Large messages tie at about 4 GiB/s.
+
+First Windows results, both under Prime95 load (DataPath additionally under `--stress 0`), p50 / p99.9:
+
+| | 8 B | 64 B |
+|---|---|---|
+| DataPath, defaults | 3.3 / 23 µs | 3.4 / 27 µs |
+| DataPath, `--spin 0` | 17.8 / 67 µs | 18.7 / 70 µs |
+| libuv as shipped | 71.9 / 1081 µs | 74.8 / 1072 µs |
 
 ## License
 GNU Affero General Public License v3.0 or later, see `LICENSE`.
