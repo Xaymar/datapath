@@ -127,4 +127,4 @@ Requires CMake 3.16+ and a C++17 compiler (MSVC 2019+, GCC 9+, Clang 10+). To bu
 * No server-side handshake timeout: a local client that connects and never sends its hello holds a connection slot.
 
 ## License
-GNU Affero General Public License v3.0 or later, see `LICENSE`.
+BSD 3-Clause License, see `LICENSE`.
