@@ -38,7 +38,8 @@ namespace datapath::posix {
 	// A non-blocking, close-on-exec AF_UNIX stream socket that never raises
 	// SIGPIPE. -1 with errno set on failure.
 	int open_stream_socket();
-	// accept() on `listener`, with the same properties. -1 with errno set.
+	// accept() on `listener`, with the same properties. -1 with errno set;
+	// ECONNABORTED means a connection was dropped and the next one may wait.
 	int accept_stream_socket(int listener);
 	// Apply per-connection kernel buffer sizes, where the OS defaults are too
 	// small for the library's traffic (macOS: 8 KiB). No-op elsewhere.

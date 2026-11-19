@@ -41,7 +41,17 @@ int datapath::posix::open_stream_socket()
 
 int datapath::posix::accept_stream_socket(int listener)
 {
-	return prepare(::accept(listener, nullptr, nullptr));
+	int fd = ::accept(listener, nullptr, nullptr);
+	if (fd < 0)
+		return fd;
+	// setsockopt() fails with EINVAL once both directions are shut down, as on
+	// a connection whose client already closed. Report it like a connection
+	// aborted before accept(), so the caller drops it and keeps accepting
+	// (otherwise the clients queued behind it wait for the next edge).
+	fd = prepare(fd);
+	if (fd < 0)
+		errno = ECONNABORTED;
+	return fd;
 }
 
 // Unix stream sockets start with 8 KiB buffers (net.local.stream.sendspace and
