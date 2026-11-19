@@ -5,36 +5,11 @@
 
 cmake_minimum_required(VERSION 3.16)
 
-# Versioning: tweak = commits since the version tag, if available.
-set(VERSION_MAJOR 0)
-set(VERSION_MINOR 2)
-set(VERSION_PATCH 0)
-set(VERSION_TWEAK 0)
-set(PROJECT_COMMIT "N/A")
-if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/.git")
-	execute_process(
-		COMMAND git rev-parse HEAD
-		WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
-		RESULT_VARIABLE GIT_RESULT
-		OUTPUT_VARIABLE GIT_OUTPUT
-		OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET
-	)
-	if(GIT_RESULT EQUAL 0)
-		set(PROJECT_COMMIT ${GIT_OUTPUT})
-	endif()
-endif()
-
 project(datapath
-	VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.${VERSION_TWEAK}
+	VERSION 0.2.0
 	DESCRIPTION "High performance, low latency IPC library"
 	LANGUAGES CXX
 )
-
-# Optional clang tooling submodule.
-if(EXISTS "${PROJECT_SOURCE_DIR}/cmake/clang/Clang.cmake")
-	list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/clang")
-	include("Clang")
-endif()
 
 if("${CMAKE_SOURCE_DIR}" STREQUAL "${PROJECT_SOURCE_DIR}")
 	set(DATAPATH_TOPLEVEL ON)
@@ -52,11 +27,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 	set(CMAKE_BUILD_TYPE Release)
 endif()
-
-configure_file(
-	"${PROJECT_SOURCE_DIR}/cmake/version.hpp.in"
-	"${PROJECT_BINARY_DIR}/generated/version.hpp"
-)
 
 set(DATAPATH_PUBLIC_HEADERS
 	include/datapath/context.hpp
@@ -120,7 +90,6 @@ target_include_directories(datapath
 		"$<INSTALL_INTERFACE:include>"
 	PRIVATE
 		"${PROJECT_SOURCE_DIR}/source"
-		"${PROJECT_BINARY_DIR}/generated"
 )
 set_target_properties(datapath PROPERTIES
 	CXX_VISIBILITY_PRESET hidden

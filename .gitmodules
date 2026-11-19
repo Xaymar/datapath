@@ -1,3 +1,0 @@
-[submodule "cmake/clang"]
-	path = cmake/clang
-	url = https://github.com/Xaymar/cmake-clang.git
