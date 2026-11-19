@@ -67,6 +67,7 @@ namespace datapath::linux_ {
 		void platform_arm() override;
 		void platform_post_close() override;
 		void platform_write() override;
+		void after_inline_write() override;
 		void on_finished() override;
 
 		public:

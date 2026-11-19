@@ -159,12 +159,14 @@ void datapath::windows::iocp_context::run()
         return n > 0;
 	};
 	while (!quit) {
-		datapath::detail::spin_then_block(
-			_opts.spin, [&] { return !quit && pump(0); },
-			[&] {
-				if (!quit)
-					pump(INFINITE);
-			});
+		auto block = [&] {
+			if (!quit)
+				pump(INFINITE);
+		};
+		if (_opts.yield)
+			datapath::detail::spin_then_block(_opts.spin, [&] { return !quit && pump(0); }, block, [] { Sleep(0); });
+		else
+			datapath::detail::spin_then_block(_opts.spin, [&] { return !quit && pump(0); }, block);
 	}
 }
 

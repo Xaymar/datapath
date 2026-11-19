@@ -88,6 +88,27 @@ TEST(coalesces_small_frames)
 	CHECK(!q.take(batch));
 }
 
+TEST(large_frames_reuse_and_stay_intact)
+{
+	send_queue           q(1 << 24, uint64_t(1) << 30);
+	std::vector<uint8_t> batch;
+	for (int round = 0; round < 4; round++) {
+		size_t               n = size_t(300000 - round * 50000);
+		std::vector<uint8_t> p(n, uint8_t(round + 1));
+		buffer_view          v{p.data(), p.size()};
+		bool                 w = false;
+		CHECK(q.push(&v, 1, w) == error::Success);
+		CHECK(q.take(batch)); // recycles the previous (large) batch as the spare
+		CHECK_EQ(batch.size(), n + datapath::detail::frame_header_size);
+		for (size_t i = datapath::detail::frame_header_size; i < batch.size(); i++)
+			if (batch[i] != uint8_t(round + 1)) {
+				CHECK(false);
+				break;
+			}
+		CHECK(!q.take(batch) || true);
+	}
+}
+
 TEST(single_writer_slot)
 {
 	send_queue q(1 << 20, 1 << 20);

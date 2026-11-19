@@ -63,6 +63,8 @@ namespace datapath::detail {
 		// The calling thread holds the send queue's writer slot: write until empty
 		// or until the OS reports pending.
 		virtual void platform_write() = 0;
+		// Called after send() wrote data from the caller's thread.
+		virtual void after_inline_write() {}
 		// Called after on_close has fired (listener bookkeeping).
 		virtual void on_finished() {}
 
@@ -155,8 +157,10 @@ namespace datapath::detail {
 				return datapath::error::Closed;
 			bool writer = false;
 			auto ec     = _queue.push(parts, count, writer);
-			if (ec == datapath::error::Success && writer)
+			if (ec == datapath::error::Success && writer) {
 				platform_write();
+				after_inline_write();
+			}
 			return ec;
 		}
 

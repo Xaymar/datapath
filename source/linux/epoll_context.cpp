@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "epoll_context.hpp"
 #include <poll.h>
+#include <sched.h>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <sys/socket.h>
@@ -174,12 +175,15 @@ void datapath::linux_::event_loop::run()
         return true;
 	};
 	while (!quit) {
-		datapath::detail::spin_then_block(
-			_ctx->spin(), [&] { return !quit && pump(0); },
-			[&] {
-				if (!quit)
-					pump(-1);
-			});
+		auto block = [&] {
+			if (!quit)
+				pump(-1);
+		};
+		if (_ctx->yield_enabled())
+			datapath::detail::spin_then_block(_ctx->spin(), [&] { return !quit && pump(0); }, block,
+											  [] { sched_yield(); });
+		else
+			datapath::detail::spin_then_block(_ctx->spin(), [&] { return !quit && pump(0); }, block);
 	}
 }
 

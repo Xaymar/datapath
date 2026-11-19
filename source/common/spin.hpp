@@ -31,10 +31,18 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #endif
 
 namespace datapath::detail {
+	struct cpu_relax {
+		void operator()() const noexcept
+		{
+			DATAPATH_CPU_RELAX();
+		}
+	};
+
 	// Busy-poll with `poll()` until `budget` passes without work, then call `block()`
 	// once. poll() returns true when it handled work, which restarts the budget.
-	template<typename Poll, typename Block>
-	void spin_then_block(std::chrono::microseconds budget, Poll&& poll, Block&& block)
+	// `relax()` runs between idle polls.
+	template<typename Poll, typename Block, typename Relax = cpu_relax>
+	void spin_then_block(std::chrono::microseconds budget, Poll&& poll, Block&& block, Relax&& relax = Relax())
 	{
 		using clock = std::chrono::steady_clock;
 		if (budget.count() > 0) {
@@ -46,7 +54,7 @@ namespace datapath::detail {
 				}
 				if (clock::now() >= deadline)
 					break;
-				DATAPATH_CPU_RELAX();
+				relax();
 			}
 		}
 		block();

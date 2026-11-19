@@ -68,7 +68,8 @@ datapath::error datapath::windows::pipe_listener::spawn_locked(bool first)
 	if (first)
 		open_mode |= FILE_FLAG_FIRST_PIPE_INSTANCE;
 	DWORD pipe_mode = PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS;
-	DWORD buffer    = DWORD(std::min<size_t>(_opts.receive_buffer, 64u << 20));
+	size_t wanted   = _opts.pipe_buffer ? _opts.pipe_buffer : _opts.receive_buffer;
+	DWORD  buffer   = DWORD(std::min<size_t>(wanted, 64u << 20));
 
 	for (int attempt = 0; attempt < 4; attempt++) {
 		HANDLE h = CreateNamedPipeW(_path.c_str(), open_mode, pipe_mode, PIPE_UNLIMITED_INSTANCES, buffer, buffer, 0,

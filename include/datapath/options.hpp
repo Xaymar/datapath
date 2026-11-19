@@ -30,6 +30,11 @@ namespace datapath {
 		std::chrono::microseconds spin{50};
 		// Number of I/O threads.
 		size_t io_threads = 1;
+		// Yield the CPU (Windows: Sleep(0), Linux: sched_yield) after a send has
+		// written its data and between busy-poll iterations, so a peer thread that
+		// was just woken on this core runs at once instead of waiting for our
+		// time slice to end.
+		bool yield = false;
 	};
 
 	// Per-connection / per-server settings.
@@ -47,7 +52,10 @@ namespace datapath {
 		size_t max_clients = 0;
 		// Time connect() waits for the server's handshake (connect() only).
 		std::chrono::milliseconds connect_timeout{1000};
-		// Initial receive buffer per connection; also the kernel pipe buffer on Windows.
+		// Receive buffer per connection. Frames that fit are delivered straight from
+		// it; larger frames use a temporary buffer of their own.
 		size_t receive_buffer = size_t(64) * 1024;
+		// Kernel pipe buffer on Windows (host() only); 0 = same as receive_buffer.
+		size_t pipe_buffer = 0;
 	};
 } // namespace datapath

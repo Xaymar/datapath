@@ -113,6 +113,21 @@ TEST(parser_large_frame_beyond_buffer)
 	CHECK(feed(stream, {65536}, 65536) == msgs);
 }
 
+TEST(parser_alternating_large_and_small_frames)
+{
+	// Large buffers are reused across consecutive large frames, released on small
+	// ones, and must never leak bytes between messages.
+	std::vector<bytes> msgs = {pattern(200000, 1), pattern(150000, 2), pattern(300000, 3), pattern(7, 4),
+							   pattern(250000, 5), bytes{},          pattern(100000, 6)};
+	bytes              stream;
+	for (auto& m : msgs) {
+		auto f = frame(m);
+		stream.insert(stream.end(), f.begin(), f.end());
+	}
+	CHECK(feed(stream, {65536}, 65536) == msgs);
+	CHECK(feed(stream, {999}, 4096) == msgs);
+}
+
 TEST(parser_rejects_oversize_header)
 {
 	error st = error::Unknown;

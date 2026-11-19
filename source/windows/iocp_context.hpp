@@ -94,6 +94,10 @@ namespace datapath::windows {
 		{
 			return _stopped.load(std::memory_order_acquire);
 		}
+		bool yield_enabled() const noexcept
+		{
+			return _opts.yield;
+		}
 
 		void add_member(std::weak_ptr<datapath::detail::connection> c);
 		void add_member(std::weak_ptr<datapath::detail::listener> l);

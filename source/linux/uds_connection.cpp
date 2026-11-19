@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "uds_connection.hpp"
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <sched.h>
 #include <unistd.h>
 #include <algorithm>
 #include <cerrno>
@@ -240,6 +241,12 @@ void datapath::linux_::uds_connection::platform_post_close()
 void datapath::linux_::uds_connection::platform_write()
 {
 	write_loop();
+}
+
+void datapath::linux_::uds_connection::after_inline_write()
+{
+	if (_ctx->yield_enabled())
+		sched_yield();
 }
 
 void datapath::linux_::uds_connection::on_finished()

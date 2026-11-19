@@ -44,16 +44,15 @@ datapath::error datapath::detail::send_queue::push(const buffer_view* parts, siz
 		total += parts[i].size;
 	const uint64_t frame = total + frame_header_size;
 
+	// Append without zero-filling first: insert() copies straight into place.
 	auto append = [&](std::vector<uint8_t>& block) {
-		size_t at = block.size();
-		block.resize(at + size_t(frame));
-		encode_frame_header(block.data() + at, total);
-		at += frame_header_size;
+		uint8_t header[frame_header_size];
+		encode_frame_header(header, total);
+		block.insert(block.end(), header, header + frame_header_size);
 		for (size_t i = 0; i < count; i++) {
-			if (parts[i].size) {
-				std::memcpy(block.data() + at, parts[i].data, parts[i].size);
-				at += parts[i].size;
-			}
+			auto* p = static_cast<const uint8_t*>(parts[i].data);
+			if (parts[i].size)
+				block.insert(block.end(), p, p + parts[i].size);
 		}
 	};
 
@@ -66,6 +65,8 @@ datapath::error datapath::detail::send_queue::push(const buffer_view* parts, siz
 		return datapath::error::WouldBlock;
 
 	if (frame <= coalesce_limit) {
+		if (_spare_large.capacity())
+			_spare_large = std::vector<uint8_t>(); // back to small traffic: release it
 		// Small: pack into the tail block when it has room, all under the lock.
 		if (_blocks.empty() || _blocks.back().size() + frame > coalesce_limit
 			|| _blocks.back().capacity() > coalesce_limit) {
@@ -76,8 +77,12 @@ datapath::error datapath::detail::send_queue::push(const buffer_view* parts, siz
 	} else {
 		// Large: reserve queue space, copy outside the lock, then publish.
 		_queued += frame;
-		ul.unlock();
 		std::vector<uint8_t> block;
+		if (_spare_large.capacity() >= frame) {
+			block = std::move(_spare_large);
+			block.clear();
+		}
+		ul.unlock();
 		try {
 			block.reserve(size_t(frame));
 			append(block);
@@ -105,6 +110,8 @@ bool datapath::detail::send_queue::take(std::vector<uint8_t>& batch)
 	if (batch.capacity() > 0 && batch.capacity() <= coalesce_limit && _free.size() < 4) {
 		batch.clear();
 		_free.push_back(std::move(batch));
+	} else if (batch.capacity() > coalesce_limit && !_closed) {
+		_spare_large = std::move(batch);
 	}
 	batch = std::vector<uint8_t>();
 	if (_blocks.empty() || _closed) {
@@ -153,7 +160,8 @@ void datapath::detail::send_queue::close()
 	_closed = true;
 	_blocks.clear();
 	_free.clear();
-	_queued = 0;
+	_spare_large = std::vector<uint8_t>();
+	_queued      = 0;
 }
 
 bool datapath::detail::send_queue::closed() const

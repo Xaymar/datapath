@@ -216,6 +216,13 @@ void datapath::windows::pipe_connection::platform_write()
 	write_loop();
 }
 
+void datapath::windows::pipe_connection::after_inline_write()
+{
+	// Let a receiver that our write just woke run on this core right away.
+	if (_ctx->yield_enabled())
+		Sleep(0);
+}
+
 void datapath::windows::pipe_connection::on_finished()
 {
 	if (auto l = _listener.lock())

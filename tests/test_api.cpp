@@ -43,6 +43,7 @@ TEST(options_defaults)
 	datapath::context_options co;
 	CHECK_EQ(co.spin.count(), 50);
 	CHECK_EQ(co.io_threads, size_t(1));
+	CHECK(!co.yield);
 
 	datapath::options o;
 	CHECK_EQ(o.max_message_size, uint64_t(64) << 20);
@@ -52,6 +53,7 @@ TEST(options_defaults)
 	CHECK_EQ(o.max_clients, size_t(0));
 	CHECK_EQ(o.connect_timeout.count(), 1000);
 	CHECK_EQ(o.receive_buffer, size_t(64) * 1024);
+	CHECK_EQ(o.pipe_buffer, size_t(0));
 }
 
 TEST(default_context_is_shared)

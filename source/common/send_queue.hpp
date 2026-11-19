@@ -36,6 +36,8 @@ namespace datapath::detail {
 		mutable std::mutex                _lock;
 		std::deque<std::vector<uint8_t>>  _blocks;
 		std::vector<std::vector<uint8_t>> _free;
+		// One recycled large block, reused while large messages keep coming.
+		std::vector<uint8_t>              _spare_large;
 		uint64_t                          _queued = 0;
 		uint64_t                          _limit;
 		uint64_t                          _max_queued;

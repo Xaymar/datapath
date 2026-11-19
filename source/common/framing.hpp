@@ -23,6 +23,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <new>
 #include <type_traits>
 #include <utility>
@@ -50,9 +51,14 @@ namespace datapath::detail {
 		size_t               _rpos = 0;
 		size_t               _wpos = 0;
 
-		std::vector<uint8_t> _big;
-		size_t               _big_filled = 0;
-		bool                 _in_big     = false;
+		// Dedicated buffer for frames larger than _buf. Allocated uninitialised and
+		// kept across consecutive large frames (bulk streams); released as soon as a
+		// small frame arrives, so idle or chatty connections hold no extra memory.
+		std::unique_ptr<uint8_t[]> _big;
+		size_t                     _big_cap    = 0;
+		size_t                     _big_size   = 0;
+		size_t                     _big_filled = 0;
+		bool                       _in_big     = false;
 
 		uint64_t _limit;
 
@@ -92,7 +98,7 @@ namespace datapath::detail {
 		std::pair<uint8_t*, size_t> prepare() noexcept
 		{
 			if (_in_big)
-				return {_big.data() + _big_filled, _big.size() - _big_filled};
+				return {_big.get() + _big_filled, _big_size - _big_filled};
 			if (_rpos == _wpos) {
 				_rpos = _wpos = 0;
 			} else if (_wpos == _buf.size() || (_buf.size() - _wpos) < frame_header_size) {
@@ -109,13 +115,11 @@ namespace datapath::detail {
 		{
 			if (_in_big) {
 				_big_filled += n;
-				if (_big_filled < _big.size())
+				if (_big_filled < _big_size)
 					return datapath::error::Success;
-				_in_big = false;
-				std::vector<uint8_t> msg;
-				msg.swap(_big);
+				_in_big     = false;
 				_big_filled = 0;
-				if (!call(deliver, msg.data(), msg.size()))
+				if (!call(deliver, _big.get(), _big_size))
 					return datapath::error::Closed;
 				return datapath::error::Success;
 			}
@@ -129,6 +133,11 @@ namespace datapath::detail {
 				if (len > _limit)
 					return datapath::error::TooLarge;
 				if (avail - frame_header_size >= len) {
+					if (_big) {
+						// Back to small frames: give the large buffer back.
+						_big.reset();
+						_big_cap = 0;
+					}
 					const uint8_t* data = _buf.data() + _rpos + frame_header_size;
 					_rpos += frame_header_size + size_t(len);
 					if (!call(deliver, data, size_t(len)))
@@ -142,13 +151,17 @@ namespace datapath::detail {
 					break;
 				}
 				// Larger than the receive buffer: move to a dedicated buffer.
-				try {
-					_big.resize(size_t(len));
-				} catch (const std::bad_alloc&) {
-					return datapath::error::Failure;
+				if (_big_cap < len) {
+					_big.reset();
+					_big_cap = 0;
+					_big.reset(new (std::nothrow) uint8_t[size_t(len)]);
+					if (!_big)
+						return datapath::error::Failure;
+					_big_cap = size_t(len);
 				}
+				_big_size   = size_t(len);
 				size_t have = avail - frame_header_size;
-				std::memcpy(_big.data(), _buf.data() + _rpos + frame_header_size, have);
+				std::memcpy(_big.get(), _buf.data() + _rpos + frame_header_size, have);
 				_big_filled = have;
 				_rpos = _wpos = 0;
 				_in_big       = true;

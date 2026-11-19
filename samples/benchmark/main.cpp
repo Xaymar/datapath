@@ -29,7 +29,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //   --spin 50                                   I/O thread spin budget in microseconds
 //   --threads 1                                 I/O threads
 //   --load                                      stream 1 MiB messages on an extra connection meanwhile
-//   --buffer 65536                              receive buffer per connection (also the Windows pipe buffer)
+//   --buffer 65536                              receive buffer per connection
+//   --yield                                     Sleep(0)/sched_yield after sends and while spinning
+//   --pipe-buffer 0                             Windows kernel pipe buffer (0 = same as --buffer)
 //
 // Latency is the full round trip (send -> echo -> receive), measured with
 // QueryPerformanceCounter on Windows and CLOCK_MONOTONIC elsewhere. The next
@@ -77,6 +79,8 @@ namespace {
 		size_t                threads = 1;
 		bool                  load    = false;
 		size_t                buffer  = 64 * 1024;
+		size_t                pipe_buffer = 0;
+		bool                  yield       = false;
 	};
 
 	int current_pid()
@@ -133,8 +137,12 @@ namespace {
 				c.spin = std::strtol(next(), nullptr, 10);
 			} else if (a == "--threads") {
 				c.threads = size_t(std::strtoull(next(), nullptr, 10));
+			} else if (a == "--pipe-buffer") {
+				c.pipe_buffer = size_t(std::strtoull(next(), nullptr, 10));
 			} else if (a == "--buffer") {
 				c.buffer = size_t(std::strtoull(next(), nullptr, 10));
+			} else if (a == "--yield") {
+				c.yield = true;
 			} else if (a == "--load") {
 				c.load = true;
 			} else {
@@ -152,6 +160,7 @@ namespace {
 		datapath::context_options o;
 		o.spin       = std::chrono::microseconds(c.spin);
 		o.io_threads = c.threads;
+		o.yield      = c.yield;
 		return datapath::context::create(o);
 	}
 
@@ -165,6 +174,7 @@ namespace {
 		opts.max_message_size = uint64_t(1) << 30;
 		opts.max_queued_bytes = uint64_t(256) << 20;
 		opts.receive_buffer   = c.buffer;
+		opts.pipe_buffer      = c.pipe_buffer;
 		if (auto ec = datapath::host(srv, c.name, opts, ctx); ec != error::Success) {
 			std::fprintf(stderr, "host failed: %s\n", datapath::to_string(ec));
 			return 1;
@@ -356,8 +366,8 @@ namespace {
 			bulk->start();
 		}
 
-		std::printf("DataPath benchmark: platform=%s spin=%ldus io_threads=%zu clients=%zu buffer=%zu load=%s\n",
-					platform_name(), c.spin, c.threads, c.clients, c.buffer, c.load ? "1MiB stream" : "off");
+		std::printf("DataPath benchmark: platform=%s spin=%ldus io_threads=%zu clients=%zu buffer=%zu pipe_buffer=%zu yield=%s load=%s\n",
+					platform_name(), c.spin, c.threads, c.clients, c.buffer, c.pipe_buffer, c.yield ? "on" : "off", c.load ? "1MiB stream" : "off");
 		std::printf("Full round-trip latency in microseconds.\n");
 		std::printf("%10s %8s %9s %9s %9s %9s %9s %10s\n", "size", "count", "min", "p50", "p99", "p99.9", "max",
 					"MiB/s");
@@ -413,13 +423,15 @@ namespace {
 		std::string spin    = std::to_string(c.spin);
 		std::string threads = std::to_string(c.threads);
 		std::string buffer  = std::to_string(c.buffer);
+		std::string pipebuf = std::to_string(c.pipe_buffer);
 #ifdef _WIN32
 		wchar_t exe[MAX_PATH];
 		GetModuleFileNameW(nullptr, exe, MAX_PATH);
 		std::wstring cmd = L"\"" + std::wstring(exe) + L"\" server " + std::wstring(c.name.begin(), c.name.end())
 						   + L" --spin " + std::wstring(spin.begin(), spin.end()) + L" --threads "
 						   + std::wstring(threads.begin(), threads.end()) + L" --buffer "
-						   + std::wstring(buffer.begin(), buffer.end());
+						   + std::wstring(buffer.begin(), buffer.end()) + L" --pipe-buffer "
+						   + std::wstring(pipebuf.begin(), pipebuf.end()) + (c.yield ? L" --yield" : L"");
 		STARTUPINFOW        si{};
 		PROCESS_INFORMATION pi{};
 		si.cb = sizeof(si);
@@ -437,7 +449,9 @@ namespace {
 		(void)argc;
 		(void)argv;
 		std::vector<std::string> args = {"datapath-benchmark", "server", c.name, "--spin",  spin,
-										  "--threads",          threads, "--buffer", buffer};
+										  "--threads",          threads, "--buffer", buffer, "--pipe-buffer", pipebuf};
+		if (c.yield)
+			args.push_back("--yield");
 		std::vector<char*>       cargv;
 		for (auto& a : args)
 			cargv.push_back(&a[0]);
@@ -467,7 +481,7 @@ int main(int argc, char** argv)
 	if (!parse(argc, argv, c)) {
 		std::fprintf(stderr,
 					 "usage: %s local|server <name>|client <name> [--sizes a,b,..] [--count n] [--clients n]\n"
-					 "       [--spin us] [--threads n] [--buffer bytes] [--load]\n",
+					 "       [--spin us] [--threads n] [--buffer bytes] [--pipe-buffer bytes] [--yield] [--load]\n",
 					 argc > 0 ? argv[0] : "datapath-benchmark");
 		return 2;
 	}
