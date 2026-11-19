@@ -597,6 +597,34 @@ TEST(custom_context_shutdown_closes_sockets)
 	CHECK(!keep || !keep->good());
 }
 
+// io_threads = 0: one I/O thread per physical core. Several connections spread
+// over those threads must all echo correctly.
+TEST(auto_io_threads_echo)
+{
+	datapath::context_options co;
+	co.spin       = std::chrono::microseconds(0);
+	co.io_threads = 0;
+	auto ctx      = datapath::context::create(co);
+	CHECK(ctx != nullptr);
+	auto        name = unique_name();
+	echo_server srv;
+	CHECK_EQ(srv.start(name), error::Success);
+	const size_t           n = 8;
+	std::vector<collector> cols(n);
+	std::vector<sock_ptr>  socks(n);
+	for (size_t i = 0; i < n; i++) {
+		CHECK_EQ(datapath::connect(socks[i], name, {}, ctx), error::Success);
+		cols[i].attach(*socks[i]);
+		auto msg = pattern(64 + i, uint32_t(i));
+		CHECK_EQ(socks[i]->send(msg.data(), msg.size()), error::Success);
+	}
+	for (size_t i = 0; i < n; i++) {
+		CHECK(cols[i].received.wait(1));
+		std::lock_guard<std::mutex> l(cols[i].lock);
+		CHECK(cols[i].messages[0] == pattern(64 + i, uint32_t(i)));
+	}
+}
+
 TEST(drop_context_inside_callback)
 {
 	struct holder {
