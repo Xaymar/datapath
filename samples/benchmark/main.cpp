@@ -56,6 +56,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #ifdef _WIN32
 #include <process.h>
 #else
+#include <signal.h>
 #include <spawn.h>
 #ifdef __linux__
 #include <sys/prctl.h>
