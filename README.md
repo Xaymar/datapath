@@ -1,14 +1,28 @@
 # DataPath
-DataPath is a high-performance, low-latency inter-process communication (IPC) library written in C++17. It moves length-framed messages between processes on the same machine, from a few bytes to many megabytes, from one server to many clients, with any number of threads sending at once.
+**Fast, predictable message passing between processes on the same machine.**
+
+DataPath is a C++17 IPC library for programs that talk to each other locally and care about the worst case, not just the average. It moves whole, length-framed messages, from a few bytes to many megabytes, between one server and any number of clients, with any number of threads sending at once. It uses each OS's native transport (named pipes with I/O completion ports on Windows, Unix domain sockets with epoll on Linux) behind one small API, and keeps round trips in the single-digit to low double-digit microseconds at the 99.9th percentile.
+
+![Round-trip p99.9 latency: DataPath vs libuv](docs/images/latency-p999.svg)
+
+On a Windows PC under full CPU load, DataPath's 8-byte round trip stays at 23 µs p99.9, while libuv as shipped stalls past 1 ms. On Linux, where both libraries sit on the same epoll and Unix-socket stack, DataPath's defaults keep the tail about 5× lower than libuv's, and stay ahead when libuv is given the same busy-poll policy. Details and the configs behind each bar are under [Comparison with libuv](#comparison-with-libuv).
 
 ## Features
-* One API on Windows (named pipes + I/O completion ports) and Linux (Unix domain sockets + epoll).
-* Sub-100 µs round trips: no timers or sleeps anywhere on the data path.
-* Zero-copy receive: handlers get a pointer into the receive buffer; several small messages arrive per system call.
-* Thread-safe, non-blocking `send()` with bounded queues and explicit backpressure (`TooLarge`, `WouldBlock`).
-* Idle connections cost no CPU. A short, tunable busy-poll before sleeping keeps tail latency low under traffic.
-* Permissions per server (`User`, `Group`, `World`), a version handshake, and validation before `on_accept`.
-* No dependencies outside the C++ standard library and the OS.
+**Latency**
+* No timers or sleeps on the data path. An I/O thread busy-polls for a short, tunable time (`spin`, default 50 µs) after the last event, then sleeps in the kernel, so tail latency stays low under traffic and idle connections cost no CPU.
+* Scheduling tuned for the tail: elevated I/O thread priority, opt-out of Windows EcoQoS throttling, and one I/O thread per physical core without sharing hyper-threads.
+* Zero-copy receive: handlers get a pointer straight into the receive buffer, and several small messages arrive per system call.
+
+**Messaging**
+* Whole messages, never byte streams: each `send()` arrives as one `on_message` call, and messages from different threads never interleave.
+* One server, many clients; `send()` is thread-safe and non-blocking from any thread, including from inside handlers.
+* Bounded queues with explicit backpressure: `send()` returns `TooLarge` or `WouldBlock` instead of blocking or growing without limit.
+* Large messages at 3.6–4 GiB/s per direction, without slowing down small messages on other connections.
+
+**Safety and setup**
+* Per-server access control (`User`, `Group`, `World`), a version handshake, and peer validation before `on_accept` runs.
+* Clean shutdown: destroying a handle waits for running handlers, and no handler fires afterwards.
+* One API on Windows and Linux, no dependencies outside the C++ standard library and the OS, usable as a CMake subdirectory.
 
 ## Platforms
 | Platform | Transport | Status |
@@ -80,47 +94,16 @@ See `samples/echo/main.cpp` for a complete program.
 * **Tuning.** `context_options::spin` (default 50 µs) is how long an I/O thread busy-polls after the last event before sleeping in the kernel. Higher values cut tail latency for bursty traffic and cost CPU only while traffic flows. `0` disables spinning. On Windows the I/O threads also opt out of EcoQoS power throttling.
 * **Paths.** A bare name maps to `\\.\pipe\<name>` on Windows and to the abstract socket `datapath.<name>` on Linux. On Linux, a path starting with `/` is a filesystem socket instead, created with mode `0600`/`0660`/`0666` for `User`/`Group`/`World` and removed on close.
 
-## Building
-Requires CMake 3.16+ and a C++17 compiler (MSVC 2019+, GCC 9+, Clang 10+).
-
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+## Getting DataPath
+Add the repository as a subdirectory and link the `datapath::datapath` target:
+```cmake
+add_subdirectory(datapath)
+target_link_libraries(my-app PRIVATE datapath::datapath)
 ```
-```bash
-cmake --build build --config Release
-```
-```bash
-ctest --test-dir build -C Release --output-on-failure
-```
+Requires CMake 3.16+ and a C++17 compiler (MSVC 2019+, GCC 9+, Clang 10+). To build the library, tests and benchmarks on their own, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Options: `DATAPATH_SHARED` (shared library, default `OFF`), `DATAPATH_BUILD_TESTS` and `DATAPATH_BUILD_SAMPLES` (default `ON` for top-level builds). The `datapath::datapath` target can be used through `add_subdirectory`.
-
-Cross-compiling for Windows from Linux with mingw-w64 (tests run through Wine if it's installed):
-```bash
-cmake -S . -B build-mingw -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/mingw-w64.cmake
-```
-
-## Benchmarking
-`datapath-benchmark local` starts an echo server in a second process and runs the client against it:
-```bash
-./build/samples/datapath-benchmark local
-```
-On Windows, run `build\samples\Release\datapath-benchmark.exe local`. Useful variations:
-* `--spin 0` measures without busy-polling.
-* `--load` adds a 1 MiB bulk stream on a second connection and reports its throughput.
-* `--clients 8` runs eight concurrent ping-pong connections.
-* `--threads 2` uses two I/O threads per process.
-* `--threads auto` uses one I/O thread per physical core (`context_options::io_threads = 0`). Compare it with `--ideal-core off` on Windows to see what pairing threads with cores does.
-* `--sizes 8,64,4096` picks the message sizes. The default is 8 B to 64 KiB; add `1048576,16777216` to measure bulk-sized messages.
-
-You can also run `server <name>` and `client <name>` separately, in two terminals.
-
-Single runs are noisy at microsecond resolution. `--runs 5` repeats every size five times and reports the median, plus the lowest and highest p99.9 of any run. `samples\benchmark\matrix.cmd` (Windows) and `samples/benchmark/matrix.sh` (Linux) run every option combination that way and collect the output in `benchmark-results.txt`.
-
-For stable numbers on Windows, use the High Performance power plan. Run from a foreground console and close CPU-heavy applications.
-
-## Comparing with other IPC libraries
-Configure with `-DDATAPATH_BUILD_COMPARE=ON` to also build `libuv-benchmark`; CMake downloads libuv 1.52.1. It runs the same harness over libuv named pipes / Unix sockets: same framing, clock, sizes, `--runs`, `--stress`. It also uses the same `--spin`, `--priority` and `--mmcss` policy on its loop thread, so both libraries can be compared with identical settings. libuv itself has none of these, so use `--spin 0 --no-mmcss --priority 0` to measure libuv as it ships. The matrix scripts include libuv runs when the executable exists.
+## Comparison with libuv
+The benchmark ships a second transport over libuv 1.52.1 named pipes / Unix sockets with the same framing, clock, message sizes and harness, so both libraries are measured the same way. "libuv as shipped" means libuv's own event loop with no busy-polling and normal thread priority; "same spin policy" gives libuv's loop thread DataPath's spin and priority settings. How to reproduce these runs is in [CONTRIBUTING.md](CONTRIBUTING.md#benchmarking).
 
 First Linux results (4 vCPU VM, 3-run medians, round trip):
 
