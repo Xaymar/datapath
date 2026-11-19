@@ -158,6 +158,18 @@ with datapath.connect("my-service") as sock:
 ```
 Wheels cover CPython 3.10+ (including free-threaded builds) on Windows and Linux. See [python/README.md](python/README.md) for the API, the two ways to receive and their latency.
 
+### Node.js
+```bash
+npm install @xaymar/datapath
+```
+```js
+const datapath = require('@xaymar/datapath');
+const sock = await datapath.connect('my-service');
+sock.on('message', (data) => console.log(data.toString()));
+sock.send('hello');
+```
+A Node-API addon built on the C++ API, with TypeScript typings and prebuilt binaries for Windows and Linux, for Node.js 18+. See [bindings/node/README.md](bindings/node/README.md) for the API and how it differs from C++.
+
 ## Known issues (work in progress)
 * No server-side handshake timeout: a local client that connects and never sends its hello holds a connection slot.
 

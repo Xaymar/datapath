@@ -1,0 +1,77 @@
+{
+  "name": "@xaymar/datapath",
+  "version": "0.2.0",
+  "description": "Node.js bindings for DataPath, a high performance, low latency IPC library (Windows named pipes, Unix domain sockets).",
+  "license": "BSD-3-Clause",
+  "author": "Narta Xaymar Dirks <info@xaymar.com>",
+  "homepage": "https://github.com/Xaymar/datapath/tree/master/bindings/node#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Xaymar/datapath.git",
+    "directory": "bindings/node"
+  },
+  "bugs": {
+    "url": "https://github.com/Xaymar/datapath/issues"
+  },
+  "keywords": [
+    "ipc",
+    "named-pipe",
+    "unix-socket",
+    "low-latency",
+    "napi",
+    "node-api"
+  ],
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/",
+    "src/",
+    "scripts/install.js",
+    "prebuilds/",
+    "deps/",
+    "CMakeLists.txt",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "win32",
+    "linux",
+    "android"
+  ],
+  "gypfile": false,
+  "binary": {
+    "napi_versions": [
+      8
+    ]
+  },
+  "scripts": {
+    "install": "node scripts/install.js",
+    "build": "cmake-js compile",
+    "build:debug": "cmake-js compile --debug",
+    "package-prebuild": "node scripts/prebuild.js",
+    "prepack": "node scripts/vendor.js",
+    "postpack": "node scripts/vendor.js --clean",
+    "typecheck": "tsc -p test/tsconfig.json",
+    "test": "node --test test/datapath.test.js",
+    "bench": "node test/bench.mjs"
+  },
+  "dependencies": {
+    "cmake-js": "^8.0.0",
+    "node-addon-api": "^8.5.0",
+    "node-gyp-build": "^4.8.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}
