@@ -13,4 +13,13 @@ for opts in "" "--yield" "--spin 0" "--spin 200" "--threads 2" "--clients 8" "--
 	# shellcheck disable=SC2086
 	"$BENCH" local --runs "$RUNS" $opts >> "$OUT" 2>&1
 done
+LIBUV="$(dirname "$BENCH")/libuv-benchmark"
+if [ -x "$LIBUV" ]; then
+	for opts in "--spin 0" "" "--stress 0 --spin 0" "--stress 0"; do
+		printf '\n==== libuv %s\n' "${opts:-defaults}" >> "$OUT"
+		echo "Running: libuv ${opts:-defaults}"
+		# shellcheck disable=SC2086
+		"$LIBUV" local --runs "$RUNS" $opts >> "$OUT" 2>&1
+	done
+fi
 echo "Results written to $OUT"

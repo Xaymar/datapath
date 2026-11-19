@@ -1,7 +1,12 @@
-add_executable(datapath-benchmark
+# Benchmark harness shared by every transport; each executable links one transport.
+set(BENCH_HARNESS
 	benchmark/main.cpp
+	benchmark/bench.hpp
 	benchmark/clock.hpp
 	benchmark/stats.hpp
+)
+
+add_executable(datapath-benchmark ${BENCH_HARNESS} benchmark/transport_datapath.cpp
 	benchmark/matrix.cmd
 	benchmark/matrix.sh
 )
@@ -9,3 +14,24 @@ target_link_libraries(datapath-benchmark PRIVATE datapath)
 
 add_executable(datapath-echo echo/main.cpp)
 target_link_libraries(datapath-echo PRIVATE datapath)
+
+# Comparison against other IPC libraries (downloads them at configure time).
+option(DATAPATH_BUILD_COMPARE "Build benchmarks for other IPC libraries (libuv) for comparison." OFF)
+if(DATAPATH_BUILD_COMPARE)
+	enable_language(C)
+	include(FetchContent)
+	set(LIBUV_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+	set(LIBUV_BUILD_BENCH OFF CACHE BOOL "" FORCE)
+	set(LIBUV_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+	FetchContent_Declare(libuv
+		GIT_REPOSITORY https://github.com/libuv/libuv.git
+		GIT_TAG v1.52.1
+		GIT_SHALLOW TRUE
+	)
+	FetchContent_MakeAvailable(libuv)
+
+	add_executable(libuv-benchmark ${BENCH_HARNESS} benchmark/transport_libuv.cpp)
+	# DataPath is linked only for its option defaults and frame parser headers.
+	target_link_libraries(libuv-benchmark PRIVATE uv_a datapath)
+	target_include_directories(libuv-benchmark PRIVATE "${PROJECT_SOURCE_DIR}/source")
+endif()

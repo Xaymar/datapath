@@ -114,5 +114,19 @@ Single runs are noisy at microsecond resolution. `--runs 5` repeats every size f
 
 For stable numbers on Windows, use the High Performance power plan. Run from a foreground console and close CPU-heavy applications.
 
+## Comparing with other IPC libraries
+Configure with `-DDATAPATH_BUILD_COMPARE=ON` to also build `libuv-benchmark`; CMake downloads libuv 1.52.1. It runs the same harness over libuv named pipes / Unix sockets: same framing, clock, sizes, `--runs`, `--stress`. It also uses the same `--spin`, `--priority` and `--mmcss` policy on its loop thread, so both libraries can be compared with identical settings. libuv itself has none of these, so use `--spin 0 --no-mmcss --priority 0` to measure libuv as it ships. The matrix scripts include libuv runs when the executable exists.
+
+First Linux results (4 vCPU VM, 3-run medians, round trip):
+
+| | 8 B p50 | 8 B p99.9 | 4 KiB p50 | 64 KiB p50 |
+|---|---|---|---|---|
+| DataPath, defaults | 4.8 µs | 27 µs | 7.5 µs | 28 µs |
+| libuv, same spin policy | 5.5 µs | 35 µs | 8.3 µs | 28 µs |
+| DataPath, `--spin 0` | 25.8 µs | 127 µs | 28.3 µs | 46 µs |
+| libuv as shipped (no spin) | 27.0 µs | 142 µs | 29.1 µs | 46 µs |
+
+On Linux both sit on epoll and Unix sockets, so the difference comes from the defaults (spinning, scheduling) and per-message overhead. Large messages tie at about 4 GiB/s.
+
 ## License
 GNU Affero General Public License v3.0 or later, see `LICENSE`.

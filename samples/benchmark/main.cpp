@@ -45,7 +45,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 // ping is sent from inside the receive callback, so no extra thread wake-up
 // is included.
 
-#include <datapath/datapath.hpp>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -56,6 +55,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <string>
 #include <thread>
 #include <vector>
+#include "bench.hpp"
 #include "clock.hpp"
 #include "stats.hpp"
 
@@ -68,8 +68,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 extern char** environ;
 #endif
 
-using sock_ptr = std::shared_ptr<datapath::socket>;
-using datapath::error;
+using sock_ptr = bench::conn_ptr;
+using bench::config;
+using bench::status;
 
 namespace {
 	constexpr uint8_t tag_ping  = 'P';
@@ -77,23 +78,6 @@ namespace {
 	constexpr uint8_t tag_stats = 'S';
 	constexpr uint8_t tag_quit  = 'Q';
 
-	struct config {
-		std::string           mode, name;
-		std::vector<size_t>   sizes = {8, 64, 4096, 65536, 1 << 20, 16 << 20};
-		size_t                count = 100000;
-		size_t                clients = 1;
-		long                  spin    = 50;
-		size_t                threads = 1;
-		bool                  load    = false;
-		size_t                buffer      = datapath::options{}.receive_buffer;
-		size_t                pipe_buffer = datapath::options{}.pipe_buffer;
-		bool                  yield       = datapath::context_options{}.yield;
-		bool                  alertable   = false;
-		bool                  mmcss       = datapath::context_options{}.mmcss;
-		int                   priority    = datapath::context_options{}.priority;
-		size_t                runs        = 1;
-		int                   stress      = -1; // -1 off, 0 = one thread per logical core
-	};
 
 	int current_pid()
 	{
@@ -184,50 +168,29 @@ namespace {
 		return true;
 	}
 
-	std::shared_ptr<datapath::context> make_context(const config& c)
-	{
-		datapath::context_options o;
-		o.spin       = std::chrono::microseconds(c.spin);
-		o.io_threads = c.threads;
-		o.yield      = c.yield;
-		o.alertable  = c.alertable;
-		o.mmcss      = c.mmcss;
-		o.priority   = c.priority;
-		return datapath::context::create(o);
-	}
-
 	// ---------------------------------------------------------------- server
 
 	int run_server(const config& c)
 	{
-		auto                              ctx = make_context(c);
-		std::shared_ptr<datapath::server> srv;
-		datapath::options                 opts;
-		opts.max_message_size = uint64_t(1) << 30;
-		opts.max_queued_bytes = uint64_t(256) << 20;
-		opts.receive_buffer   = c.buffer;
-		opts.pipe_buffer      = c.pipe_buffer;
-		if (auto ec = datapath::host(srv, c.name, opts, ctx); ec != error::Success) {
-			std::fprintf(stderr, "host failed: %s\n", datapath::to_string(ec));
-			return 1;
-		}
+		auto                    tp = bench::make_transport(c);
 		std::mutex              lock;
 		std::condition_variable cv;
 		bool                    quit = false;
 		std::vector<sock_ptr>   clients;
 
-		srv->on_accept([&](sock_ptr s) {
-			std::weak_ptr<datapath::socket> weak  = s;
-			auto                            bulk  = std::make_shared<uint64_t>(0);
-			s->on_message([&, weak, bulk](const uint8_t* d, size_t n) {
+		auto ec = tp->host(c.name, [&](sock_ptr s) {
+			bench::connection* sock = s.get(); // kept alive by `clients`
+			auto               bulk = std::make_shared<uint64_t>(0);
+			{
+				std::lock_guard<std::mutex> l(lock);
+				clients.push_back(s);
+			}
+			s->on_message([&, sock, bulk](const uint8_t* d, size_t n) {
 				if (n == 0)
-					return;
-				auto sock = weak.lock();
-				if (!sock)
 					return;
 				switch (d[0]) {
 				case tag_ping:
-					while (sock->send(d, n) == error::WouldBlock)
+					while (sock->send(d, n) == status::would_block)
 						std::this_thread::yield();
 					break;
 				case tag_bulk:
@@ -248,15 +211,15 @@ namespace {
 				}
 				}
 			});
-			std::lock_guard<std::mutex> l(lock);
-			clients.push_back(s);
-			return true;
 		});
+		if (ec != status::ok) {
+			std::fprintf(stderr, "host failed: %s\n", bench::status_name(ec));
+			return 1;
+		}
 
 		std::unique_lock<std::mutex> l(lock);
 		cv.wait(l, [&] { return quit; });
-		clients.clear();
-		return 0;
+		std::exit(0); // skip transport teardown: the client is gone
 	}
 
 	// ---------------------------------------------------------------- client
@@ -275,10 +238,10 @@ namespace {
 		void send_one()
 		{
 			sent_at = now_ns();
-			error ec;
-			while ((ec = sock->send(payload.data(), payload.size())) == error::WouldBlock)
+			status ec;
+			while ((ec = sock->send(payload.data(), payload.size())) == status::would_block)
 				std::this_thread::yield();
-			if (ec != error::Success)
+			if (ec != status::ok)
 				finish(true);
 		}
 
@@ -310,13 +273,12 @@ namespace {
 		}
 	};
 
-	error connect_retry(sock_ptr& s, const std::string& name, const datapath::options& o,
-						std::shared_ptr<datapath::context> ctx)
+	status connect_retry(bench::transport& tp, const std::string& name, sock_ptr& s)
 	{
-		error ec = error::NotFound;
+		status ec = status::not_found;
 		for (int i = 0; i < 500; i++) {
-			ec = datapath::connect(s, name, o, ctx);
-			if (ec != error::NotFound)
+			ec = tp.connect(name, s);
+			if (ec != status::not_found)
 				return ec;
 			std::this_thread::sleep_for(std::chrono::milliseconds(10));
 		}
@@ -348,7 +310,7 @@ namespace {
                 std::vector<uint8_t> chunk(1 << 20, 0x5a);
                 chunk[0] = tag_bulk;
                 while (!stop.load(std::memory_order_relaxed)) {
-                    if (sock->send(chunk.data(), chunk.size()) == error::WouldBlock)
+                    if (sock->send(chunk.data(), chunk.size()) == status::would_block)
                         std::this_thread::yield();
                 }
 			});
@@ -360,7 +322,7 @@ namespace {
 			stop = true;
 			thread.join();
 			uint8_t q = tag_stats;
-			while (sock->send(&q, 1) == error::WouldBlock)
+			while (sock->send(&q, 1) == status::would_block)
 				std::this_thread::yield();
 			std::unique_lock<std::mutex> l(lock);
 			cv.wait_for(l, std::chrono::seconds(30), [&] { return have_stats; });
@@ -371,18 +333,13 @@ namespace {
 
 	int run_client(const config& c)
 	{
-		auto              ctx = make_context(c);
-		datapath::options opts;
-		opts.max_message_size = uint64_t(1) << 30;
-		opts.max_queued_bytes = uint64_t(256) << 20;
-		opts.connect_timeout  = std::chrono::milliseconds(5000);
-		opts.receive_buffer   = c.buffer;
+		auto tp = bench::make_transport(c);
 
 		std::vector<std::unique_ptr<pinger>> pingers;
 		for (size_t i = 0; i < c.clients; i++) {
 			auto p = std::make_unique<pinger>();
-			if (auto ec = connect_retry(p->sock, c.name, opts, ctx); ec != error::Success) {
-				std::fprintf(stderr, "connect failed: %s\n", datapath::to_string(ec));
+			if (auto ec = connect_retry(*tp, c.name, p->sock); ec != status::ok) {
+				std::fprintf(stderr, "connect failed: %s\n", bench::status_name(ec));
 				return 1;
 			}
 			pinger* raw = p.get();
@@ -393,13 +350,13 @@ namespace {
 		std::unique_ptr<bulk_stream> bulk;
 		if (c.load) {
 			bulk = std::make_unique<bulk_stream>();
-			if (connect_retry(bulk->sock, c.name, opts, ctx) != error::Success)
+			if (connect_retry(*tp, c.name, bulk->sock) != status::ok)
 				return 1;
 			bulk->start();
 		}
 
-		std::printf("DataPath benchmark: platform=%s spin=%ldus io_threads=%zu clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s mmcss=%s priority=%d stress=%s load=%s\n",
-					platform_name(), c.spin, c.threads, c.clients, c.buffer, c.pipe_buffer, c.yield ? "on" : "off", c.alertable ? "on" : "off", c.mmcss ? "on" : "off", c.priority,
+		std::printf("IPC benchmark: transport=%s platform=%s spin=%ldus io_threads=%zu clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s mmcss=%s priority=%d stress=%s load=%s\n",
+					tp->name(), platform_name(), c.spin, c.threads, c.clients, c.buffer, c.pipe_buffer, c.yield ? "on" : "off", c.alertable ? "on" : "off", c.mmcss ? "on" : "off", c.priority,
 					c.stress < 0 ? "off" : (c.stress == 0 ? "all cores" : std::to_string(c.stress).c_str()), c.load ? "1MiB stream" : "off");
 		std::printf("Full round-trip latency in microseconds.\n");
 		if (c.runs > 1)
@@ -501,7 +458,9 @@ namespace {
 		uint8_t q = tag_quit;
 		pingers[0]->sock->send(&q, 1);
 		std::this_thread::sleep_for(std::chrono::milliseconds(50));
-		return 0;
+		std::fflush(stdout);
+		std::exit(0); // skip transport teardown
+
 	}
 
 	// ---------------------------------------------------------------- stress
@@ -653,4 +612,48 @@ int main(int argc, char** argv)
 	if (c.mode == "stress")
 		return run_stress(c);
 	return run_local(c);
+}
+
+const char* bench::status_name(status s)
+{
+	switch (s) {
+	case status::ok:
+		return "ok";
+	case status::would_block:
+		return "would_block";
+	case status::closed:
+		return "closed";
+	case status::not_found:
+		return "not_found";
+	case status::failed:
+		return "failed";
+	}
+	return "?";
+}
+
+void bench::tune_io_thread(const config& c)
+{
+#ifdef _WIN32
+	static const int levels[] = {THREAD_PRIORITY_NORMAL, THREAD_PRIORITY_ABOVE_NORMAL, THREAD_PRIORITY_HIGHEST,
+								 THREAD_PRIORITY_TIME_CRITICAL};
+	if (c.priority > 0 && c.priority <= 3)
+		SetThreadPriority(GetCurrentThread(), levels[c.priority]);
+	if (c.mmcss) {
+		static HMODULE avrt = LoadLibraryW(L"avrt.dll");
+		using set_t         = HANDLE(WINAPI*)(LPCWSTR, LPDWORD);
+		using priority_t    = BOOL(WINAPI*)(HANDLE, int);
+		if (avrt) {
+			auto  set  = reinterpret_cast<set_t>(reinterpret_cast<void*>(GetProcAddress(avrt, "AvSetMmThreadCharacteristicsW")));
+			auto  prio = reinterpret_cast<priority_t>(reinterpret_cast<void*>(GetProcAddress(avrt, "AvSetMmThreadPriority")));
+			DWORD task = 0;
+			if (set) {
+				HANDLE h = set(L"Pro Audio", &task);
+				if (h && prio)
+					prio(h, 2);
+			}
+		}
+	}
+#else
+	(void)c;
+#endif
 }

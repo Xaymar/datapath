@@ -39,4 +39,20 @@ for %%A in (
 	echo Running: %%~A
 	"%BENCH%" local --runs %RUNS% %%~A >> "%OUT%" 2>&1
 )
+rem Same measurements for libuv, if it was built (-DDATAPATH_BUILD_COMPARE=ON).
+for %%D in ("%BENCH%") do set "LIBUV=%%~dpDlibuv-benchmark.exe"
+if exist "%LIBUV%" (
+	for %%A in (
+		"--spin 0 --no-mmcss --priority 0"
+		"--priority 2"
+		"--spin 0"
+		"--stress 0 --spin 0 --no-mmcss --priority 0"
+		"--stress 0"
+	) do (
+		echo.>> "%OUT%"
+		echo ==== libuv %%~A>> "%OUT%"
+		echo Running: libuv %%~A
+		"%LIBUV%" local --runs %RUNS% %%~A >> "%OUT%" 2>&1
+	)
+)
 echo Results written to %OUT%
