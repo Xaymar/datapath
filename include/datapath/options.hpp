@@ -34,6 +34,12 @@ namespace datapath {
 		// written its data and between busy-poll iterations, so a peer thread that
 		// was just woken on this core runs at once instead of waiting for our
 		// time slice to end.
+		// Windows only: register I/O threads with the Multimedia Class Scheduler
+		// Service ("Pro Audio" task, critical priority) to reduce preemption.
+		bool mmcss = false;
+		// Windows only: I/O thread priority. 0 = normal, 1 = above normal,
+		// 2 = highest, 3 = time critical.
+		int priority = 0;
 		// Windows only: block in an alertable wait (GetQueuedCompletionStatusEx with
 		// fAlertable = TRUE), so the scheduler may run the I/O thread early.
 		bool alertable = false;

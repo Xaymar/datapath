@@ -44,6 +44,8 @@ TEST(options_defaults)
 	CHECK_EQ(co.spin.count(), 50);
 	CHECK_EQ(co.io_threads, size_t(1));
 	CHECK(!co.alertable);
+	CHECK(!co.mmcss);
+	CHECK_EQ(co.priority, 0);
 #ifdef _WIN32
 	CHECK(co.yield);
 #else

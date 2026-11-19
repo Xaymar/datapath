@@ -65,6 +65,54 @@ namespace {
 							   1 /*THREAD_POWER_THROTTLING_EXECUTION_SPEED*/, 0};
 		fn(GetCurrentThread(), 3 /*ThreadPowerThrottling*/, &state, sizeof(state));
 	}
+	// Scheduling tweaks for an I/O thread. Returns the MMCSS handle to revert.
+	HANDLE apply_thread_scheduling(const datapath::context_options& opts)
+	{
+		switch (opts.priority) {
+		case 1:
+			SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
+			break;
+		case 2:
+			SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+			break;
+		case 3:
+			SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+			break;
+		default:
+			break;
+		}
+		if (!opts.mmcss)
+			return nullptr;
+		static HMODULE avrt = LoadLibraryW(L"avrt.dll");
+		if (!avrt)
+			return nullptr;
+		using set_t      = HANDLE(WINAPI*)(LPCWSTR, LPDWORD);
+		using priority_t = BOOL(WINAPI*)(HANDLE, int);
+		auto set         = reinterpret_cast<set_t>(
+            reinterpret_cast<void*>(GetProcAddress(avrt, "AvSetMmThreadCharacteristicsW")));
+		auto prio = reinterpret_cast<priority_t>(
+			reinterpret_cast<void*>(GetProcAddress(avrt, "AvSetMmThreadPriority")));
+		if (!set)
+			return nullptr;
+		DWORD  task = 0;
+		HANDLE h    = set(L"Pro Audio", &task);
+		if (h && prio)
+			prio(h, 2 /*AVRT_PRIORITY_CRITICAL*/);
+		return h;
+	}
+
+	void revert_thread_scheduling(HANDLE mmcss)
+	{
+		if (!mmcss)
+			return;
+		static HMODULE avrt   = GetModuleHandleW(L"avrt.dll");
+		using revert_t        = BOOL(WINAPI*)(HANDLE);
+		auto revert           = avrt ? reinterpret_cast<revert_t>(reinterpret_cast<void*>(
+                                     GetProcAddress(avrt, "AvRevertMmThreadCharacteristics")))
+									 : nullptr;
+		if (revert)
+			revert(mmcss);
+	}
 } // namespace
 
 datapath::windows::iocp_context::iocp_context(const datapath::context_options& opts) : _opts(opts)
@@ -140,6 +188,7 @@ void datapath::windows::iocp_context::dispatch(OVERLAPPED_ENTRY& entry)
 void datapath::windows::iocp_context::run()
 {
 	disable_power_throttling();
+	HANDLE           mmcss = apply_thread_scheduling(_opts);
 	OVERLAPPED_ENTRY entries[64];
 	bool             quit = false;
 	auto             pump = [&](DWORD timeout) {
@@ -170,6 +219,7 @@ void datapath::windows::iocp_context::run()
 		else
 			datapath::detail::spin_then_block(_opts.spin, [&] { return !quit && pump(0); }, block);
 	}
+	revert_thread_scheduling(mmcss);
 }
 
 void datapath::windows::iocp_context::add_member(std::weak_ptr<datapath::detail::connection> c)

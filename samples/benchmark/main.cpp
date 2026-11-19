@@ -33,6 +33,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //   --yield / --no-yield                        Sleep(0)/sched_yield after sends and while spinning
 //                                               (default: on for Windows, off elsewhere)
 //   --alertable                                 Windows: alertable completion-port waits
+//   --mmcss                                     Windows: register I/O threads with MMCSS ("Pro Audio")
+//   --priority 0..3                             Windows: I/O thread priority (normal .. time critical)
 //   --pipe-buffer 0                             Windows kernel pipe buffer (0 = same as --buffer)
 //
 // Latency is the full round trip (send -> echo -> receive), measured with
@@ -84,6 +86,8 @@ namespace {
 		size_t                pipe_buffer = datapath::options{}.pipe_buffer;
 		bool                  yield       = datapath::context_options{}.yield;
 		bool                  alertable   = false;
+		bool                  mmcss       = false;
+		int                   priority    = 0;
 	};
 
 	int current_pid()
@@ -150,6 +154,10 @@ namespace {
 				c.yield = false;
 			} else if (a == "--alertable") {
 				c.alertable = true;
+			} else if (a == "--mmcss") {
+				c.mmcss = true;
+			} else if (a == "--priority") {
+				c.priority = int(std::strtol(next(), nullptr, 10));
 			} else if (a == "--load") {
 				c.load = true;
 			} else {
@@ -169,6 +177,8 @@ namespace {
 		o.io_threads = c.threads;
 		o.yield      = c.yield;
 		o.alertable  = c.alertable;
+		o.mmcss      = c.mmcss;
+		o.priority   = c.priority;
 		return datapath::context::create(o);
 	}
 
@@ -374,8 +384,8 @@ namespace {
 			bulk->start();
 		}
 
-		std::printf("DataPath benchmark: platform=%s spin=%ldus io_threads=%zu clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s load=%s\n",
-					platform_name(), c.spin, c.threads, c.clients, c.buffer, c.pipe_buffer, c.yield ? "on" : "off", c.alertable ? "on" : "off", c.load ? "1MiB stream" : "off");
+		std::printf("DataPath benchmark: platform=%s spin=%ldus io_threads=%zu clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s mmcss=%s priority=%d load=%s\n",
+					platform_name(), c.spin, c.threads, c.clients, c.buffer, c.pipe_buffer, c.yield ? "on" : "off", c.alertable ? "on" : "off", c.mmcss ? "on" : "off", c.priority, c.load ? "1MiB stream" : "off");
 		std::printf("Full round-trip latency in microseconds.\n");
 		std::printf("%10s %8s %9s %9s %9s %9s %9s %10s\n", "size", "count", "min", "p50", "p99", "p99.9", "max",
 					"MiB/s");
@@ -440,7 +450,8 @@ namespace {
 						   + std::wstring(threads.begin(), threads.end()) + L" --buffer "
 						   + std::wstring(buffer.begin(), buffer.end()) + L" --pipe-buffer "
 						   + std::wstring(pipebuf.begin(), pipebuf.end()) + (c.yield ? L" --yield" : L" --no-yield")
-						   + (c.alertable ? L" --alertable" : L"");
+						   + (c.alertable ? L" --alertable" : L"") + (c.mmcss ? L" --mmcss" : L"") + L" --priority "
+						   + std::to_wstring(c.priority);
 		STARTUPINFOW        si{};
 		PROCESS_INFORMATION pi{};
 		si.cb = sizeof(si);
@@ -462,6 +473,10 @@ namespace {
 		args.push_back(c.yield ? "--yield" : "--no-yield");
 		if (c.alertable)
 			args.push_back("--alertable");
+		if (c.mmcss)
+			args.push_back("--mmcss");
+		args.push_back("--priority");
+		args.push_back(std::to_string(c.priority));
 		std::vector<char*>       cargv;
 		for (auto& a : args)
 			cargv.push_back(&a[0]);
@@ -491,7 +506,7 @@ int main(int argc, char** argv)
 	if (!parse(argc, argv, c)) {
 		std::fprintf(stderr,
 					 "usage: %s local|server <name>|client <name> [--sizes a,b,..] [--count n] [--clients n]\n"
-					 "       [--spin us] [--threads n] [--buffer bytes] [--pipe-buffer bytes] [--yield|--no-yield] [--alertable] [--load]\n",
+					 "       [--spin us] [--threads n] [--buffer bytes] [--pipe-buffer bytes] [--yield|--no-yield] [--alertable] [--mmcss] [--priority 0..3] [--load]\n",
 					 argc > 0 ? argv[0] : "datapath-benchmark");
 		return 2;
 	}
