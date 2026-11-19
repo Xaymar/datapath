@@ -47,6 +47,7 @@ namespace bench {
 		int                 priority    = datapath::context_options{}.priority;
 		size_t              runs        = 1;
 		int                 stress      = -1; // -1 off, 0 = one thread per logical core
+		int                 stress_nice = 0;  // Linux: nice value of the stress process
 		int                 ideal_core  = datapath::context_options{}.ideal_core;
 	};
 
