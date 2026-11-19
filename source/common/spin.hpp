@@ -21,6 +21,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #if defined(_M_X64) || defined(_M_IX86) || defined(__x86_64__) || defined(__i386__)
 #include <immintrin.h>
 #define DATAPATH_CPU_RELAX() _mm_pause()
+#elif defined(_M_ARM64) || defined(_M_ARM)
+#include <intrin.h>
+#define DATAPATH_CPU_RELAX() __yield()
 #elif defined(__aarch64__) || defined(__arm__)
 #define DATAPATH_CPU_RELAX() __asm__ __volatile__("yield")
 #else
