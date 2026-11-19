@@ -24,6 +24,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <cstring>
 #include <algorithm>
 #include <atomic>
+#include <mutex>
 #include <chrono>
 #include <thread>
 #include <vector>
@@ -89,6 +90,59 @@ TEST(filesystem_socket_roundtrip_and_stale_file)
 	std::shared_ptr<datapath::socket> c;
 	CHECK_EQ(datapath::connect(c, path), error::Success);
 	CHECK(c->good());
+}
+
+TEST(accept_survives_client_that_already_left)
+{
+	// Queue a connection whose client is already gone ahead of a live one
+	// while the I/O thread is busy. Accepting the dead one must not stall the
+	// live one (macOS: setsockopt() on it fails with EINVAL).
+	datapath::context_options co;
+	co.spin       = std::chrono::microseconds(0);
+	co.io_threads = 1;
+	auto ctx      = datapath::context::create(co);
+	CHECK(ctx != nullptr);
+	auto                              path = socket_path("dead");
+	std::shared_ptr<datapath::server> srv;
+	CHECK_EQ(datapath::host(srv, path, {}, ctx), error::Success);
+	std::vector<std::shared_ptr<datapath::socket>> keep;
+	std::mutex                                     keep_lock;
+	srv->on_accept([&](std::shared_ptr<datapath::socket> s) {
+		s->on_message([](const uint8_t*, size_t) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(300)); // hold the I/O thread
+		});
+		std::lock_guard<std::mutex> l(keep_lock);
+		keep.push_back(s);
+		return true;
+	});
+	std::shared_ptr<datapath::socket> blocker;
+	CHECK_EQ(datapath::connect(blocker, path, {}, ctx), error::Success);
+	for (int i = 0; i < 1000; i++) {
+		std::lock_guard<std::mutex> l(keep_lock);
+		if (!keep.empty())
+			break;
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
+	uint8_t byte = 1;
+	CHECK_EQ(blocker->send(&byte, 1), error::Success);
+	std::this_thread::sleep_for(std::chrono::milliseconds(50)); // the handler is sleeping now
+	{
+		int         fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
+		sockaddr_un a{};
+		a.sun_family = AF_UNIX;
+		std::memcpy(a.sun_path, path.c_str(), path.size() + 1);
+		CHECK_EQ(::connect(fd, reinterpret_cast<sockaddr*>(&a), sizeof(a)), 0);
+		::close(fd);
+	}
+	datapath::options o;
+	o.connect_timeout = std::chrono::milliseconds(2000);
+	std::shared_ptr<datapath::socket> c;
+	CHECK_EQ(datapath::connect(c, path, o, ctx), error::Success);
+	c.reset();
+	blocker.reset();
+	srv.reset();
+	std::lock_guard<std::mutex> l(keep_lock);
+	keep.clear();
 }
 
 TEST(invalid_paths)
