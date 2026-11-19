@@ -15,6 +15,9 @@ SPDX-License-Identifier: BSD-3-Clause
 #endif
 #include <sys/socket.h>
 #include <sys/resource.h>
+#ifdef __linux__
+#include <sys/syscall.h>
+#endif
 #include <sys/stat.h>
 #include <sys/un.h>
 #include <cstdio>
@@ -186,7 +189,7 @@ static int thread_priority_marker()
 #else
 static int thread_priority_marker()
 {
-	return ::getpriority(PRIO_PROCESS, id_t(::gettid()));
+	return ::getpriority(PRIO_PROCESS, id_t(pid_t(::syscall(SYS_gettid))));
 }
 #endif
 
@@ -236,7 +239,7 @@ TEST(io_thread_priority)
 	// RLIMIT_NICE and CAP_SYS_NICE: probe it on a scratch thread.
 	int  want = std::max(-20, base - 12);
 	bool can  = false;
-	std::thread([&] { can = ::setpriority(PRIO_PROCESS, id_t(::gettid()), want) == 0; }).join();
+	std::thread([&] { can = ::setpriority(PRIO_PROCESS, id_t(pid_t(::syscall(SYS_gettid))), want) == 0; }).join();
 	int got = io_thread_marker(2);
 	CHECK(got <= base);
 	if (can)
