@@ -71,7 +71,11 @@ jobs:
 
           - name: Ubuntu 26.04 / GCC / TSan
             os: ubuntu-latest
-            container: ubuntu:26.04
+            # TSan re-executes itself with ASLR disabled; Docker's default seccomp
+            # profile blocks that, and the runner's ASLR entropy is too high for TSan.
+            container:
+              image: ubuntu:26.04
+              options: --security-opt seccomp=unconfined
             cxx: g++
             build_type: RelWithDebInfo
             cxxflags: -fsanitize=thread
