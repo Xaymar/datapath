@@ -23,7 +23,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //   datapath-benchmark client <name> [options]
 //
 // Client options:
-//   --sizes 8,64,4096,65536,1048576,16777216   message sizes in bytes
+//   --sizes 8,64,4096,65536                     message sizes in bytes (add 1048576,16777216 for bulk sizes)
 //   --count 100000                              round trips per size (large sizes use fewer)
 //   --clients 1                                 concurrent ping-pong connections
 //   --spin 50                                   I/O thread spin budget in microseconds

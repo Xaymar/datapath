@@ -33,7 +33,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 namespace bench {
 	struct config {
 		std::string         mode, name;
-		std::vector<size_t> sizes   = {8, 64, 4096, 65536, 1 << 20, 16 << 20};
+		std::vector<size_t> sizes   = {8, 64, 4096, 65536};
 		size_t              count   = 100000;
 		size_t              clients = 1;
 		long                spin    = 50;

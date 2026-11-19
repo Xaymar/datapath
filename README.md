@@ -106,7 +106,7 @@ On Windows, run `build\samples\Release\datapath-benchmark.exe local`. Useful var
 * `--load` adds a 1 MiB bulk stream on a second connection and reports its throughput.
 * `--clients 8` runs eight concurrent ping-pong connections.
 * `--threads 2` uses two I/O threads per process.
-* `--sizes 8,64,4096` picks the message sizes.
+* `--sizes 8,64,4096` picks the message sizes. The default is 8 B to 64 KiB; add `1048576,16777216` to measure bulk-sized messages.
 
 You can also run `server <name>` and `client <name>` separately, in two terminals.
 
