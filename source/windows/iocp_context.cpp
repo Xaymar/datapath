@@ -103,9 +103,16 @@ namespace {
 		const auto& cores = physical_cores();
 		if (cores.empty())
 			return;
-		size_t start = opts.ideal_core >= 0 ? size_t(opts.ideal_core)
-											: size_t(GetCurrentProcessId() * 2654435761u) % cores.size();
-		PROCESSOR_NUMBER pn = cores[(start + index) % cores.size()];
+		PROCESSOR_NUMBER pn;
+		if (opts.ideal_core >= 0) {
+			pn = cores[(size_t(opts.ideal_core) + index) % cores.size()];
+		} else {
+			// Automatic: skip core 0 (interrupt/DPC heavy) when there is room.
+			size_t first = cores.size() > 2 ? 1 : 0;
+			size_t span  = cores.size() - first;
+			size_t start = size_t(GetCurrentProcessId() * 2654435761u) % span;
+			pn           = cores[first + (start + index) % span];
+		}
 		SetThreadIdealProcessorEx(GetCurrentThread(), &pn, nullptr);
 	}
 

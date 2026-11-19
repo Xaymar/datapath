@@ -45,7 +45,7 @@ TEST(options_defaults)
 	CHECK_EQ(co.io_threads, size_t(1));
 	CHECK(!co.alertable);
 	CHECK(!co.mmcss);
-	CHECK_EQ(co.ideal_core, -2);
+	CHECK_EQ(co.ideal_core, -1);
 	CHECK_EQ(co.priority, 2);
 	CHECK(!co.yield);
 
