@@ -1,3 +1,0 @@
-/usr/bin/cmake -E rm -f CMakeFiles/test_api.dir/objects.a
-/usr/bin/x86_64-w64-mingw32-ar qc CMakeFiles/test_api.dir/objects.a @CMakeFiles/test_api.dir/objects1.rsp
-/usr/bin/x86_64-w64-mingw32-g++-posix -O3 -DNDEBUG -static -static-libgcc -static-libstdc++ -Wl,--whole-archive CMakeFiles/test_api.dir/objects.a -Wl,--no-whole-archive -o test_api.exe -Wl,--out-implib,libtest_api.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles/test_api.dir/linkLibs.rsp

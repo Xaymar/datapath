@@ -1,3 +1,0 @@
-/usr/bin/cmake -E rm -f CMakeFiles/datapath-echo.dir/objects.a
-/usr/bin/x86_64-w64-mingw32-ar qc CMakeFiles/datapath-echo.dir/objects.a @CMakeFiles/datapath-echo.dir/objects1.rsp
-/usr/bin/x86_64-w64-mingw32-g++-posix -O3 -DNDEBUG -static -static-libgcc -static-libstdc++ -Wl,--whole-archive CMakeFiles/datapath-echo.dir/objects.a -Wl,--no-whole-archive -o datapath-echo.exe -Wl,--out-implib,libdatapath-echo.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles/datapath-echo.dir/linkLibs.rsp

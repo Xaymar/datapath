@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG "CMakeFiles/datapath-echo.dir/echo/main.cpp.o" -o datapath-echo  ../libdatapath.a 

@@ -1,2 +1,0 @@
-/usr/bin/x86_64-w64-mingw32-ar qc libdatapath.a CMakeFiles/datapath.dir/source/common/api.cpp.obj CMakeFiles/datapath.dir/source/common/send_queue.cpp.obj CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.obj CMakeFiles/datapath.dir/source/windows/path.cpp.obj CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.obj CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.obj CMakeFiles/datapath.dir/source/windows/security.cpp.obj
-/usr/bin/x86_64-w64-mingw32-ranlib libdatapath.a

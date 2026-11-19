@@ -1,1 +1,3 @@
-/build/.superpowers
+/build
+/build-*
+/.superpowers
