@@ -10,6 +10,7 @@
 /home/user/datapath/build/mingw/tests/CMakeFiles/test_framing.dir
 /home/user/datapath/build/mingw/tests/CMakeFiles/test_send_queue.dir
 /home/user/datapath/build/mingw/tests/CMakeFiles/test_integration.dir
+/home/user/datapath/build/mingw/tests/CMakeFiles/test_windows_security.dir
 /home/user/datapath/build/mingw/tests/CMakeFiles/test.dir
 /home/user/datapath/build/mingw/tests/CMakeFiles/edit_cache.dir
 /home/user/datapath/build/mingw/tests/CMakeFiles/rebuild_cache.dir

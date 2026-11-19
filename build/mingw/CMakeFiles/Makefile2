@@ -84,6 +84,7 @@ tests/all: tests/CMakeFiles/test_api.dir/all
 tests/all: tests/CMakeFiles/test_framing.dir/all
 tests/all: tests/CMakeFiles/test_send_queue.dir/all
 tests/all: tests/CMakeFiles/test_integration.dir/all
+tests/all: tests/CMakeFiles/test_windows_security.dir/all
 .PHONY : tests/all
 
 # Recursive "preinstall" directory target.
@@ -95,6 +96,7 @@ tests/clean: tests/CMakeFiles/test_api.dir/clean
 tests/clean: tests/CMakeFiles/test_framing.dir/clean
 tests/clean: tests/CMakeFiles/test_send_queue.dir/clean
 tests/clean: tests/CMakeFiles/test_integration.dir/clean
+tests/clean: tests/CMakeFiles/test_windows_security.dir/clean
 .PHONY : tests/clean
 
 #=============================================================================
@@ -226,6 +228,32 @@ test_integration: tests/CMakeFiles/test_integration.dir/rule
 tests/CMakeFiles/test_integration.dir/clean:
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/clean
 .PHONY : tests/CMakeFiles/test_integration.dir/clean
+
+#=============================================================================
+# Target rules for target tests/CMakeFiles/test_windows_security.dir
+
+# All Build rule for target.
+tests/CMakeFiles/test_windows_security.dir/all: CMakeFiles/datapath.dir/all
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_windows_security.dir/build.make tests/CMakeFiles/test_windows_security.dir/depend
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_windows_security.dir/build.make tests/CMakeFiles/test_windows_security.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=18,19 "Built target test_windows_security"
+.PHONY : tests/CMakeFiles/test_windows_security.dir/all
+
+# Build rule for subdir invocation for target.
+tests/CMakeFiles/test_windows_security.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/mingw/CMakeFiles 10
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_windows_security.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/mingw/CMakeFiles 0
+.PHONY : tests/CMakeFiles/test_windows_security.dir/rule
+
+# Convenience name for target.
+test_windows_security: tests/CMakeFiles/test_windows_security.dir/rule
+.PHONY : test_windows_security
+
+# clean rule for target.
+tests/CMakeFiles/test_windows_security.dir/clean:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_windows_security.dir/build.make tests/CMakeFiles/test_windows_security.dir/clean
+.PHONY : tests/CMakeFiles/test_windows_security.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.

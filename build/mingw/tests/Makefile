@@ -227,6 +227,20 @@ test_integration/fast:
 	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/build
 .PHONY : test_integration/fast
 
+# Convenience name for target.
+tests/CMakeFiles/test_windows_security.dir/rule:
+	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_windows_security.dir/rule
+.PHONY : tests/CMakeFiles/test_windows_security.dir/rule
+
+# Convenience name for target.
+test_windows_security: tests/CMakeFiles/test_windows_security.dir/rule
+.PHONY : test_windows_security
+
+# fast build rule for target.
+test_windows_security/fast:
+	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_windows_security.dir/build.make tests/CMakeFiles/test_windows_security.dir/build
+.PHONY : test_windows_security/fast
+
 raw_peer.obj: raw_peer.cpp.obj
 .PHONY : raw_peer.obj
 
@@ -347,6 +361,30 @@ test_send_queue.cpp.s:
 	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_send_queue.dir/build.make tests/CMakeFiles/test_send_queue.dir/test_send_queue.cpp.s
 .PHONY : test_send_queue.cpp.s
 
+test_windows_security.obj: test_windows_security.cpp.obj
+.PHONY : test_windows_security.obj
+
+# target to build an object file
+test_windows_security.cpp.obj:
+	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_windows_security.dir/build.make tests/CMakeFiles/test_windows_security.dir/test_windows_security.cpp.obj
+.PHONY : test_windows_security.cpp.obj
+
+test_windows_security.i: test_windows_security.cpp.i
+.PHONY : test_windows_security.i
+
+# target to preprocess a source file
+test_windows_security.cpp.i:
+	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_windows_security.dir/build.make tests/CMakeFiles/test_windows_security.dir/test_windows_security.cpp.i
+.PHONY : test_windows_security.cpp.i
+
+test_windows_security.s: test_windows_security.cpp.s
+.PHONY : test_windows_security.s
+
+# target to generate assembly for a file
+test_windows_security.cpp.s:
+	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_windows_security.dir/build.make tests/CMakeFiles/test_windows_security.dir/test_windows_security.cpp.s
+.PHONY : test_windows_security.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -364,6 +402,7 @@ help:
 	@echo "... test_framing"
 	@echo "... test_integration"
 	@echo "... test_send_queue"
+	@echo "... test_windows_security"
 	@echo "... raw_peer.obj"
 	@echo "... raw_peer.i"
 	@echo "... raw_peer.s"
@@ -379,6 +418,9 @@ help:
 	@echo "... test_send_queue.obj"
 	@echo "... test_send_queue.i"
 	@echo "... test_send_queue.s"
+	@echo "... test_windows_security.obj"
+	@echo "... test_windows_security.i"
+	@echo "... test_windows_security.s"
 .PHONY : help
 
 

@@ -1,0 +1,3 @@
+/usr/bin/cmake -E rm -f CMakeFiles/test_windows_security.dir/objects.a
+/usr/bin/x86_64-w64-mingw32-ar qc CMakeFiles/test_windows_security.dir/objects.a @CMakeFiles/test_windows_security.dir/objects1.rsp
+/usr/bin/x86_64-w64-mingw32-g++-posix -O3 -DNDEBUG -static -static-libgcc -static-libstdc++ -Wl,--whole-archive CMakeFiles/test_windows_security.dir/objects.a -Wl,--no-whole-archive -o test_windows_security.exe -Wl,--out-implib,libtest_windows_security.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles/test_windows_security.dir/linkLibs.rsp

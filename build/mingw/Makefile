@@ -236,6 +236,19 @@ test_integration/fast:
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/build
 .PHONY : test_integration/fast
 
+#=============================================================================
+# Target rules for targets named test_windows_security
+
+# Build rule for target.
+test_windows_security: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_windows_security
+.PHONY : test_windows_security
+
+# fast build rule for target.
+test_windows_security/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_windows_security.dir/build.make tests/CMakeFiles/test_windows_security.dir/build
+.PHONY : test_windows_security/fast
+
 source/common/api.obj: source/common/api.cpp.obj
 .PHONY : source/common/api.obj
 
@@ -422,6 +435,7 @@ help:
 	@echo "... test_framing"
 	@echo "... test_integration"
 	@echo "... test_send_queue"
+	@echo "... test_windows_security"
 	@echo "... source/common/api.obj"
 	@echo "... source/common/api.i"
 	@echo "... source/common/api.s"
