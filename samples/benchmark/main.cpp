@@ -30,12 +30,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //   --threads 1                                 I/O threads
 //   --load                                      stream 1 MiB messages on an extra connection meanwhile
 //   --buffer 65536                              receive buffer per connection
-//   --yield / --no-yield                        Sleep(0)/sched_yield after sends and while spinning
-//                                               (default: on for Windows, off elsewhere)
+//   --yield / --no-yield                        Sleep(0)/sched_yield after sends and while spinning (default off)
 //   --alertable                                 Windows: alertable completion-port waits
 //   --runs 1                                    repeat each size N times; report the median of the runs
 //                                               and the lowest/highest p99.9 across them
-//   --mmcss                                     Windows: register I/O threads with MMCSS ("Pro Audio")
+//   --mmcss / --no-mmcss                        Windows: register I/O threads with MMCSS (default on)
 //   --priority 0..3                             Windows: I/O thread priority (normal .. time critical, default 2)
 //   --pipe-buffer 0                             Windows kernel pipe buffer (0 = same as --buffer)
 //
@@ -88,7 +87,7 @@ namespace {
 		size_t                pipe_buffer = datapath::options{}.pipe_buffer;
 		bool                  yield       = datapath::context_options{}.yield;
 		bool                  alertable   = false;
-		bool                  mmcss       = false;
+		bool                  mmcss       = datapath::context_options{}.mmcss;
 		int                   priority    = datapath::context_options{}.priority;
 		size_t                runs        = 1;
 	};
@@ -161,6 +160,8 @@ namespace {
 				c.runs = std::max<size_t>(1, size_t(std::strtoull(next(), nullptr, 10)));
 			} else if (a == "--mmcss") {
 				c.mmcss = true;
+			} else if (a == "--no-mmcss") {
+				c.mmcss = false;
 			} else if (a == "--priority") {
 				c.priority = int(std::strtol(next(), nullptr, 10));
 			} else if (a == "--load") {
@@ -408,6 +409,30 @@ namespace {
 			return v[v.size() / 2];
 		};
 
+		// Discarded warm-up: process start-up, page faults and CPU clock ramp-up
+		// otherwise land in whichever size is measured first.
+		{
+			auto deadline = now_ns() + 1000000000; // 1 s
+			for (auto& p : pingers) {
+				p->payload.assign(64, 0xa5);
+				p->payload[0] = tag_ping;
+			}
+			while (now_ns() < deadline) {
+				for (auto& p : pingers) {
+					p->samples.clear();
+					p->samples.reserve(10000);
+					p->warmup   = 0;
+					p->count    = 10000;
+					p->done     = 0;
+					p->finished = false;
+					p->send_one();
+				}
+				for (auto& p : pingers)
+					if (!p->wait())
+						return 1;
+			}
+		}
+
 		for (size_t size : c.sizes) {
 			size = std::max<size_t>(size, 1);
 			// Keep each size to roughly 2 GiB of traffic per client.
@@ -487,7 +512,7 @@ namespace {
 						   + std::wstring(threads.begin(), threads.end()) + L" --buffer "
 						   + std::wstring(buffer.begin(), buffer.end()) + L" --pipe-buffer "
 						   + std::wstring(pipebuf.begin(), pipebuf.end()) + (c.yield ? L" --yield" : L" --no-yield")
-						   + (c.alertable ? L" --alertable" : L"") + (c.mmcss ? L" --mmcss" : L"") + L" --priority "
+						   + (c.alertable ? L" --alertable" : L"") + (c.mmcss ? L" --mmcss" : L" --no-mmcss") + L" --priority "
 						   + std::to_wstring(c.priority);
 		STARTUPINFOW        si{};
 		PROCESS_INFORMATION pi{};
@@ -510,8 +535,7 @@ namespace {
 		args.push_back(c.yield ? "--yield" : "--no-yield");
 		if (c.alertable)
 			args.push_back("--alertable");
-		if (c.mmcss)
-			args.push_back("--mmcss");
+		args.push_back(c.mmcss ? "--mmcss" : "--no-mmcss");
 		args.push_back("--priority");
 		args.push_back(std::to_string(c.priority));
 		std::vector<char*>       cargv;
@@ -543,7 +567,7 @@ int main(int argc, char** argv)
 	if (!parse(argc, argv, c)) {
 		std::fprintf(stderr,
 					 "usage: %s local|server <name>|client <name> [--sizes a,b,..] [--count n] [--clients n]\n"
-					 "       [--spin us] [--threads n] [--buffer bytes] [--pipe-buffer bytes] [--yield|--no-yield] [--alertable] [--runs n] [--mmcss] [--priority 0..3] [--load]\n",
+					 "       [--spin us] [--threads n] [--buffer bytes] [--pipe-buffer bytes] [--yield|--no-yield] [--alertable] [--runs n] [--mmcss|--no-mmcss] [--priority 0..3] [--load]\n",
 					 argc > 0 ? argv[0] : "datapath-benchmark");
 		return 2;
 	}

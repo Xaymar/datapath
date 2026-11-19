@@ -44,13 +44,9 @@ TEST(options_defaults)
 	CHECK_EQ(co.spin.count(), 50);
 	CHECK_EQ(co.io_threads, size_t(1));
 	CHECK(!co.alertable);
-	CHECK(!co.mmcss);
+	CHECK(co.mmcss);
 	CHECK_EQ(co.priority, 2);
-#ifdef _WIN32
-	CHECK(co.yield);
-#else
 	CHECK(!co.yield);
-#endif
 
 	datapath::options o;
 	CHECK_EQ(o.max_message_size, uint64_t(64) << 20);

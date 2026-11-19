@@ -30,26 +30,22 @@ namespace datapath {
 		std::chrono::microseconds spin{50};
 		// Number of I/O threads.
 		size_t io_threads = 1;
-		// Yield the CPU (Windows: Sleep(0), Linux: sched_yield) after a send has
-		// written its data and between busy-poll iterations, so a peer thread that
-		// was just woken on this core runs at once instead of waiting for our
-		// time slice to end.
 		// Windows only: register I/O threads with the Multimedia Class Scheduler
-		// Service ("Pro Audio" task, critical priority) to reduce preemption.
-		// Recommended with spin = 0: it shortens wake-up tails from a real sleep.
-		bool mmcss = false;
-		// Windows only: I/O thread priority. 0 = normal, 1 = above normal,
-		// 2 = highest (default: measurably shortens the p99.9 tail), 3 = time critical.
+		// Service ("Pro Audio" task, critical priority). Default on: over 5-run
+		// medians it cut 64 KiB p99.9 from ~190 to ~83 us and shortened large-message
+		// and spin = 0 tails, with no cost for small messages.
+		bool mmcss = true;
+		// Windows only: I/O thread priority, applied before MMCSS and kept if MMCSS
+		// registration fails. 0 = normal, 1 = above normal, 2 = highest,
+		// 3 = time critical. Normal priority made large-message tails 2x worse.
 		int priority = 2;
 		// Windows only: block in an alertable wait (GetQueuedCompletionStatusEx with
 		// fAlertable = TRUE), so the scheduler may run the I/O thread early.
 		bool alertable = false;
-		// Default on Windows, where it measurably cuts p99 latency; off elsewhere.
-#ifdef _WIN32
-		bool yield = true;
-#else
+		// Yield the CPU (Windows: Sleep(0), Linux: sched_yield) after a send has
+		// written its data and between busy-poll iterations. Off by default: 5-run
+		// medians on Windows showed no gain (slightly higher p50 and p99).
 		bool yield = false;
-#endif
 	};
 
 	// Per-connection / per-server settings.
