@@ -2,6 +2,8 @@ add_executable(datapath-benchmark
 	benchmark/main.cpp
 	benchmark/clock.hpp
 	benchmark/stats.hpp
+	benchmark/matrix.cmd
+	benchmark/matrix.sh
 )
 target_link_libraries(datapath-benchmark PRIVATE datapath)
 

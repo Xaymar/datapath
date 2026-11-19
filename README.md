@@ -112,6 +112,8 @@ On Windows, run `build\samples\Release\datapath-benchmark.exe local`. Useful var
 
 You can also run `server <name>` and `client <name>` separately, in two terminals.
 
+Single runs are noisy at microsecond resolution. `--runs 5` repeats every size five times and reports the median, plus the lowest and highest p99.9 of any run. `samples\benchmark\matrix.cmd` (Windows) and `samples/benchmark/matrix.sh` (Linux) run every option combination that way and collect the output in `benchmark-results.txt`.
+
 For stable numbers on Windows, use the High Performance power plan. Run from a foreground console and close CPU-heavy applications.
 
 ## License

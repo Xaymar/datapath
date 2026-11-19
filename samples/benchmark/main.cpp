@@ -33,6 +33,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //   --yield / --no-yield                        Sleep(0)/sched_yield after sends and while spinning
 //                                               (default: on for Windows, off elsewhere)
 //   --alertable                                 Windows: alertable completion-port waits
+//   --runs 1                                    repeat each size N times; report the median of the runs
+//                                               and the lowest/highest p99.9 across them
 //   --mmcss                                     Windows: register I/O threads with MMCSS ("Pro Audio")
 //   --priority 0..3                             Windows: I/O thread priority (normal .. time critical, default 2)
 //   --pipe-buffer 0                             Windows kernel pipe buffer (0 = same as --buffer)
@@ -88,6 +90,7 @@ namespace {
 		bool                  alertable   = false;
 		bool                  mmcss       = false;
 		int                   priority    = datapath::context_options{}.priority;
+		size_t                runs        = 1;
 	};
 
 	int current_pid()
@@ -154,6 +157,8 @@ namespace {
 				c.yield = false;
 			} else if (a == "--alertable") {
 				c.alertable = true;
+			} else if (a == "--runs") {
+				c.runs = std::max<size_t>(1, size_t(std::strtoull(next(), nullptr, 10)));
 			} else if (a == "--mmcss") {
 				c.mmcss = true;
 			} else if (a == "--priority") {
@@ -387,8 +392,21 @@ namespace {
 		std::printf("DataPath benchmark: platform=%s spin=%ldus io_threads=%zu clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s mmcss=%s priority=%d load=%s\n",
 					platform_name(), c.spin, c.threads, c.clients, c.buffer, c.pipe_buffer, c.yield ? "on" : "off", c.alertable ? "on" : "off", c.mmcss ? "on" : "off", c.priority, c.load ? "1MiB stream" : "off");
 		std::printf("Full round-trip latency in microseconds.\n");
-		std::printf("%10s %8s %9s %9s %9s %9s %9s %10s\n", "size", "count", "min", "p50", "p99", "p99.9", "max",
-					"MiB/s");
+		if (c.runs > 1)
+			std::printf("Each row: median of %zu runs; p99.9 lo/hi = lowest/highest p99.9 of any run.\n", c.runs);
+		std::printf("%10s %8s %9s %9s %9s %9s %9s %10s", "size", "count", "min", "p50", "p99", "p99.9", "max", "MiB/s");
+		if (c.runs > 1)
+			std::printf(" %9s %9s", "p99.9 lo", "p99.9 hi");
+		std::printf("\n");
+
+		struct run_result {
+			summary s;
+			double  mibs;
+		};
+		auto median = [](std::vector<double> v) {
+			std::sort(v.begin(), v.end());
+			return v[v.size() / 2];
+		};
 
 		for (size_t size : c.sizes) {
 			size = std::max<size_t>(size, 1);
@@ -396,6 +414,8 @@ namespace {
 			size_t count  = std::max<size_t>(50, std::min(c.count, (size_t(2) << 30) / size));
 			size_t warmup = std::max<size_t>(10, count / 20);
 
+			std::vector<run_result> results;
+			for (size_t run = 0; run < c.runs; run++) {
 			int64_t t0 = now_ns();
 			for (auto& p : pingers) {
 				p->payload.assign(size, 0xa5);
@@ -418,9 +438,26 @@ namespace {
 			}
 			double secs = double(now_ns() - t0) / 1e9;
 			double mibs = double(size) * double((count + warmup) * pingers.size()) * 2.0 / secs / (1 << 20);
-			auto   s    = summarize(all);
-			std::printf("%10zu %8zu %9.2f %9.2f %9.2f %9.2f %9.2f %10.1f\n", size, count * pingers.size(), s.min_us,
-						s.p50_us, s.p99_us, s.p999_us, s.max_us, mibs);
+			results.push_back({summarize(all), mibs});
+			}
+
+			auto pick = [&](auto field) {
+				std::vector<double> v;
+				for (auto& r : results)
+					v.push_back(field(r));
+				return v;
+			};
+			auto p999 = pick([](const run_result& r) { return r.s.p999_us; });
+			std::printf("%10zu %8zu %9.2f %9.2f %9.2f %9.2f %9.2f %10.1f", size, count * pingers.size(),
+						median(pick([](const run_result& r) { return r.s.min_us; })),
+						median(pick([](const run_result& r) { return r.s.p50_us; })),
+						median(pick([](const run_result& r) { return r.s.p99_us; })), median(p999),
+						median(pick([](const run_result& r) { return r.s.max_us; })),
+						median(pick([](const run_result& r) { return r.mibs; })));
+			if (c.runs > 1)
+				std::printf(" %9.2f %9.2f", *std::min_element(p999.begin(), p999.end()),
+							*std::max_element(p999.begin(), p999.end()));
+			std::printf("\n");
 			std::fflush(stdout);
 		}
 
@@ -506,7 +543,7 @@ int main(int argc, char** argv)
 	if (!parse(argc, argv, c)) {
 		std::fprintf(stderr,
 					 "usage: %s local|server <name>|client <name> [--sizes a,b,..] [--count n] [--clients n]\n"
-					 "       [--spin us] [--threads n] [--buffer bytes] [--pipe-buffer bytes] [--yield|--no-yield] [--alertable] [--mmcss] [--priority 0..3] [--load]\n",
+					 "       [--spin us] [--threads n] [--buffer bytes] [--pipe-buffer bytes] [--yield|--no-yield] [--alertable] [--runs n] [--mmcss] [--priority 0..3] [--load]\n",
 					 argc > 0 ? argv[0] : "datapath-benchmark");
 		return 2;
 	}
