@@ -30,7 +30,16 @@ Full round trip (send → echo → receive), ping-pong between two processes, re
 
 While another connection streams 1 MiB messages at 4–5 GiB/s, small-message round trips stay at p99.9 ≈ 2 ms with one I/O thread, and ≈ 0.25 ms with two.
 
-Windows numbers come from `datapath-benchmark local` on real hardware; see [Benchmarking](#benchmarking). The original DataPath reached 11.9 µs round-trip p99.9 on Windows 10, and that is the target to beat.
+| Windows, desktop PC | p50 | p99 | p99.9 |
+|---|---|---|---|
+| 8 B | 3.3 µs | 4.7–6.7 µs | 10–14 µs |
+| 64 B | 3.3 µs | 4.9–5.0 µs | 10.8–13 µs |
+| 4 KiB | 5.9 µs | 7.8–10 µs | 21–27 µs |
+| 64 KiB | 25.9 µs | 39–46 µs | 98–134 µs |
+| 1 MiB | 0.53 ms | 0.8–1.0 ms | 1.0–1.2 ms |
+| 16 MiB | 8.5 ms | 9.2–9.8 ms | 9.3–10.2 ms |
+
+Large messages move at about 3.6 GiB/s per direction on Windows. With a 1 MiB bulk stream running at 2.1 GiB/s on another connection (two I/O threads), small-message round trips stay at p99.9 30–50 µs. The original DataPath reached 11.9 µs round-trip p99.9 on Windows 10; this version reaches 10–14 µs for small messages with a 3.3 µs median.
 
 ## Usage
 ```cpp
@@ -63,7 +72,7 @@ See `samples/echo/main.cpp` for a complete program.
 * **Backpressure.** `send()` never blocks. It returns `TooLarge` above the connection's message size limit (`options::max_message_size`, default 64 MiB; the smaller of both peers' values applies). It returns `WouldBlock` when more than `options::max_queued_bytes` (default 64 MiB) is waiting. A message is either queued whole or rejected. Split very large payloads yourself.
 * **Closing.** `close()` drops unsent messages and fires `on_close` once, on an I/O thread. Destroying your last `shared_ptr` to a socket or server closes it too. That waits for a handler that is currently running on another thread, and no handler of that object runs afterwards (`on_close` doesn't fire either). So it's safe to destroy what your handlers capture right after the handle.
 * **Contexts.** All sockets share one process-wide context (I/O threads) by default. Create your own with `datapath::context::create({spin, io_threads})` and pass it to `connect`/`host` for separate tuning. Destroying a context closes everything on it.
-* **Windows scheduling.** `context_options::yield` (default on for Windows) calls `Sleep(0)` after a send writes data and between busy-poll iterations, so a receiver the write just woke can run on that core at once. On Windows this cut small-message p99 from about 9 µs to 5 µs. `context_options::alertable` makes the I/O threads wait alertably (experimental, default off).
+* **Windows scheduling.** `context_options::yield` (default on for Windows) calls `Sleep(0)` after a send writes data and between busy-poll iterations, so a receiver the write just woke can run on that core at once. On Windows this cut small-message p99 from about 9 µs to 5 µs. `context_options::alertable` makes the I/O threads wait alertably; it measured no difference, so it is off by default.
 * **Buffers.** `options::receive_buffer` (256 KiB) holds incoming frames; reads adapt their size to the traffic, so a large buffer doesn't slow down small messages. `options::pipe_buffer` (1 MiB) is the Windows kernel pipe buffer.
 * **Tuning.** `context_options::spin` (default 50 µs) is how long an I/O thread busy-polls after the last event before sleeping in the kernel. Higher values cut tail latency for bursty traffic and cost CPU only while traffic flows. `0` disables spinning. On Windows the I/O threads also opt out of EcoQoS power throttling.
 * **Paths.** A bare name maps to `\\.\pipe\<name>` on Windows and to the abstract socket `datapath.<name>` on Linux. On Linux, a path starting with `/` is a filesystem socket instead, created with mode `0600`/`0660`/`0666` for `User`/`Group`/`World` and removed on close.
