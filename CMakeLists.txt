@@ -13,7 +13,7 @@ set(DATAPATH_VERSION_PATCH 0)
 project(datapath
 	VERSION ${DATAPATH_VERSION_ABI}.${DATAPATH_VERSION_PATCH}
 	DESCRIPTION "High performance, low latency IPC library"
-	LANGUAGES CXX
+	LANGUAGES C CXX
 )
 
 if("${CMAKE_SOURCE_DIR}" STREQUAL "${PROJECT_SOURCE_DIR}")
@@ -42,6 +42,7 @@ configure_file(
 set(DATAPATH_PUBLIC_HEADERS
 	"${PROJECT_BINARY_DIR}/generated/include/datapath/version.hpp"
 	include/datapath/context.hpp
+	include/datapath/datapath.h
 	include/datapath/datapath.hpp
 	include/datapath/error.hpp
 	include/datapath/options.hpp
@@ -51,6 +52,7 @@ set(DATAPATH_PUBLIC_HEADERS
 )
 set(DATAPATH_SOURCES
 	source/common/api.cpp
+	source/common/c_api.cpp
 	source/common/connection_base.hpp
 	source/common/detail.hpp
 	source/common/endian.hpp
@@ -104,6 +106,11 @@ target_include_directories(datapath
 	PRIVATE
 		"${PROJECT_SOURCE_DIR}/source"
 )
+# C API export macro (see include/datapath/datapath.h).
+target_compile_definitions(datapath PRIVATE DATAPATH_BUILDING)
+if(NOT DATAPATH_SHARED)
+	target_compile_definitions(datapath PUBLIC DATAPATH_STATIC)
+endif()
 set_target_properties(datapath PROPERTIES
 	CXX_VISIBILITY_PRESET hidden
 	POSITION_INDEPENDENT_CODE ON
