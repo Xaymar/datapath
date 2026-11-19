@@ -35,21 +35,9 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <stddef.h>
 #include <stdint.h>
 
-/* Symbol visibility. Define DATAPATH_STATIC when linking the static library
- * (the CMake target does this for you). */
-#if defined(DATAPATH_STATIC)
-#define DATAPATH_C_API
-#elif defined(_WIN32) || defined(__CYGWIN__)
-#if defined(DATAPATH_BUILDING)
-#define DATAPATH_C_API __declspec(dllexport)
-#else
-#define DATAPATH_C_API __declspec(dllimport)
-#endif
-#elif defined(__GNUC__) || defined(__clang__)
-#define DATAPATH_C_API __attribute__((visibility("default")))
-#else
-#define DATAPATH_C_API
-#endif
+/* Symbol visibility: the same switches as the C++ API (datapath/export.h). */
+#include <datapath/export.h>
+#define DATAPATH_C_API DATAPATH_API
 
 #ifdef __cplusplus
 extern "C" {

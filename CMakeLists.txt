@@ -156,11 +156,6 @@ target_include_directories(datapath
 		"$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/generated/include>"
 		"$<INSTALL_INTERFACE:include>"
 )
-# C API export macro (see include/datapath/datapath.h).
-target_compile_definitions(datapath PRIVATE DATAPATH_BUILDING)
-if(NOT DATAPATH_SHARED)
-	target_compile_definitions(datapath PUBLIC DATAPATH_STATIC)
-endif()
 set_target_properties(datapath PROPERTIES
 	VERSION ${DATAPATH_VERSION_ABI}.${DATAPATH_VERSION_PATCH}
 	SOVERSION ${DATAPATH_VERSION_ABI}
