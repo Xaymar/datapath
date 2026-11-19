@@ -625,8 +625,13 @@ TEST(drop_context_inside_callback)
 		local.reset();
 		done.notify();
 	});
-	(*slot)->server_side->send("x", 1);
+	// Keep our own reference while sending: send() writes inline, and the
+	// callback may drop the holder (and with it every other reference) on the
+	// I/O thread before send() has returned.
+	sock_ptr sender = (*slot)->server_side;
+	sender->send("x", 1);
 	CHECK(done.wait(1));
+	sender.reset();
 	std::this_thread::sleep_for(300ms); // let the context finish tearing down
 	delete slot;
 }
