@@ -7,7 +7,7 @@ RUNS="${2:-5}"
 OUT=benchmark-results.txt
 [ -x "$BENCH" ] || { echo "Benchmark not found: $BENCH"; exit 1; }
 echo "DataPath benchmark matrix, $RUNS runs per size" > "$OUT"
-for opts in "" "--yield" "--spin 0" "--spin 200" "--threads 2" "--clients 8" "--clients 8 --threads 4" "--load --threads 2"; do
+for opts in "" "--yield" "--spin 0" "--spin 200" "--threads 2" "--clients 8" "--clients 8 --threads 4" "--load --threads 2" "--stress 0" "--stress 0 --spin 0"; do
 	printf '\n==== %s\n' "${opts:-defaults}" >> "$OUT"
 	echo "Running: ${opts:-defaults}"
 	# shellcheck disable=SC2086

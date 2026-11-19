@@ -34,6 +34,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //   --alertable                                 Windows: alertable completion-port waits
 //   --runs 1                                    repeat each size N times; report the median of the runs
 //                                               and the lowest/highest p99.9 across them
+//   --stress N                                  local mode: load all cores with N busy threads in a
+//                                               separate process (0 = one per logical core)
 //   --mmcss / --no-mmcss                        Windows: register I/O threads with MMCSS (default on)
 //   --priority 0..3                             Windows: I/O thread priority (normal .. time critical, default 2)
 //   --pipe-buffer 0                             Windows kernel pipe buffer (0 = same as --buffer)
@@ -90,6 +92,7 @@ namespace {
 		bool                  mmcss       = datapath::context_options{}.mmcss;
 		int                   priority    = datapath::context_options{}.priority;
 		size_t                runs        = 1;
+		int                   stress      = -1; // -1 off, 0 = one thread per logical core
 	};
 
 	int current_pid()
@@ -121,6 +124,9 @@ namespace {
 				return false;
 			c.name = argv[2];
 			i      = 3;
+		} else if (c.mode == "stress") {
+			c.stress = argc > 2 ? int(std::strtol(argv[2], nullptr, 10)) : 0;
+			return true;
 		} else if (c.mode != "local") {
 			return false;
 		}
@@ -156,6 +162,8 @@ namespace {
 				c.yield = false;
 			} else if (a == "--alertable") {
 				c.alertable = true;
+			} else if (a == "--stress") {
+				c.stress = int(std::strtol(next(), nullptr, 10));
 			} else if (a == "--runs") {
 				c.runs = std::max<size_t>(1, size_t(std::strtoull(next(), nullptr, 10)));
 			} else if (a == "--mmcss") {
@@ -390,8 +398,9 @@ namespace {
 			bulk->start();
 		}
 
-		std::printf("DataPath benchmark: platform=%s spin=%ldus io_threads=%zu clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s mmcss=%s priority=%d load=%s\n",
-					platform_name(), c.spin, c.threads, c.clients, c.buffer, c.pipe_buffer, c.yield ? "on" : "off", c.alertable ? "on" : "off", c.mmcss ? "on" : "off", c.priority, c.load ? "1MiB stream" : "off");
+		std::printf("DataPath benchmark: platform=%s spin=%ldus io_threads=%zu clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s mmcss=%s priority=%d stress=%s load=%s\n",
+					platform_name(), c.spin, c.threads, c.clients, c.buffer, c.pipe_buffer, c.yield ? "on" : "off", c.alertable ? "on" : "off", c.mmcss ? "on" : "off", c.priority,
+					c.stress < 0 ? "off" : (c.stress == 0 ? "all cores" : std::to_string(c.stress).c_str()), c.load ? "1MiB stream" : "off");
 		std::printf("Full round-trip latency in microseconds.\n");
 		if (c.runs > 1)
 			std::printf("Each row: median of %zu runs; p99.9 lo/hi = lowest/highest p99.9 of any run.\n", c.runs);
@@ -495,69 +504,135 @@ namespace {
 		return 0;
 	}
 
+	// ---------------------------------------------------------------- stress
+
+	// Keep every core busy like ordinary applications would: integer work plus a
+	// streaming pass over an 8 MiB buffer per loop to evict other data from the
+	// caches. Runs at normal priority until the parent kills the process.
+	int run_stress(const config& c)
+	{
+		unsigned n = c.stress > 0 ? unsigned(c.stress) : std::max(1u, std::thread::hardware_concurrency());
+		std::vector<std::thread> ts;
+		for (unsigned t = 0; t < n; t++) {
+			ts.emplace_back([t] {
+				std::vector<uint64_t> buf((8u << 20) / sizeof(uint64_t), t);
+				volatile uint64_t     sink = 0;
+				uint64_t              x    = 0x9e3779b97f4a7c15ull * (t + 1);
+				for (;;) {
+					for (int i = 0; i < 100000; i++)
+						x ^= (x << 13) ^ (x >> 7) ^ (x << 17);
+					for (size_t i = 0; i < buf.size(); i += 8)
+						buf[i] += x;
+					sink = sink + buf[x % buf.size()];
+				}
+			});
+		}
+		for (auto& t : ts)
+			t.join();
+		return 0;
+	}
+
+	// A child process running this executable with `args`; killed on destruction.
+	struct child_process {
+#ifdef _WIN32
+		PROCESS_INFORMATION pi{};
+		bool                ok = false;
+
+		explicit child_process(const std::vector<std::string>& args)
+		{
+			wchar_t exe[MAX_PATH];
+			GetModuleFileNameW(nullptr, exe, MAX_PATH);
+			std::wstring cmd = L"\"" + std::wstring(exe) + L"\"";
+			for (auto& a : args)
+				cmd += L" " + std::wstring(a.begin(), a.end());
+			STARTUPINFOW si{};
+			si.cb = sizeof(si);
+			ok    = CreateProcessW(nullptr, &cmd[0], nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi) != FALSE;
+		}
+		// Wait up to `ms` for a clean exit, then kill.
+		void finish(int ms)
+		{
+			if (!ok)
+				return;
+			if (WaitForSingleObject(pi.hProcess, DWORD(ms)) != WAIT_OBJECT_0)
+				TerminateProcess(pi.hProcess, 1);
+			WaitForSingleObject(pi.hProcess, 5000);
+			CloseHandle(pi.hThread);
+			CloseHandle(pi.hProcess);
+			ok = false;
+		}
+#else
+		pid_t pid = -1;
+		bool  ok  = false;
+
+		explicit child_process(const std::vector<std::string>& args)
+		{
+			std::vector<std::string> all = {"datapath-benchmark"};
+			all.insert(all.end(), args.begin(), args.end());
+			std::vector<char*> argv;
+			for (auto& a : all)
+				argv.push_back(&a[0]);
+			argv.push_back(nullptr);
+			ok = posix_spawn(&pid, "/proc/self/exe", nullptr, nullptr, argv.data(), environ) == 0;
+		}
+		void finish(int ms)
+		{
+			if (!ok)
+				return;
+			for (int waited = 0; waited < ms; waited += 50) {
+				int status;
+				if (waitpid(pid, &status, WNOHANG) == pid) {
+					ok = false;
+					return;
+				}
+				std::this_thread::sleep_for(std::chrono::milliseconds(50));
+			}
+			kill(pid, SIGKILL);
+			waitpid(pid, nullptr, 0);
+			ok = false;
+		}
+#endif
+		~child_process()
+		{
+			finish(0);
+		}
+		child_process(const child_process&)            = delete;
+		child_process& operator=(const child_process&) = delete;
+	};
+
 	// ---------------------------------------------------------------- local
 
-	int run_local(int argc, char** argv, config c)
+	int run_local(config c)
 	{
 		c.name = "dp-bench-" + std::to_string(current_pid());
-		std::string spin    = std::to_string(c.spin);
-		std::string threads = std::to_string(c.threads);
-		std::string buffer  = std::to_string(c.buffer);
-		std::string pipebuf = std::to_string(c.pipe_buffer);
-#ifdef _WIN32
-		wchar_t exe[MAX_PATH];
-		GetModuleFileNameW(nullptr, exe, MAX_PATH);
-		std::wstring cmd = L"\"" + std::wstring(exe) + L"\" server " + std::wstring(c.name.begin(), c.name.end())
-						   + L" --spin " + std::wstring(spin.begin(), spin.end()) + L" --threads "
-						   + std::wstring(threads.begin(), threads.end()) + L" --buffer "
-						   + std::wstring(buffer.begin(), buffer.end()) + L" --pipe-buffer "
-						   + std::wstring(pipebuf.begin(), pipebuf.end()) + (c.yield ? L" --yield" : L" --no-yield")
-						   + (c.alertable ? L" --alertable" : L"") + (c.mmcss ? L" --mmcss" : L" --no-mmcss") + L" --priority "
-						   + std::to_wstring(c.priority);
-		STARTUPINFOW        si{};
-		PROCESS_INFORMATION pi{};
-		si.cb = sizeof(si);
-		if (!CreateProcessW(nullptr, &cmd[0], nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) {
-			std::fprintf(stderr, "failed to start server process\n");
-			return 1;
-		}
-		int rc = run_client(c);
-		if (WaitForSingleObject(pi.hProcess, 5000) != WAIT_OBJECT_0)
-			TerminateProcess(pi.hProcess, 1);
-		CloseHandle(pi.hThread);
-		CloseHandle(pi.hProcess);
-		return rc;
-#else
-		(void)argc;
-		(void)argv;
-		std::vector<std::string> args = {"datapath-benchmark", "server", c.name, "--spin",  spin,
-										  "--threads",          threads, "--buffer", buffer, "--pipe-buffer", pipebuf};
-		args.push_back(c.yield ? "--yield" : "--no-yield");
+		std::vector<std::string> args = {"server",     c.name,
+										 "--spin",     std::to_string(c.spin),
+										 "--threads",  std::to_string(c.threads),
+										 "--buffer",   std::to_string(c.buffer),
+										 "--pipe-buffer", std::to_string(c.pipe_buffer),
+										 c.yield ? "--yield" : "--no-yield",
+										 c.mmcss ? "--mmcss" : "--no-mmcss",
+										 "--priority", std::to_string(c.priority)};
 		if (c.alertable)
 			args.push_back("--alertable");
-		args.push_back(c.mmcss ? "--mmcss" : "--no-mmcss");
-		args.push_back("--priority");
-		args.push_back(std::to_string(c.priority));
-		std::vector<char*>       cargv;
-		for (auto& a : args)
-			cargv.push_back(&a[0]);
-		cargv.push_back(nullptr);
-		pid_t pid;
-		if (posix_spawn(&pid, "/proc/self/exe", nullptr, nullptr, cargv.data(), environ) != 0) {
+
+		std::unique_ptr<child_process> stress;
+		if (c.stress >= 0) {
+			stress = std::make_unique<child_process>(std::vector<std::string>{"stress", std::to_string(c.stress)});
+			if (!stress->ok) {
+				std::fprintf(stderr, "failed to start stress process\n");
+				return 1;
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(500)); // let it ramp up
+		}
+		child_process server(args);
+		if (!server.ok) {
 			std::fprintf(stderr, "failed to start server process\n");
 			return 1;
 		}
 		int rc = run_client(c);
-		for (int i = 0; i < 100; i++) {
-			int status;
-			if (waitpid(pid, &status, WNOHANG) == pid)
-				return rc;
-			std::this_thread::sleep_for(std::chrono::milliseconds(50));
-		}
-		kill(pid, SIGKILL);
-		waitpid(pid, nullptr, 0);
+		server.finish(5000);
 		return rc;
-#endif
 	}
 } // namespace
 
@@ -567,7 +642,7 @@ int main(int argc, char** argv)
 	if (!parse(argc, argv, c)) {
 		std::fprintf(stderr,
 					 "usage: %s local|server <name>|client <name> [--sizes a,b,..] [--count n] [--clients n]\n"
-					 "       [--spin us] [--threads n] [--buffer bytes] [--pipe-buffer bytes] [--yield|--no-yield] [--alertable] [--runs n] [--mmcss|--no-mmcss] [--priority 0..3] [--load]\n",
+					 "       [--spin us] [--threads n] [--buffer bytes] [--pipe-buffer bytes] [--yield|--no-yield] [--alertable] [--runs n] [--stress n] [--mmcss|--no-mmcss] [--priority 0..3] [--load]\n",
 					 argc > 0 ? argv[0] : "datapath-benchmark");
 		return 2;
 	}
@@ -575,5 +650,7 @@ int main(int argc, char** argv)
 		return run_server(c);
 	if (c.mode == "client")
 		return run_client(c);
-	return run_local(argc, argv, c);
+	if (c.mode == "stress")
+		return run_stress(c);
+	return run_local(c);
 }

@@ -27,6 +27,12 @@ for %%A in (
 	"--clients 8"
 	"--clients 8 --threads 4"
 	"--load --threads 2"
+	"--stress 0"
+	"--stress 0 --no-mmcss"
+	"--stress 0 --no-mmcss --priority 0"
+	"--stress 0 --priority 3"
+	"--stress 0 --spin 0"
+	"--stress 0 --spin 0 --no-mmcss"
 ) do (
 	echo.>> "%OUT%"
 	echo ==== %%~A>> "%OUT%"
