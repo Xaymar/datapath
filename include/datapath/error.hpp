@@ -7,6 +7,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 #pragma once
 #include <cstdint>
+#include <datapath/export.h>
 
 namespace datapath {
 	enum class error : int32_t {
@@ -34,5 +35,5 @@ namespace datapath {
 		AccessDenied,
 	};
 
-	const char* to_string(error e) noexcept;
+	DATAPATH_API const char* to_string(error e) noexcept;
 } // namespace datapath

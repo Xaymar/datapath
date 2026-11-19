@@ -6,6 +6,7 @@ SPDX-License-Identifier: BSD-3-Clause
 */
 
 #pragma once
+#include <datapath/export.h>
 #include <functional>
 #include <memory>
 #include "error.hpp"
@@ -20,7 +21,13 @@ namespace datapath {
 	// Return true to accept. Keep the shared_ptr to keep the connection open.
 	using accept_handler = std::function<bool(std::shared_ptr<datapath::socket> client)>;
 
-	class server {
+#ifdef _MSC_VER
+// C4251 (std::shared_ptr member without dll-interface) is harmless: a C++ API
+// already requires the library and program to share one C++ runtime.
+#pragma warning(push)
+#pragma warning(disable : 4251)
+#endif
+	class DATAPATH_API server {
 		std::shared_ptr<detail::listener> _impl;
 
 		public:
@@ -32,4 +39,7 @@ namespace datapath {
 		void            on_accept(accept_handler handler);
 		datapath::error close();
 	};
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 } // namespace datapath
