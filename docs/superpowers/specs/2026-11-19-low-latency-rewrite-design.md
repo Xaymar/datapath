@@ -277,8 +277,14 @@ policy with `SO_PEERCRED` (uid equal / gid equal / anyone).
   closed (RAII); on the server side, the user keeps sockets alive by keeping
   the `shared_ptr` handed to `on_accept`. Returning `true` but discarding the
   pointer closes the connection.
-- `on_close` fires exactly once, on an I/O thread, after which no further
+- `on_close` fires at most once, on an I/O thread, after which no further
   callbacks run for that socket.
+- Destroying the last handle (socket or server) closes it and waits for a
+  callback that is currently running on another thread; afterwards no callback
+  of that object runs again, and `on_close` does not fire for it. This makes it
+  safe to destroy the objects a handler captures right after the handle.
+  (Added during implementation: the asynchronous on_close otherwise ran into
+  already-destroyed captures.)
 
 ### Latency target scope (builder's call, marked)
 

@@ -213,6 +213,44 @@ test_send_queue/fast:
 	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_send_queue.dir/build.make tests/CMakeFiles/test_send_queue.dir/build
 .PHONY : test_send_queue/fast
 
+# Convenience name for target.
+tests/CMakeFiles/test_integration.dir/rule:
+	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_integration.dir/rule
+.PHONY : tests/CMakeFiles/test_integration.dir/rule
+
+# Convenience name for target.
+test_integration: tests/CMakeFiles/test_integration.dir/rule
+.PHONY : test_integration
+
+# fast build rule for target.
+test_integration/fast:
+	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/build
+.PHONY : test_integration/fast
+
+raw_peer.obj: raw_peer.cpp.obj
+.PHONY : raw_peer.obj
+
+# target to build an object file
+raw_peer.cpp.obj:
+	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/raw_peer.cpp.obj
+.PHONY : raw_peer.cpp.obj
+
+raw_peer.i: raw_peer.cpp.i
+.PHONY : raw_peer.i
+
+# target to preprocess a source file
+raw_peer.cpp.i:
+	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/raw_peer.cpp.i
+.PHONY : raw_peer.cpp.i
+
+raw_peer.s: raw_peer.cpp.s
+.PHONY : raw_peer.s
+
+# target to generate assembly for a file
+raw_peer.cpp.s:
+	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/raw_peer.cpp.s
+.PHONY : raw_peer.cpp.s
+
 test_api.obj: test_api.cpp.obj
 .PHONY : test_api.obj
 
@@ -261,6 +299,30 @@ test_framing.cpp.s:
 	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_framing.dir/build.make tests/CMakeFiles/test_framing.dir/test_framing.cpp.s
 .PHONY : test_framing.cpp.s
 
+test_integration.obj: test_integration.cpp.obj
+.PHONY : test_integration.obj
+
+# target to build an object file
+test_integration.cpp.obj:
+	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/test_integration.cpp.obj
+.PHONY : test_integration.cpp.obj
+
+test_integration.i: test_integration.cpp.i
+.PHONY : test_integration.i
+
+# target to preprocess a source file
+test_integration.cpp.i:
+	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/test_integration.cpp.i
+.PHONY : test_integration.cpp.i
+
+test_integration.s: test_integration.cpp.s
+.PHONY : test_integration.s
+
+# target to generate assembly for a file
+test_integration.cpp.s:
+	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/test_integration.cpp.s
+.PHONY : test_integration.cpp.s
+
 test_send_queue.obj: test_send_queue.cpp.obj
 .PHONY : test_send_queue.obj
 
@@ -300,13 +362,20 @@ help:
 	@echo "... test"
 	@echo "... test_api"
 	@echo "... test_framing"
+	@echo "... test_integration"
 	@echo "... test_send_queue"
+	@echo "... raw_peer.obj"
+	@echo "... raw_peer.i"
+	@echo "... raw_peer.s"
 	@echo "... test_api.obj"
 	@echo "... test_api.i"
 	@echo "... test_api.s"
 	@echo "... test_framing.obj"
 	@echo "... test_framing.i"
 	@echo "... test_framing.s"
+	@echo "... test_integration.obj"
+	@echo "... test_integration.i"
+	@echo "... test_integration.s"
 	@echo "... test_send_queue.obj"
 	@echo "... test_send_queue.i"
 	@echo "... test_send_queue.s"

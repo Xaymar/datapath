@@ -223,6 +223,19 @@ test_send_queue/fast:
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_send_queue.dir/build.make tests/CMakeFiles/test_send_queue.dir/build
 .PHONY : test_send_queue/fast
 
+#=============================================================================
+# Target rules for targets named test_integration
+
+# Build rule for target.
+test_integration: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_integration
+.PHONY : test_integration
+
+# fast build rule for target.
+test_integration/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/build
+.PHONY : test_integration/fast
+
 source/common/api.obj: source/common/api.cpp.obj
 .PHONY : source/common/api.obj
 
@@ -271,29 +284,125 @@ source/common/send_queue.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/common/send_queue.cpp.s
 .PHONY : source/common/send_queue.cpp.s
 
-source/windows/context.obj: source/windows/context.cpp.obj
-.PHONY : source/windows/context.obj
+source/windows/iocp_context.obj: source/windows/iocp_context.cpp.obj
+.PHONY : source/windows/iocp_context.obj
 
 # target to build an object file
-source/windows/context.cpp.obj:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/windows/context.cpp.obj
-.PHONY : source/windows/context.cpp.obj
+source/windows/iocp_context.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.obj
+.PHONY : source/windows/iocp_context.cpp.obj
 
-source/windows/context.i: source/windows/context.cpp.i
-.PHONY : source/windows/context.i
+source/windows/iocp_context.i: source/windows/iocp_context.cpp.i
+.PHONY : source/windows/iocp_context.i
 
 # target to preprocess a source file
-source/windows/context.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/windows/context.cpp.i
-.PHONY : source/windows/context.cpp.i
+source/windows/iocp_context.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.i
+.PHONY : source/windows/iocp_context.cpp.i
 
-source/windows/context.s: source/windows/context.cpp.s
-.PHONY : source/windows/context.s
+source/windows/iocp_context.s: source/windows/iocp_context.cpp.s
+.PHONY : source/windows/iocp_context.s
 
 # target to generate assembly for a file
-source/windows/context.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/windows/context.cpp.s
-.PHONY : source/windows/context.cpp.s
+source/windows/iocp_context.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.s
+.PHONY : source/windows/iocp_context.cpp.s
+
+source/windows/path.obj: source/windows/path.cpp.obj
+.PHONY : source/windows/path.obj
+
+# target to build an object file
+source/windows/path.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/windows/path.cpp.obj
+.PHONY : source/windows/path.cpp.obj
+
+source/windows/path.i: source/windows/path.cpp.i
+.PHONY : source/windows/path.i
+
+# target to preprocess a source file
+source/windows/path.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/windows/path.cpp.i
+.PHONY : source/windows/path.cpp.i
+
+source/windows/path.s: source/windows/path.cpp.s
+.PHONY : source/windows/path.s
+
+# target to generate assembly for a file
+source/windows/path.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/windows/path.cpp.s
+.PHONY : source/windows/path.cpp.s
+
+source/windows/pipe_connection.obj: source/windows/pipe_connection.cpp.obj
+.PHONY : source/windows/pipe_connection.obj
+
+# target to build an object file
+source/windows/pipe_connection.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.obj
+.PHONY : source/windows/pipe_connection.cpp.obj
+
+source/windows/pipe_connection.i: source/windows/pipe_connection.cpp.i
+.PHONY : source/windows/pipe_connection.i
+
+# target to preprocess a source file
+source/windows/pipe_connection.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.i
+.PHONY : source/windows/pipe_connection.cpp.i
+
+source/windows/pipe_connection.s: source/windows/pipe_connection.cpp.s
+.PHONY : source/windows/pipe_connection.s
+
+# target to generate assembly for a file
+source/windows/pipe_connection.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.s
+.PHONY : source/windows/pipe_connection.cpp.s
+
+source/windows/pipe_server.obj: source/windows/pipe_server.cpp.obj
+.PHONY : source/windows/pipe_server.obj
+
+# target to build an object file
+source/windows/pipe_server.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.obj
+.PHONY : source/windows/pipe_server.cpp.obj
+
+source/windows/pipe_server.i: source/windows/pipe_server.cpp.i
+.PHONY : source/windows/pipe_server.i
+
+# target to preprocess a source file
+source/windows/pipe_server.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.i
+.PHONY : source/windows/pipe_server.cpp.i
+
+source/windows/pipe_server.s: source/windows/pipe_server.cpp.s
+.PHONY : source/windows/pipe_server.s
+
+# target to generate assembly for a file
+source/windows/pipe_server.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.s
+.PHONY : source/windows/pipe_server.cpp.s
+
+source/windows/security.obj: source/windows/security.cpp.obj
+.PHONY : source/windows/security.obj
+
+# target to build an object file
+source/windows/security.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/windows/security.cpp.obj
+.PHONY : source/windows/security.cpp.obj
+
+source/windows/security.i: source/windows/security.cpp.i
+.PHONY : source/windows/security.i
+
+# target to preprocess a source file
+source/windows/security.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/windows/security.cpp.i
+.PHONY : source/windows/security.cpp.i
+
+source/windows/security.s: source/windows/security.cpp.s
+.PHONY : source/windows/security.s
+
+# target to generate assembly for a file
+source/windows/security.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/windows/security.cpp.s
+.PHONY : source/windows/security.cpp.s
 
 # Help Target
 help:
@@ -311,6 +420,7 @@ help:
 	@echo "... datapath"
 	@echo "... test_api"
 	@echo "... test_framing"
+	@echo "... test_integration"
 	@echo "... test_send_queue"
 	@echo "... source/common/api.obj"
 	@echo "... source/common/api.i"
@@ -318,9 +428,21 @@ help:
 	@echo "... source/common/send_queue.obj"
 	@echo "... source/common/send_queue.i"
 	@echo "... source/common/send_queue.s"
-	@echo "... source/windows/context.obj"
-	@echo "... source/windows/context.i"
-	@echo "... source/windows/context.s"
+	@echo "... source/windows/iocp_context.obj"
+	@echo "... source/windows/iocp_context.i"
+	@echo "... source/windows/iocp_context.s"
+	@echo "... source/windows/path.obj"
+	@echo "... source/windows/path.i"
+	@echo "... source/windows/path.s"
+	@echo "... source/windows/pipe_connection.obj"
+	@echo "... source/windows/pipe_connection.i"
+	@echo "... source/windows/pipe_connection.s"
+	@echo "... source/windows/pipe_server.obj"
+	@echo "... source/windows/pipe_server.i"
+	@echo "... source/windows/pipe_server.s"
+	@echo "... source/windows/security.obj"
+	@echo "... source/windows/security.i"
+	@echo "... source/windows/security.s"
 .PHONY : help
 
 

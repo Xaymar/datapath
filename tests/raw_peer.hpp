@@ -16,26 +16,25 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "common/detail.hpp"
+// Raw platform connections used by tests to play a misbehaving peer.
 
-namespace {
-	class stub_context : public datapath::detail::context_impl {
-		public:
-		datapath::error connect(std::shared_ptr<datapath::detail::connection>&, const std::string&,
-								const datapath::options&) override
-		{
-			return datapath::error::NotSupported;
-		}
-		datapath::error listen(std::shared_ptr<datapath::detail::listener>&, const std::string&,
-							   const datapath::options&) override
-		{
-			return datapath::error::NotSupported;
-		}
-		void shutdown() override {}
+#pragma once
+#include <cstddef>
+#include <memory>
+#include <string>
+
+namespace raw {
+	struct peer;
+	struct peer_deleter {
+		void operator()(peer* p) const;
 	};
-} // namespace
+	using peer_ptr = std::unique_ptr<peer, peer_deleter>;
 
-std::shared_ptr<datapath::detail::context_impl> datapath::detail::make_platform_context(const datapath::context_options&)
-{
-	return std::make_shared<stub_context>();
-}
+	// Connect to the DataPath server hosted at `name` (a bare name) without a handshake.
+	peer_ptr connect(const std::string& name);
+	bool     write(peer& p, const void* data, size_t size);
+	// Read exactly `size` bytes; false on timeout, EOF or error.
+	bool read(peer& p, void* data, size_t size, int timeout_ms);
+	// True if the peer closed its end within `timeout_ms`.
+	bool wait_closed(peer& p, int timeout_ms);
+} // namespace raw

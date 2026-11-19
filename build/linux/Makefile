@@ -223,6 +223,19 @@ test_send_queue/fast:
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_send_queue.dir/build.make tests/CMakeFiles/test_send_queue.dir/build
 .PHONY : test_send_queue/fast
 
+#=============================================================================
+# Target rules for targets named test_integration
+
+# Build rule for target.
+test_integration: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_integration
+.PHONY : test_integration
+
+# fast build rule for target.
+test_integration/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/build
+.PHONY : test_integration/fast
+
 source/common/api.o: source/common/api.cpp.o
 .PHONY : source/common/api.o
 
@@ -311,6 +324,7 @@ help:
 	@echo "... datapath"
 	@echo "... test_api"
 	@echo "... test_framing"
+	@echo "... test_integration"
 	@echo "... test_send_queue"
 	@echo "... source/common/api.o"
 	@echo "... source/common/api.i"

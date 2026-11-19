@@ -85,7 +85,7 @@ datapath::socket::socket(std::shared_ptr<detail::connection> impl) : _impl(std::
 datapath::socket::~socket()
 {
 	if (_impl)
-		_impl->close();
+		_impl->release();
 }
 
 void datapath::socket::on_message(message_handler handler)
@@ -104,7 +104,7 @@ datapath::error datapath::socket::send(const void* data, size_t size)
 	return _impl->send(&part, 1);
 }
 
-datapath::error datapath::socket::send(const buffer_view* parts, size_t count)
+datapath::error datapath::socket::sendv(const buffer_view* parts, size_t count)
 {
 	return _impl->send(parts, count);
 }
@@ -131,7 +131,7 @@ datapath::server::server(std::shared_ptr<detail::listener> impl) : _impl(std::mo
 datapath::server::~server()
 {
 	if (_impl)
-		_impl->close();
+		_impl->release();
 }
 
 void datapath::server::on_accept(accept_handler handler)

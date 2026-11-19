@@ -33,6 +33,9 @@ namespace datapath::detail {
 		virtual void            set_close_handler(close_handler handler)     = 0;
 		virtual datapath::error send(const buffer_view* parts, size_t count) = 0;
 		virtual datapath::error close()                                      = 0;
+		// The user dropped their handle: close, wait for running callbacks, and
+		// never call a handler again (on_close does not fire).
+		virtual void            release()                                    = 0;
 		virtual bool            good() const                                 = 0;
 		virtual uint64_t        max_message_size() const                     = 0;
 	};
@@ -47,6 +50,8 @@ namespace datapath::detail {
 		// held and offered as soon as one is set.
 		virtual void            set_accept_handler(accept_fn handler) = 0;
 		virtual datapath::error close()                               = 0;
+		// Close, wait for a running accept handler, and never call it again.
+		virtual void            release()                             = 0;
 	};
 
 	class context_impl {

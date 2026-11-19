@@ -80,6 +80,7 @@ set(DATAPATH_PUBLIC_HEADERS
 )
 set(DATAPATH_SOURCES
 	source/common/api.cpp
+	source/common/connection_base.hpp
 	source/common/detail.hpp
 	source/common/endian.hpp
 	source/common/framing.hpp
@@ -90,7 +91,17 @@ set(DATAPATH_SOURCES
 )
 if(WIN32)
 	list(APPEND DATAPATH_SOURCES
-		source/windows/context.cpp
+		source/windows/iocp_context.cpp
+		source/windows/iocp_context.hpp
+		source/windows/path.cpp
+		source/windows/path.hpp
+		source/windows/pipe_connection.cpp
+		source/windows/pipe_connection.hpp
+		source/windows/pipe_server.cpp
+		source/windows/pipe_server.hpp
+		source/windows/security.cpp
+		source/windows/security.hpp
+		source/windows/win.hpp
 	)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR ANDROID)
 	list(APPEND DATAPATH_SOURCES

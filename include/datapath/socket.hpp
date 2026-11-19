@@ -57,7 +57,7 @@ namespace datapath {
 		// handlers. Returns TooLarge, WouldBlock or Closed when not queued.
 		datapath::error send(const void* data, size_t size);
 		// Queue one message assembled from several parts.
-		datapath::error send(const buffer_view* parts, size_t count);
+		datapath::error sendv(const buffer_view* parts, size_t count);
 
 		datapath::error close();
 		bool            good() const;

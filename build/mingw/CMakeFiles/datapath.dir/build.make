@@ -99,36 +99,104 @@ CMakeFiles/datapath.dir/source/common/send_queue.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/datapath.dir/source/common/send_queue.cpp.s"
 	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/user/datapath/source/common/send_queue.cpp -o CMakeFiles/datapath.dir/source/common/send_queue.cpp.s
 
-CMakeFiles/datapath.dir/source/windows/context.cpp.obj: CMakeFiles/datapath.dir/flags.make
-CMakeFiles/datapath.dir/source/windows/context.cpp.obj: CMakeFiles/datapath.dir/includes_CXX.rsp
-CMakeFiles/datapath.dir/source/windows/context.cpp.obj: /home/user/datapath/source/windows/context.cpp
-CMakeFiles/datapath.dir/source/windows/context.cpp.obj: CMakeFiles/datapath.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/datapath.dir/source/windows/context.cpp.obj"
-	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/datapath.dir/source/windows/context.cpp.obj -MF CMakeFiles/datapath.dir/source/windows/context.cpp.obj.d -o CMakeFiles/datapath.dir/source/windows/context.cpp.obj -c /home/user/datapath/source/windows/context.cpp
+CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.obj: CMakeFiles/datapath.dir/flags.make
+CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.obj: CMakeFiles/datapath.dir/includes_CXX.rsp
+CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.obj: /home/user/datapath/source/windows/iocp_context.cpp
+CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.obj: CMakeFiles/datapath.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.obj"
+	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.obj -MF CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.obj.d -o CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.obj -c /home/user/datapath/source/windows/iocp_context.cpp
 
-CMakeFiles/datapath.dir/source/windows/context.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/datapath.dir/source/windows/context.cpp.i"
-	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/user/datapath/source/windows/context.cpp > CMakeFiles/datapath.dir/source/windows/context.cpp.i
+CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.i"
+	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/user/datapath/source/windows/iocp_context.cpp > CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.i
 
-CMakeFiles/datapath.dir/source/windows/context.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/datapath.dir/source/windows/context.cpp.s"
-	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/user/datapath/source/windows/context.cpp -o CMakeFiles/datapath.dir/source/windows/context.cpp.s
+CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.s"
+	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/user/datapath/source/windows/iocp_context.cpp -o CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.s
+
+CMakeFiles/datapath.dir/source/windows/path.cpp.obj: CMakeFiles/datapath.dir/flags.make
+CMakeFiles/datapath.dir/source/windows/path.cpp.obj: CMakeFiles/datapath.dir/includes_CXX.rsp
+CMakeFiles/datapath.dir/source/windows/path.cpp.obj: /home/user/datapath/source/windows/path.cpp
+CMakeFiles/datapath.dir/source/windows/path.cpp.obj: CMakeFiles/datapath.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/datapath.dir/source/windows/path.cpp.obj"
+	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/datapath.dir/source/windows/path.cpp.obj -MF CMakeFiles/datapath.dir/source/windows/path.cpp.obj.d -o CMakeFiles/datapath.dir/source/windows/path.cpp.obj -c /home/user/datapath/source/windows/path.cpp
+
+CMakeFiles/datapath.dir/source/windows/path.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/datapath.dir/source/windows/path.cpp.i"
+	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/user/datapath/source/windows/path.cpp > CMakeFiles/datapath.dir/source/windows/path.cpp.i
+
+CMakeFiles/datapath.dir/source/windows/path.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/datapath.dir/source/windows/path.cpp.s"
+	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/user/datapath/source/windows/path.cpp -o CMakeFiles/datapath.dir/source/windows/path.cpp.s
+
+CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.obj: CMakeFiles/datapath.dir/flags.make
+CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.obj: CMakeFiles/datapath.dir/includes_CXX.rsp
+CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.obj: /home/user/datapath/source/windows/pipe_connection.cpp
+CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.obj: CMakeFiles/datapath.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.obj"
+	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.obj -MF CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.obj.d -o CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.obj -c /home/user/datapath/source/windows/pipe_connection.cpp
+
+CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.i"
+	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/user/datapath/source/windows/pipe_connection.cpp > CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.i
+
+CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.s"
+	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/user/datapath/source/windows/pipe_connection.cpp -o CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.s
+
+CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.obj: CMakeFiles/datapath.dir/flags.make
+CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.obj: CMakeFiles/datapath.dir/includes_CXX.rsp
+CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.obj: /home/user/datapath/source/windows/pipe_server.cpp
+CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.obj: CMakeFiles/datapath.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.obj"
+	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.obj -MF CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.obj.d -o CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.obj -c /home/user/datapath/source/windows/pipe_server.cpp
+
+CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.i"
+	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/user/datapath/source/windows/pipe_server.cpp > CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.i
+
+CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.s"
+	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/user/datapath/source/windows/pipe_server.cpp -o CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.s
+
+CMakeFiles/datapath.dir/source/windows/security.cpp.obj: CMakeFiles/datapath.dir/flags.make
+CMakeFiles/datapath.dir/source/windows/security.cpp.obj: CMakeFiles/datapath.dir/includes_CXX.rsp
+CMakeFiles/datapath.dir/source/windows/security.cpp.obj: /home/user/datapath/source/windows/security.cpp
+CMakeFiles/datapath.dir/source/windows/security.cpp.obj: CMakeFiles/datapath.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/datapath.dir/source/windows/security.cpp.obj"
+	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/datapath.dir/source/windows/security.cpp.obj -MF CMakeFiles/datapath.dir/source/windows/security.cpp.obj.d -o CMakeFiles/datapath.dir/source/windows/security.cpp.obj -c /home/user/datapath/source/windows/security.cpp
+
+CMakeFiles/datapath.dir/source/windows/security.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/datapath.dir/source/windows/security.cpp.i"
+	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/user/datapath/source/windows/security.cpp > CMakeFiles/datapath.dir/source/windows/security.cpp.i
+
+CMakeFiles/datapath.dir/source/windows/security.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/datapath.dir/source/windows/security.cpp.s"
+	/usr/bin/x86_64-w64-mingw32-g++-posix $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/user/datapath/source/windows/security.cpp -o CMakeFiles/datapath.dir/source/windows/security.cpp.s
 
 # Object files for target datapath
 datapath_OBJECTS = \
 "CMakeFiles/datapath.dir/source/common/api.cpp.obj" \
 "CMakeFiles/datapath.dir/source/common/send_queue.cpp.obj" \
-"CMakeFiles/datapath.dir/source/windows/context.cpp.obj"
+"CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.obj" \
+"CMakeFiles/datapath.dir/source/windows/path.cpp.obj" \
+"CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.obj" \
+"CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.obj" \
+"CMakeFiles/datapath.dir/source/windows/security.cpp.obj"
 
 # External object files for target datapath
 datapath_EXTERNAL_OBJECTS =
 
 libdatapath.a: CMakeFiles/datapath.dir/source/common/api.cpp.obj
 libdatapath.a: CMakeFiles/datapath.dir/source/common/send_queue.cpp.obj
-libdatapath.a: CMakeFiles/datapath.dir/source/windows/context.cpp.obj
+libdatapath.a: CMakeFiles/datapath.dir/source/windows/iocp_context.cpp.obj
+libdatapath.a: CMakeFiles/datapath.dir/source/windows/path.cpp.obj
+libdatapath.a: CMakeFiles/datapath.dir/source/windows/pipe_connection.cpp.obj
+libdatapath.a: CMakeFiles/datapath.dir/source/windows/pipe_server.cpp.obj
+libdatapath.a: CMakeFiles/datapath.dir/source/windows/security.cpp.obj
 libdatapath.a: CMakeFiles/datapath.dir/build.make
 libdatapath.a: CMakeFiles/datapath.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Linking CXX static library libdatapath.a"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Linking CXX static library libdatapath.a"
 	$(CMAKE_COMMAND) -P CMakeFiles/datapath.dir/cmake_clean_target.cmake
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/datapath.dir/link.txt --verbose=$(VERBOSE)
 
