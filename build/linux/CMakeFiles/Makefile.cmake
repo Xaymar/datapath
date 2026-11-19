@@ -57,4 +57,5 @@ set(CMAKE_DEPEND_INFO_FILES
   "tests/CMakeFiles/test_framing.dir/DependInfo.cmake"
   "tests/CMakeFiles/test_send_queue.dir/DependInfo.cmake"
   "tests/CMakeFiles/test_integration.dir/DependInfo.cmake"
+  "tests/CMakeFiles/test_linux.dir/DependInfo.cmake"
   )

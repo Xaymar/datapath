@@ -38,6 +38,6 @@ test_integration.bad_handshake_rejected 6 0.424303
 test_integration.peer_dies_mid_frame 6 0.421377
 test_integration.oversized_header_disconnects 6 0.421681
 test_integration.custom_context_shutdown_closes_sockets 4 0.612913
-test_windows_security.sddl_levels 1 2.43792
-test_windows_security.security_descriptor_builds_for_each_level 1 2.48267
+test_windows_security.sddl_levels 2 1.23241
+test_windows_security.security_descriptor_builds_for_each_level 2 1.22096
 ---

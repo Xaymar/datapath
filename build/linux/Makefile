@@ -236,6 +236,19 @@ test_integration/fast:
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/build
 .PHONY : test_integration/fast
 
+#=============================================================================
+# Target rules for targets named test_linux
+
+# Build rule for target.
+test_linux: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_linux
+.PHONY : test_linux
+
+# fast build rule for target.
+test_linux/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux.dir/build.make tests/CMakeFiles/test_linux.dir/build
+.PHONY : test_linux/fast
+
 source/common/api.o: source/common/api.cpp.o
 .PHONY : source/common/api.o
 
@@ -284,29 +297,101 @@ source/common/send_queue.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/common/send_queue.cpp.s
 .PHONY : source/common/send_queue.cpp.s
 
-source/linux/context.o: source/linux/context.cpp.o
-.PHONY : source/linux/context.o
+source/linux/epoll_context.o: source/linux/epoll_context.cpp.o
+.PHONY : source/linux/epoll_context.o
 
 # target to build an object file
-source/linux/context.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/linux/context.cpp.o
-.PHONY : source/linux/context.cpp.o
+source/linux/epoll_context.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.o
+.PHONY : source/linux/epoll_context.cpp.o
 
-source/linux/context.i: source/linux/context.cpp.i
-.PHONY : source/linux/context.i
+source/linux/epoll_context.i: source/linux/epoll_context.cpp.i
+.PHONY : source/linux/epoll_context.i
 
 # target to preprocess a source file
-source/linux/context.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/linux/context.cpp.i
-.PHONY : source/linux/context.cpp.i
+source/linux/epoll_context.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.i
+.PHONY : source/linux/epoll_context.cpp.i
 
-source/linux/context.s: source/linux/context.cpp.s
-.PHONY : source/linux/context.s
+source/linux/epoll_context.s: source/linux/epoll_context.cpp.s
+.PHONY : source/linux/epoll_context.s
 
 # target to generate assembly for a file
-source/linux/context.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/linux/context.cpp.s
-.PHONY : source/linux/context.cpp.s
+source/linux/epoll_context.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.s
+.PHONY : source/linux/epoll_context.cpp.s
+
+source/linux/path.o: source/linux/path.cpp.o
+.PHONY : source/linux/path.o
+
+# target to build an object file
+source/linux/path.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/linux/path.cpp.o
+.PHONY : source/linux/path.cpp.o
+
+source/linux/path.i: source/linux/path.cpp.i
+.PHONY : source/linux/path.i
+
+# target to preprocess a source file
+source/linux/path.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/linux/path.cpp.i
+.PHONY : source/linux/path.cpp.i
+
+source/linux/path.s: source/linux/path.cpp.s
+.PHONY : source/linux/path.s
+
+# target to generate assembly for a file
+source/linux/path.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/linux/path.cpp.s
+.PHONY : source/linux/path.cpp.s
+
+source/linux/uds_connection.o: source/linux/uds_connection.cpp.o
+.PHONY : source/linux/uds_connection.o
+
+# target to build an object file
+source/linux/uds_connection.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.o
+.PHONY : source/linux/uds_connection.cpp.o
+
+source/linux/uds_connection.i: source/linux/uds_connection.cpp.i
+.PHONY : source/linux/uds_connection.i
+
+# target to preprocess a source file
+source/linux/uds_connection.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.i
+.PHONY : source/linux/uds_connection.cpp.i
+
+source/linux/uds_connection.s: source/linux/uds_connection.cpp.s
+.PHONY : source/linux/uds_connection.s
+
+# target to generate assembly for a file
+source/linux/uds_connection.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.s
+.PHONY : source/linux/uds_connection.cpp.s
+
+source/linux/uds_server.o: source/linux/uds_server.cpp.o
+.PHONY : source/linux/uds_server.o
+
+# target to build an object file
+source/linux/uds_server.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/linux/uds_server.cpp.o
+.PHONY : source/linux/uds_server.cpp.o
+
+source/linux/uds_server.i: source/linux/uds_server.cpp.i
+.PHONY : source/linux/uds_server.i
+
+# target to preprocess a source file
+source/linux/uds_server.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/linux/uds_server.cpp.i
+.PHONY : source/linux/uds_server.cpp.i
+
+source/linux/uds_server.s: source/linux/uds_server.cpp.s
+.PHONY : source/linux/uds_server.s
+
+# target to generate assembly for a file
+source/linux/uds_server.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/linux/uds_server.cpp.s
+.PHONY : source/linux/uds_server.cpp.s
 
 # Help Target
 help:
@@ -325,6 +410,7 @@ help:
 	@echo "... test_api"
 	@echo "... test_framing"
 	@echo "... test_integration"
+	@echo "... test_linux"
 	@echo "... test_send_queue"
 	@echo "... source/common/api.o"
 	@echo "... source/common/api.i"
@@ -332,9 +418,18 @@ help:
 	@echo "... source/common/send_queue.o"
 	@echo "... source/common/send_queue.i"
 	@echo "... source/common/send_queue.s"
-	@echo "... source/linux/context.o"
-	@echo "... source/linux/context.i"
-	@echo "... source/linux/context.s"
+	@echo "... source/linux/epoll_context.o"
+	@echo "... source/linux/epoll_context.i"
+	@echo "... source/linux/epoll_context.s"
+	@echo "... source/linux/path.o"
+	@echo "... source/linux/path.i"
+	@echo "... source/linux/path.s"
+	@echo "... source/linux/uds_connection.o"
+	@echo "... source/linux/uds_connection.i"
+	@echo "... source/linux/uds_connection.s"
+	@echo "... source/linux/uds_server.o"
+	@echo "... source/linux/uds_server.i"
+	@echo "... source/linux/uds_server.s"
 .PHONY : help
 
 

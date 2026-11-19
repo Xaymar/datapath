@@ -10,7 +10,10 @@ set(CMAKE_DEPENDS_LANGUAGES
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/home/user/datapath/source/common/api.cpp" "CMakeFiles/datapath.dir/source/common/api.cpp.o" "gcc" "CMakeFiles/datapath.dir/source/common/api.cpp.o.d"
   "/home/user/datapath/source/common/send_queue.cpp" "CMakeFiles/datapath.dir/source/common/send_queue.cpp.o" "gcc" "CMakeFiles/datapath.dir/source/common/send_queue.cpp.o.d"
-  "/home/user/datapath/source/linux/context.cpp" "CMakeFiles/datapath.dir/source/linux/context.cpp.o" "gcc" "CMakeFiles/datapath.dir/source/linux/context.cpp.o.d"
+  "/home/user/datapath/source/linux/epoll_context.cpp" "CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.o" "gcc" "CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.o.d"
+  "/home/user/datapath/source/linux/path.cpp" "CMakeFiles/datapath.dir/source/linux/path.cpp.o" "gcc" "CMakeFiles/datapath.dir/source/linux/path.cpp.o.d"
+  "/home/user/datapath/source/linux/uds_connection.cpp" "CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.o" "gcc" "CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.o.d"
+  "/home/user/datapath/source/linux/uds_server.cpp" "CMakeFiles/datapath.dir/source/linux/uds_server.cpp.o" "gcc" "CMakeFiles/datapath.dir/source/linux/uds_server.cpp.o.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

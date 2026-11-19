@@ -1,15 +1,15 @@
-Start testing: Nov 19 04:36 UTC
+Start testing: Nov 19 04:37 UTC
 ----------------------------------------------------------
 41/42 Testing: test_windows_security.sddl_levels
 41/42 Test: test_windows_security.sddl_levels
 Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_windows_security.exe" "sddl_levels"
 Directory: /home/user/datapath/build/mingw/tests
-"test_windows_security.sddl_levels" start time: Nov 19 04:36 UTC
+"test_windows_security.sddl_levels" start time: Nov 19 04:37 UTC
 Output:
 ----------------------------------------------------------
 [ PASS ] sddl_levels
 <end of output>
-Test time =   2.44 sec
+Test time =   2.46 sec
 ----------------------------------------------------------
 Test Passed.
 "test_windows_security.sddl_levels" end time: Nov 19 04:37 UTC
@@ -25,7 +25,7 @@ Output:
 ----------------------------------------------------------
 [ PASS ] security_descriptor_builds_for_each_level
 <end of output>
-Test time =   2.48 sec
+Test time =   2.44 sec
 ----------------------------------------------------------
 Test Passed.
 "test_windows_security.security_descriptor_builds_for_each_level" end time: Nov 19 04:37 UTC

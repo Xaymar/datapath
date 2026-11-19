@@ -97,35 +97,83 @@ CMakeFiles/datapath.dir/source/common/send_queue.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/datapath.dir/source/common/send_queue.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/user/datapath/source/common/send_queue.cpp -o CMakeFiles/datapath.dir/source/common/send_queue.cpp.s
 
-CMakeFiles/datapath.dir/source/linux/context.cpp.o: CMakeFiles/datapath.dir/flags.make
-CMakeFiles/datapath.dir/source/linux/context.cpp.o: /home/user/datapath/source/linux/context.cpp
-CMakeFiles/datapath.dir/source/linux/context.cpp.o: CMakeFiles/datapath.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/datapath.dir/source/linux/context.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/datapath.dir/source/linux/context.cpp.o -MF CMakeFiles/datapath.dir/source/linux/context.cpp.o.d -o CMakeFiles/datapath.dir/source/linux/context.cpp.o -c /home/user/datapath/source/linux/context.cpp
+CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.o: CMakeFiles/datapath.dir/flags.make
+CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.o: /home/user/datapath/source/linux/epoll_context.cpp
+CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.o: CMakeFiles/datapath.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.o -MF CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.o.d -o CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.o -c /home/user/datapath/source/linux/epoll_context.cpp
 
-CMakeFiles/datapath.dir/source/linux/context.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/datapath.dir/source/linux/context.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/user/datapath/source/linux/context.cpp > CMakeFiles/datapath.dir/source/linux/context.cpp.i
+CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/user/datapath/source/linux/epoll_context.cpp > CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.i
 
-CMakeFiles/datapath.dir/source/linux/context.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/datapath.dir/source/linux/context.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/user/datapath/source/linux/context.cpp -o CMakeFiles/datapath.dir/source/linux/context.cpp.s
+CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/user/datapath/source/linux/epoll_context.cpp -o CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.s
+
+CMakeFiles/datapath.dir/source/linux/path.cpp.o: CMakeFiles/datapath.dir/flags.make
+CMakeFiles/datapath.dir/source/linux/path.cpp.o: /home/user/datapath/source/linux/path.cpp
+CMakeFiles/datapath.dir/source/linux/path.cpp.o: CMakeFiles/datapath.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/datapath.dir/source/linux/path.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/datapath.dir/source/linux/path.cpp.o -MF CMakeFiles/datapath.dir/source/linux/path.cpp.o.d -o CMakeFiles/datapath.dir/source/linux/path.cpp.o -c /home/user/datapath/source/linux/path.cpp
+
+CMakeFiles/datapath.dir/source/linux/path.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/datapath.dir/source/linux/path.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/user/datapath/source/linux/path.cpp > CMakeFiles/datapath.dir/source/linux/path.cpp.i
+
+CMakeFiles/datapath.dir/source/linux/path.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/datapath.dir/source/linux/path.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/user/datapath/source/linux/path.cpp -o CMakeFiles/datapath.dir/source/linux/path.cpp.s
+
+CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.o: CMakeFiles/datapath.dir/flags.make
+CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.o: /home/user/datapath/source/linux/uds_connection.cpp
+CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.o: CMakeFiles/datapath.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.o -MF CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.o.d -o CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.o -c /home/user/datapath/source/linux/uds_connection.cpp
+
+CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/user/datapath/source/linux/uds_connection.cpp > CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.i
+
+CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/user/datapath/source/linux/uds_connection.cpp -o CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.s
+
+CMakeFiles/datapath.dir/source/linux/uds_server.cpp.o: CMakeFiles/datapath.dir/flags.make
+CMakeFiles/datapath.dir/source/linux/uds_server.cpp.o: /home/user/datapath/source/linux/uds_server.cpp
+CMakeFiles/datapath.dir/source/linux/uds_server.cpp.o: CMakeFiles/datapath.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/datapath.dir/source/linux/uds_server.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/datapath.dir/source/linux/uds_server.cpp.o -MF CMakeFiles/datapath.dir/source/linux/uds_server.cpp.o.d -o CMakeFiles/datapath.dir/source/linux/uds_server.cpp.o -c /home/user/datapath/source/linux/uds_server.cpp
+
+CMakeFiles/datapath.dir/source/linux/uds_server.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/datapath.dir/source/linux/uds_server.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/user/datapath/source/linux/uds_server.cpp > CMakeFiles/datapath.dir/source/linux/uds_server.cpp.i
+
+CMakeFiles/datapath.dir/source/linux/uds_server.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/datapath.dir/source/linux/uds_server.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/user/datapath/source/linux/uds_server.cpp -o CMakeFiles/datapath.dir/source/linux/uds_server.cpp.s
 
 # Object files for target datapath
 datapath_OBJECTS = \
 "CMakeFiles/datapath.dir/source/common/api.cpp.o" \
 "CMakeFiles/datapath.dir/source/common/send_queue.cpp.o" \
-"CMakeFiles/datapath.dir/source/linux/context.cpp.o"
+"CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.o" \
+"CMakeFiles/datapath.dir/source/linux/path.cpp.o" \
+"CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.o" \
+"CMakeFiles/datapath.dir/source/linux/uds_server.cpp.o"
 
 # External object files for target datapath
 datapath_EXTERNAL_OBJECTS =
 
 libdatapath.a: CMakeFiles/datapath.dir/source/common/api.cpp.o
 libdatapath.a: CMakeFiles/datapath.dir/source/common/send_queue.cpp.o
-libdatapath.a: CMakeFiles/datapath.dir/source/linux/context.cpp.o
+libdatapath.a: CMakeFiles/datapath.dir/source/linux/epoll_context.cpp.o
+libdatapath.a: CMakeFiles/datapath.dir/source/linux/path.cpp.o
+libdatapath.a: CMakeFiles/datapath.dir/source/linux/uds_connection.cpp.o
+libdatapath.a: CMakeFiles/datapath.dir/source/linux/uds_server.cpp.o
 libdatapath.a: CMakeFiles/datapath.dir/build.make
 libdatapath.a: CMakeFiles/datapath.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Linking CXX static library libdatapath.a"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Linking CXX static library libdatapath.a"
 	$(CMAKE_COMMAND) -P CMakeFiles/datapath.dir/cmake_clean_target.cmake
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/datapath.dir/link.txt --verbose=$(VERBOSE)
 

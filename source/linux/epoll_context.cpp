@@ -1,0 +1,373 @@
+/*
+Low Latency IPC Library for high-speed traffic
+Copyright (C) 2019 - 2026 Michael Fabian Dirks <info@xaymar.com>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
+#include "epoll_context.hpp"
+#include <poll.h>
+#include <sys/epoll.h>
+#include <sys/eventfd.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <algorithm>
+#include <cerrno>
+#include <fcntl.h>
+#include "common/handshake.hpp"
+#include "common/spin.hpp"
+#include "path.hpp"
+#include "uds_connection.hpp"
+#include "uds_server.hpp"
+
+// event_loop -------------------------------------------------------------------
+
+datapath::linux_::event_loop::event_loop(epoll_context* ctx) : _ctx(ctx) {}
+
+datapath::linux_::event_loop::~event_loop()
+{
+	if (_thread.joinable())
+		_thread.detach();
+	if (_efd >= 0)
+		::close(_efd);
+	if (_ep >= 0)
+		::close(_ep);
+}
+
+bool datapath::linux_::event_loop::start()
+{
+	_ep  = ::epoll_create1(EPOLL_CLOEXEC);
+	_efd = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+	if (_ep < 0 || _efd < 0)
+		return false;
+	epoll_event ev{};
+	ev.events   = EPOLLIN;
+	ev.data.ptr = nullptr;
+	if (::epoll_ctl(_ep, EPOLL_CTL_ADD, _efd, &ev) != 0)
+		return false;
+	_thread = std::thread([this] {
+		_thread_id.store(std::this_thread::get_id(), std::memory_order_release);
+		run();
+	});
+	return true;
+}
+
+bool datapath::linux_::event_loop::add(int fd, uint32_t events, std::shared_ptr<fd_target> target)
+{
+	{
+		std::lock_guard<std::mutex> l(_reg_lock);
+		_registered[target.get()] = target;
+	}
+	epoll_event ev{};
+	ev.events   = events | EPOLLET;
+	ev.data.ptr = target.get();
+	if (::epoll_ctl(_ep, EPOLL_CTL_ADD, fd, &ev) != 0) {
+		std::lock_guard<std::mutex> l(_reg_lock);
+		_registered.erase(target.get());
+		return false;
+	}
+	return true;
+}
+
+bool datapath::linux_::event_loop::modify(int fd, uint32_t events, fd_target* target)
+{
+	epoll_event ev{};
+	ev.events   = events | EPOLLET;
+	ev.data.ptr = target;
+	return ::epoll_ctl(_ep, EPOLL_CTL_MOD, fd, &ev) == 0;
+}
+
+void datapath::linux_::event_loop::remove_fd(int fd)
+{
+	::epoll_ctl(_ep, EPOLL_CTL_DEL, fd, nullptr);
+}
+
+void datapath::linux_::event_loop::unregister(fd_target* target)
+{
+	std::shared_ptr<fd_target> dying;
+	{
+		std::lock_guard<std::mutex> l(_reg_lock);
+		auto                        it = _registered.find(target);
+		if (it == _registered.end())
+			return;
+		dying = std::move(it->second);
+		_registered.erase(it);
+	}
+	// `dying` may be the last reference; it is released outside the lock.
+}
+
+bool datapath::linux_::event_loop::post(std::shared_ptr<fd_target> target, int kind)
+{
+	bool wake;
+	{
+		std::lock_guard<std::mutex> l(_post_lock);
+		if (target && _ctx->stopped() && !_thread.joinable())
+			return false;
+		_posts.push_back({std::move(target), kind});
+		wake      = !_signaled;
+		_signaled = true;
+	}
+	if (wake) {
+		uint64_t one = 1;
+		ssize_t  r   = ::write(_efd, &one, sizeof(one));
+		(void)r;
+	}
+	return true;
+}
+
+bool datapath::linux_::event_loop::drain_posts(bool& quit)
+{
+	uint64_t v;
+	ssize_t  r = ::read(_efd, &v, sizeof(v));
+	(void)r;
+	std::vector<post_item> items;
+	{
+		std::lock_guard<std::mutex> l(_post_lock);
+		items.swap(_posts);
+		_signaled = false;
+	}
+	for (auto& it : items) {
+		if (!it.target) {
+			quit = true;
+			continue;
+		}
+		it.target->on_post(it.kind);
+	}
+	return !items.empty();
+}
+
+void datapath::linux_::event_loop::run()
+{
+	epoll_event events[64];
+	bool        quit = false;
+	auto        pump = [&](int timeout) {
+        int n = ::epoll_wait(_ep, events, 64, timeout);
+        if (n <= 0)
+            return false;
+        bool posts = false;
+        for (int i = 0; i < n; i++) {
+            auto* t = static_cast<fd_target*>(events[i].data.ptr);
+            if (!t) {
+                posts = true;
+                continue;
+            }
+            t->on_event(events[i].events);
+        }
+        if (posts)
+            drain_posts(quit);
+        return true;
+	};
+	while (!quit) {
+		datapath::detail::spin_then_block(
+			_ctx->spin(), [&] { return !quit && pump(0); },
+			[&] {
+				if (!quit)
+					pump(-1);
+			});
+	}
+}
+
+// epoll_context ----------------------------------------------------------------
+
+datapath::linux_::epoll_context::epoll_context(const datapath::context_options& opts) : _opts(opts)
+{
+	if (_opts.io_threads == 0)
+		_opts.io_threads = 1;
+}
+
+datapath::linux_::epoll_context::~epoll_context()
+{
+	shutdown();
+}
+
+bool datapath::linux_::epoll_context::start()
+{
+	for (size_t i = 0; i < _opts.io_threads; i++) {
+		_loops.push_back(std::make_unique<event_loop>(this));
+		if (!_loops.back()->start())
+			return false;
+	}
+	return true;
+}
+
+datapath::linux_::event_loop& datapath::linux_::epoll_context::pick_loop()
+{
+	return *_loops[_next.fetch_add(1, std::memory_order_relaxed) % _loops.size()];
+}
+
+void datapath::linux_::epoll_context::add_member(std::weak_ptr<datapath::detail::connection> c)
+{
+	std::lock_guard<std::mutex> l(_members_lock);
+	if (_connections.size() >= 64 && (_connections.size() & (_connections.size() - 1)) == 0)
+		_connections.erase(std::remove_if(_connections.begin(), _connections.end(), [](auto& w) { return w.expired(); }),
+						   _connections.end());
+	_connections.push_back(std::move(c));
+}
+
+void datapath::linux_::epoll_context::add_member(std::weak_ptr<datapath::detail::listener> l)
+{
+	std::lock_guard<std::mutex> g(_members_lock);
+	_listeners.erase(std::remove_if(_listeners.begin(), _listeners.end(), [](auto& w) { return w.expired(); }),
+					 _listeners.end());
+	_listeners.push_back(std::move(l));
+}
+
+void datapath::linux_::epoll_context::shutdown()
+{
+	if (_stopped.exchange(true))
+		return;
+	std::vector<std::weak_ptr<datapath::detail::connection>> conns;
+	std::vector<std::weak_ptr<datapath::detail::listener>>   lsts;
+	{
+		std::lock_guard<std::mutex> l(_members_lock);
+		conns.swap(_connections);
+		lsts.swap(_listeners);
+	}
+	for (auto& w : lsts)
+		if (auto l = w.lock())
+			l->close();
+	for (auto& w : conns)
+		if (auto c = w.lock())
+			c->close();
+	// Close notifications were posted above; the quit item queues behind them.
+	for (auto& loop : _loops)
+		loop->post(nullptr, 0);
+	for (auto& loop : _loops) {
+		if (!loop->_thread.joinable())
+			continue;
+		if (loop->on_loop_thread())
+			loop->_thread.detach();
+		else
+			loop->_thread.join();
+	}
+	// Break context <-> target reference cycles.
+	for (auto& loop : _loops) {
+		std::unordered_map<fd_target*, std::shared_ptr<fd_target>> regs;
+		{
+			std::lock_guard<std::mutex> l(loop->_reg_lock);
+			regs.swap(loop->_registered);
+		}
+		std::vector<event_loop::post_item> posts;
+		{
+			std::lock_guard<std::mutex> l(loop->_post_lock);
+			posts.swap(loop->_posts);
+		}
+	}
+}
+
+datapath::error datapath::linux_::epoll_context::connect(std::shared_ptr<datapath::detail::connection>& out,
+														 const std::string& path, const datapath::options& opts)
+{
+	if (stopped())
+		return datapath::error::Closed;
+	socket_address addr;
+	if (!make_socket_address(path, addr))
+		return datapath::error::InvalidPath;
+
+	int fd = ::socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+	if (fd < 0)
+		return datapath::error::CriticalFailure;
+	if (::connect(fd, reinterpret_cast<const sockaddr*>(&addr.addr), addr.length) != 0) {
+		int err = errno;
+		::close(fd);
+		switch (err) {
+		case ENOENT:
+		case ECONNREFUSED:
+			return datapath::error::NotFound;
+		case EACCES:
+		case EPERM:
+			return datapath::error::AccessDenied;
+		case EAGAIN:
+			return datapath::error::TimedOut;
+		default:
+			return datapath::error::Failure;
+		}
+	}
+
+	using clock   = std::chrono::steady_clock;
+	auto deadline = clock::now() + opts.connect_timeout;
+	auto transfer = [&](bool write, uint8_t* buf, size_t size) -> datapath::error {
+		size_t done = 0;
+		while (done < size) {
+			int    left = int(std::max<int64_t>(
+                0, std::chrono::duration_cast<std::chrono::milliseconds>(deadline - clock::now()).count()));
+			pollfd pfd{fd, short(write ? POLLOUT : POLLIN), 0};
+			int    pr = ::poll(&pfd, 1, left);
+			if (pr < 0 && errno == EINTR)
+				continue;
+			if (pr == 0)
+				return datapath::error::TimedOut;
+			ssize_t n = write ? ::send(fd, buf + done, size - done, MSG_NOSIGNAL | MSG_DONTWAIT)
+							  : ::recv(fd, buf + done, size - done, MSG_DONTWAIT);
+			if (n > 0) {
+				done += size_t(n);
+				continue;
+			}
+			if (n < 0 && (errno == EINTR || errno == EAGAIN))
+				continue;
+			return datapath::error::Closed;
+		}
+		return datapath::error::Success;
+	};
+
+	uint8_t hello[datapath::detail::hello_size];
+	datapath::detail::encode_hello(hello, {datapath::detail::protocol_version, opts.max_message_size});
+	datapath::error ec = transfer(true, hello, sizeof(hello));
+	if (ec == datapath::error::Success)
+		ec = transfer(false, hello, sizeof(hello));
+	datapath::detail::hello reply{};
+	if (ec == datapath::error::Success)
+		ec = datapath::detail::decode_hello(hello, reply);
+	if (ec != datapath::error::Success) {
+		::close(fd);
+		return ec;
+	}
+	::fcntl(fd, F_SETFL, ::fcntl(fd, F_GETFL) | O_NONBLOCK);
+
+	auto limit = std::min(opts.max_message_size, reply.max_message_size);
+	auto conn  = std::make_shared<uds_connection>(shared_from_this(), pick_loop(), fd, opts, limit);
+	if (!conn->start(false, {}, limit))
+		return datapath::error::CriticalFailure;
+	add_member(std::weak_ptr<datapath::detail::connection>(conn));
+	out = std::move(conn);
+	return datapath::error::Success;
+}
+
+datapath::error datapath::linux_::epoll_context::listen(std::shared_ptr<datapath::detail::listener>& out,
+														const std::string& path, const datapath::options& opts)
+{
+	if (stopped())
+		return datapath::error::Closed;
+	socket_address addr;
+	if (!make_socket_address(path, addr))
+		return datapath::error::InvalidPath;
+	auto lst = std::make_shared<uds_listener>(shared_from_this(), pick_loop(), std::move(addr), opts);
+	auto ec  = lst->create();
+	if (ec != datapath::error::Success) {
+		lst->close();
+		return ec;
+	}
+	add_member(std::weak_ptr<datapath::detail::listener>(lst));
+	out = std::move(lst);
+	return datapath::error::Success;
+}
+
+std::shared_ptr<datapath::detail::context_impl> datapath::detail::make_platform_context(
+	const datapath::context_options& options)
+{
+	auto ctx = std::make_shared<datapath::linux_::epoll_context>(options);
+	if (!ctx->start())
+		return nullptr;
+	return ctx;
+}

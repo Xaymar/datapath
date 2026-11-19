@@ -227,6 +227,20 @@ test_integration/fast:
 	cd /home/user/datapath/build/linux && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/build
 .PHONY : test_integration/fast
 
+# Convenience name for target.
+tests/CMakeFiles/test_linux.dir/rule:
+	cd /home/user/datapath/build/linux && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_linux.dir/rule
+.PHONY : tests/CMakeFiles/test_linux.dir/rule
+
+# Convenience name for target.
+test_linux: tests/CMakeFiles/test_linux.dir/rule
+.PHONY : test_linux
+
+# fast build rule for target.
+test_linux/fast:
+	cd /home/user/datapath/build/linux && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux.dir/build.make tests/CMakeFiles/test_linux.dir/build
+.PHONY : test_linux/fast
+
 raw_peer.o: raw_peer.cpp.o
 .PHONY : raw_peer.o
 
@@ -323,6 +337,30 @@ test_integration.cpp.s:
 	cd /home/user/datapath/build/linux && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/test_integration.cpp.s
 .PHONY : test_integration.cpp.s
 
+test_linux.o: test_linux.cpp.o
+.PHONY : test_linux.o
+
+# target to build an object file
+test_linux.cpp.o:
+	cd /home/user/datapath/build/linux && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux.dir/build.make tests/CMakeFiles/test_linux.dir/test_linux.cpp.o
+.PHONY : test_linux.cpp.o
+
+test_linux.i: test_linux.cpp.i
+.PHONY : test_linux.i
+
+# target to preprocess a source file
+test_linux.cpp.i:
+	cd /home/user/datapath/build/linux && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux.dir/build.make tests/CMakeFiles/test_linux.dir/test_linux.cpp.i
+.PHONY : test_linux.cpp.i
+
+test_linux.s: test_linux.cpp.s
+.PHONY : test_linux.s
+
+# target to generate assembly for a file
+test_linux.cpp.s:
+	cd /home/user/datapath/build/linux && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux.dir/build.make tests/CMakeFiles/test_linux.dir/test_linux.cpp.s
+.PHONY : test_linux.cpp.s
+
 test_send_queue.o: test_send_queue.cpp.o
 .PHONY : test_send_queue.o
 
@@ -363,6 +401,7 @@ help:
 	@echo "... test_api"
 	@echo "... test_framing"
 	@echo "... test_integration"
+	@echo "... test_linux"
 	@echo "... test_send_queue"
 	@echo "... raw_peer.o"
 	@echo "... raw_peer.i"
@@ -376,6 +415,9 @@ help:
 	@echo "... test_integration.o"
 	@echo "... test_integration.i"
 	@echo "... test_integration.s"
+	@echo "... test_linux.o"
+	@echo "... test_linux.i"
+	@echo "... test_linux.s"
 	@echo "... test_send_queue.o"
 	@echo "... test_send_queue.i"
 	@echo "... test_send_queue.s"

@@ -452,7 +452,13 @@ TEST(drop_inside_callback)
 		c->reset(); // destroy the last handle from inside its own callback
 		got.notify();
 	});
-	(*c)->send("m", 1);
+	// The server sends, so no other thread is inside a call on *c when the
+	// callback destroys it.
+	CHECK(srv.accepted.wait(1));
+	{
+		std::lock_guard<std::mutex> l(srv.lock);
+		srv.clients[0]->send("m", 1);
+	}
 	CHECK(got.wait(1));
 	std::this_thread::sleep_for(100ms);
 	CHECK_EQ(closes.load(), 0); // dropped handles never call back
@@ -472,9 +478,13 @@ TEST(on_close_exactly_once)
 	CHECK(srv.accepted.wait(1));
 	// Close from both ends at once, repeatedly.
 	std::thread t([&] { srv.server->close(); });
-	CHECK_EQ(c->close(), error::Success);
-	CHECK_EQ(c->close(), error::Closed);
+	// Either side may win the race; the first local close() reports Success
+	// only if the peer's close has not been observed yet.
+	error first  = c->close();
+	error second = c->close();
 	t.join();
+	CHECK(first == error::Success || first == error::Closed);
+	CHECK_EQ(second, error::Closed);
 	CHECK(col.closed.wait(1));
 	std::this_thread::sleep_for(100ms);
 	CHECK_EQ(col.close_calls.load(), 1);

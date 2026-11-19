@@ -105,7 +105,14 @@ if(WIN32)
 	)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR ANDROID)
 	list(APPEND DATAPATH_SOURCES
-		source/linux/context.cpp
+		source/linux/epoll_context.cpp
+		source/linux/epoll_context.hpp
+		source/linux/path.cpp
+		source/linux/path.hpp
+		source/linux/uds_connection.cpp
+		source/linux/uds_connection.hpp
+		source/linux/uds_server.cpp
+		source/linux/uds_server.hpp
 	)
 else()
 	message(FATAL_ERROR "DataPath: unsupported platform ${CMAKE_SYSTEM_NAME}")

@@ -1,62 +1,44 @@
-test_api.error_to_string 6 0.000399658
-test_api.options_defaults 6 0.000377655
-test_api.default_context_is_shared 6 0.000370185
-test_framing.parser_every_split_offset 4 0.0022724
-test_framing.parser_many_small_per_read 4 0.000797313
-test_framing.parser_large_frame_beyond_buffer 4 0.00501768
-test_framing.parser_rejects_oversize_header 4 0.000583428
-test_framing.hello_roundtrip 4 0.000562953
-test_framing.hello_bad_magic 4 0.000525247
-test_framing.hello_bad_version 4 0.00053051
-test_framing.spin_zero_budget_blocks_immediately 4 0.000527728
-test_framing.spin_work_defers_block 4 0.00105425
-test_send_queue.push_rejects_too_large 2 0.00105253
-test_send_queue.would_block_when_full 2 0.00140715
-test_send_queue.empty_queue_accepts_frame_above_queue_limit 2 0.00108321
-test_send_queue.coalesces_small_frames 2 0.00105438
-test_send_queue.single_writer_slot 2 0.00113243
-test_send_queue.closed_queue_rejects 2 0.00123113
-test_send_queue.concurrent_push_no_interleave 2 0.0558705
-test_integration.connect_missing_is_not_found 0 0
-test_integration.host_twice_is_address_in_use 0 0
-test_integration.echo_small 0 0
-test_integration.zero_length 0 0
-test_integration.large_8mib_intact 0 0
-test_integration.ordered_10000 0 0
-test_integration.concurrent_senders 0 0
-test_integration.many_clients 0 0
-test_integration.too_large_negotiated 0 0
-test_integration.would_block_when_peer_stalls 0 0
-test_integration.messages_wait_for_handler 0 0
-test_integration.rejected_accept_connect_fails 0 0
-test_integration.drop_handle_closes_peer 0 0
-test_integration.close_inside_callback 0 0
-test_integration.drop_inside_callback 0 0
-test_integration.on_close_exactly_once 0 0
-test_integration.server_close_then_rehost 0 0
-test_integration.bad_handshake_rejected 0 0
-test_integration.peer_dies_mid_frame 0 0
-test_integration.oversized_header_disconnects 0 0
-test_integration.custom_context_shutdown_closes_sockets 0 0
+test_api.error_to_string 27 0.00322259
+test_api.options_defaults 27 0.0017962
+test_api.default_context_is_shared 27 0.00232889
+test_framing.parser_every_split_offset 25 0.0121244
+test_framing.parser_many_small_per_read 25 0.00585314
+test_framing.parser_large_frame_beyond_buffer 25 0.0207052
+test_framing.parser_rejects_oversize_header 25 0.00465976
+test_framing.hello_roundtrip 25 0.00575351
+test_framing.hello_bad_magic 25 0.00569751
+test_framing.hello_bad_version 25 0.00570464
+test_framing.spin_zero_budget_blocks_immediately 25 0.00570662
+test_framing.spin_work_defers_block 25 0.0060026
+test_send_queue.push_rejects_too_large 23 0.00582095
+test_send_queue.would_block_when_full 23 0.00585
+test_send_queue.empty_queue_accepts_frame_above_queue_limit 23 0.00584469
+test_send_queue.coalesces_small_frames 23 0.00579672
+test_send_queue.single_writer_slot 23 0.00582573
+test_send_queue.closed_queue_rejects 23 0.00570451
+test_send_queue.concurrent_push_no_interleave 23 0.12235
+test_integration.connect_missing_is_not_found 21 0.00575053
+test_integration.host_twice_is_address_in_use 21 0.00586677
+test_integration.echo_small 21 0.00598947
+test_integration.zero_length 21 0.00622468
+test_integration.large_8mib_intact 21 0.0642009
+test_integration.ordered_10000 21 0.0327518
+test_integration.concurrent_senders 21 0.0544599
+test_integration.many_clients 21 0.0185417
+test_integration.too_large_negotiated 21 0.00578396
+test_integration.would_block_when_peer_stalls 21 0.00738917
+test_integration.messages_wait_for_handler 21 0.0596532
+test_integration.rejected_accept_connect_fails 21 0.00643453
+test_integration.drop_handle_closes_peer 21 0.00570249
+test_integration.close_inside_callback 21 0.108172
+test_integration.drop_inside_callback 21 0.107859
+test_integration.on_close_exactly_once 21 0.10801
+test_integration.server_close_then_rehost 21 0.00902579
+test_integration.bad_handshake_rejected 21 0.00586104
+test_integration.peer_dies_mid_frame 21 0.00592
+test_integration.oversized_header_disconnects 21 0.00570328
+test_integration.custom_context_shutdown_closes_sockets 21 0.00582235
+test_linux.linux_permissions_mode_bits 22 0.00580628
+test_linux.linux_filesystem_socket_roundtrip_and_stale_file 11 0.00577344
+test_linux.invalid_paths 22 0.00561342
 ---
-test_integration.connect_missing_is_not_found
-test_integration.host_twice_is_address_in_use
-test_integration.echo_small
-test_integration.zero_length
-test_integration.large_8mib_intact
-test_integration.ordered_10000
-test_integration.concurrent_senders
-test_integration.many_clients
-test_integration.too_large_negotiated
-test_integration.would_block_when_peer_stalls
-test_integration.messages_wait_for_handler
-test_integration.rejected_accept_connect_fails
-test_integration.drop_handle_closes_peer
-test_integration.close_inside_callback
-test_integration.drop_inside_callback
-test_integration.on_close_exactly_once
-test_integration.server_close_then_rehost
-test_integration.bad_handshake_rejected
-test_integration.peer_dies_mid_frame
-test_integration.oversized_header_disconnects
-test_integration.custom_context_shutdown_closes_sockets

@@ -16,26 +16,20 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "common/detail.hpp"
+#pragma once
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <string>
 
-namespace {
-	class stub_context : public datapath::detail::context_impl {
-		public:
-		datapath::error connect(std::shared_ptr<datapath::detail::connection>&, const std::string&,
-								const datapath::options&) override
-		{
-			return datapath::error::NotSupported;
-		}
-		datapath::error listen(std::shared_ptr<datapath::detail::listener>&, const std::string&,
-							   const datapath::options&) override
-		{
-			return datapath::error::NotSupported;
-		}
-		void shutdown() override {}
+namespace datapath::linux_ {
+	struct socket_address {
+		sockaddr_un addr{};
+		socklen_t   length   = 0;
+		bool        abstract = false;
+		std::string filesystem_path; // set when !abstract
 	};
-} // namespace
 
-std::shared_ptr<datapath::detail::context_impl> datapath::detail::make_platform_context(const datapath::context_options&)
-{
-	return std::make_shared<stub_context>();
-}
+	// Paths starting with '/' are filesystem sockets; anything else is a name
+	// in the abstract namespace ("\0datapath.<name>"). False if too long/empty.
+	bool make_socket_address(const std::string& path, socket_address& out);
+} // namespace datapath::linux_

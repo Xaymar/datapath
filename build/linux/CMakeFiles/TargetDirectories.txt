@@ -10,6 +10,7 @@
 /home/user/datapath/build/linux/tests/CMakeFiles/test_framing.dir
 /home/user/datapath/build/linux/tests/CMakeFiles/test_send_queue.dir
 /home/user/datapath/build/linux/tests/CMakeFiles/test_integration.dir
+/home/user/datapath/build/linux/tests/CMakeFiles/test_linux.dir
 /home/user/datapath/build/linux/tests/CMakeFiles/test.dir
 /home/user/datapath/build/linux/tests/CMakeFiles/edit_cache.dir
 /home/user/datapath/build/linux/tests/CMakeFiles/rebuild_cache.dir

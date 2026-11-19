@@ -84,6 +84,7 @@ tests/all: tests/CMakeFiles/test_api.dir/all
 tests/all: tests/CMakeFiles/test_framing.dir/all
 tests/all: tests/CMakeFiles/test_send_queue.dir/all
 tests/all: tests/CMakeFiles/test_integration.dir/all
+tests/all: tests/CMakeFiles/test_linux.dir/all
 .PHONY : tests/all
 
 # Recursive "preinstall" directory target.
@@ -95,6 +96,7 @@ tests/clean: tests/CMakeFiles/test_api.dir/clean
 tests/clean: tests/CMakeFiles/test_framing.dir/clean
 tests/clean: tests/CMakeFiles/test_send_queue.dir/clean
 tests/clean: tests/CMakeFiles/test_integration.dir/clean
+tests/clean: tests/CMakeFiles/test_linux.dir/clean
 .PHONY : tests/clean
 
 #=============================================================================
@@ -104,12 +106,12 @@ tests/clean: tests/CMakeFiles/test_integration.dir/clean
 CMakeFiles/datapath.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=1,2,3,4 "Built target datapath"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=1,2,3,4,5,6,7 "Built target datapath"
 .PHONY : CMakeFiles/datapath.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/datapath.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 4
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 7
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/datapath.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 0
 .PHONY : CMakeFiles/datapath.dir/rule
@@ -130,12 +132,12 @@ CMakeFiles/datapath.dir/clean:
 tests/CMakeFiles/test_api.dir/all: CMakeFiles/datapath.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_api.dir/build.make tests/CMakeFiles/test_api.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_api.dir/build.make tests/CMakeFiles/test_api.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=5,6 "Built target test_api"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=8,9 "Built target test_api"
 .PHONY : tests/CMakeFiles/test_api.dir/all
 
 # Build rule for subdir invocation for target.
 tests/CMakeFiles/test_api.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 6
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 9
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_api.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 0
 .PHONY : tests/CMakeFiles/test_api.dir/rule
@@ -156,12 +158,12 @@ tests/CMakeFiles/test_api.dir/clean:
 tests/CMakeFiles/test_framing.dir/all: CMakeFiles/datapath.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_framing.dir/build.make tests/CMakeFiles/test_framing.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_framing.dir/build.make tests/CMakeFiles/test_framing.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=7,8 "Built target test_framing"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=10,11 "Built target test_framing"
 .PHONY : tests/CMakeFiles/test_framing.dir/all
 
 # Build rule for subdir invocation for target.
 tests/CMakeFiles/test_framing.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 6
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 9
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_framing.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 0
 .PHONY : tests/CMakeFiles/test_framing.dir/rule
@@ -182,12 +184,12 @@ tests/CMakeFiles/test_framing.dir/clean:
 tests/CMakeFiles/test_send_queue.dir/all: CMakeFiles/datapath.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_send_queue.dir/build.make tests/CMakeFiles/test_send_queue.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_send_queue.dir/build.make tests/CMakeFiles/test_send_queue.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=12,13 "Built target test_send_queue"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=17,18 "Built target test_send_queue"
 .PHONY : tests/CMakeFiles/test_send_queue.dir/all
 
 # Build rule for subdir invocation for target.
 tests/CMakeFiles/test_send_queue.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 6
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 9
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_send_queue.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 0
 .PHONY : tests/CMakeFiles/test_send_queue.dir/rule
@@ -208,12 +210,12 @@ tests/CMakeFiles/test_send_queue.dir/clean:
 tests/CMakeFiles/test_integration.dir/all: CMakeFiles/datapath.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=9,10,11 "Built target test_integration"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=12,13,14 "Built target test_integration"
 .PHONY : tests/CMakeFiles/test_integration.dir/all
 
 # Build rule for subdir invocation for target.
 tests/CMakeFiles/test_integration.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 7
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 10
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_integration.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 0
 .PHONY : tests/CMakeFiles/test_integration.dir/rule
@@ -226,6 +228,32 @@ test_integration: tests/CMakeFiles/test_integration.dir/rule
 tests/CMakeFiles/test_integration.dir/clean:
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/clean
 .PHONY : tests/CMakeFiles/test_integration.dir/clean
+
+#=============================================================================
+# Target rules for target tests/CMakeFiles/test_linux.dir
+
+# All Build rule for target.
+tests/CMakeFiles/test_linux.dir/all: CMakeFiles/datapath.dir/all
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux.dir/build.make tests/CMakeFiles/test_linux.dir/depend
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux.dir/build.make tests/CMakeFiles/test_linux.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/linux/CMakeFiles --progress-num=15,16 "Built target test_linux"
+.PHONY : tests/CMakeFiles/test_linux.dir/all
+
+# Build rule for subdir invocation for target.
+tests/CMakeFiles/test_linux.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 9
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_linux.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/linux/CMakeFiles 0
+.PHONY : tests/CMakeFiles/test_linux.dir/rule
+
+# Convenience name for target.
+test_linux: tests/CMakeFiles/test_linux.dir/rule
+.PHONY : test_linux
+
+# clean rule for target.
+tests/CMakeFiles/test_linux.dir/clean:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux.dir/build.make tests/CMakeFiles/test_linux.dir/clean
+.PHONY : tests/CMakeFiles/test_linux.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.
