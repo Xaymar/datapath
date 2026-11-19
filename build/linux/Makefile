@@ -249,6 +249,32 @@ test_linux/fast:
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux.dir/build.make tests/CMakeFiles/test_linux.dir/build
 .PHONY : test_linux/fast
 
+#=============================================================================
+# Target rules for targets named datapath-benchmark
+
+# Build rule for target.
+datapath-benchmark: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 datapath-benchmark
+.PHONY : datapath-benchmark
+
+# fast build rule for target.
+datapath-benchmark/fast:
+	$(MAKE) $(MAKESILENT) -f samples/CMakeFiles/datapath-benchmark.dir/build.make samples/CMakeFiles/datapath-benchmark.dir/build
+.PHONY : datapath-benchmark/fast
+
+#=============================================================================
+# Target rules for targets named datapath-echo
+
+# Build rule for target.
+datapath-echo: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 datapath-echo
+.PHONY : datapath-echo
+
+# fast build rule for target.
+datapath-echo/fast:
+	$(MAKE) $(MAKESILENT) -f samples/CMakeFiles/datapath-echo.dir/build.make samples/CMakeFiles/datapath-echo.dir/build
+.PHONY : datapath-echo/fast
+
 source/common/api.o: source/common/api.cpp.o
 .PHONY : source/common/api.o
 
@@ -407,6 +433,8 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... test"
 	@echo "... datapath"
+	@echo "... datapath-benchmark"
+	@echo "... datapath-echo"
 	@echo "... test_api"
 	@echo "... test_framing"
 	@echo "... test_integration"

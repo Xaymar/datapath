@@ -18,3 +18,12 @@
 /home/user/datapath/build/mingw/tests/CMakeFiles/install.dir
 /home/user/datapath/build/mingw/tests/CMakeFiles/install/local.dir
 /home/user/datapath/build/mingw/tests/CMakeFiles/install/strip.dir
+/home/user/datapath/build/mingw/samples/CMakeFiles/datapath-benchmark.dir
+/home/user/datapath/build/mingw/samples/CMakeFiles/datapath-echo.dir
+/home/user/datapath/build/mingw/samples/CMakeFiles/test.dir
+/home/user/datapath/build/mingw/samples/CMakeFiles/edit_cache.dir
+/home/user/datapath/build/mingw/samples/CMakeFiles/rebuild_cache.dir
+/home/user/datapath/build/mingw/samples/CMakeFiles/list_install_components.dir
+/home/user/datapath/build/mingw/samples/CMakeFiles/install.dir
+/home/user/datapath/build/mingw/samples/CMakeFiles/install/local.dir
+/home/user/datapath/build/mingw/samples/CMakeFiles/install/strip.dir

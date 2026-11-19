@@ -11,6 +11,7 @@ set(CMAKE_MAKEFILE_DEPENDS
   "CMakeFiles/3.28.3/CMakeCXXCompiler.cmake"
   "CMakeFiles/3.28.3/CMakeSystem.cmake"
   "/home/user/datapath/cmake/version.hpp.in"
+  "/home/user/datapath/samples/CMakeLists.txt"
   "/home/user/datapath/tests/CMakeLists.txt"
   "/usr/share/cmake-3.28/Modules/CMakeCXXInformation.cmake"
   "/usr/share/cmake-3.28/Modules/CMakeCommonLanguageInclude.cmake"
@@ -48,6 +49,7 @@ set(CMAKE_MAKEFILE_PRODUCTS
   "generated/version.hpp"
   "CMakeFiles/CMakeDirectoryInformation.cmake"
   "tests/CMakeFiles/CMakeDirectoryInformation.cmake"
+  "samples/CMakeFiles/CMakeDirectoryInformation.cmake"
   )
 
 # Dependency information for all targets:
@@ -58,4 +60,6 @@ set(CMAKE_DEPEND_INFO_FILES
   "tests/CMakeFiles/test_send_queue.dir/DependInfo.cmake"
   "tests/CMakeFiles/test_integration.dir/DependInfo.cmake"
   "tests/CMakeFiles/test_linux.dir/DependInfo.cmake"
+  "samples/CMakeFiles/datapath-benchmark.dir/DependInfo.cmake"
+  "samples/CMakeFiles/datapath-echo.dir/DependInfo.cmake"
   )

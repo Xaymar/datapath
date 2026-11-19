@@ -1,0 +1,15 @@
+/home/user/datapath/build/release/CMakeFiles/datapath.dir
+/home/user/datapath/build/release/CMakeFiles/edit_cache.dir
+/home/user/datapath/build/release/CMakeFiles/rebuild_cache.dir
+/home/user/datapath/build/release/CMakeFiles/list_install_components.dir
+/home/user/datapath/build/release/CMakeFiles/install.dir
+/home/user/datapath/build/release/CMakeFiles/install/local.dir
+/home/user/datapath/build/release/CMakeFiles/install/strip.dir
+/home/user/datapath/build/release/samples/CMakeFiles/datapath-benchmark.dir
+/home/user/datapath/build/release/samples/CMakeFiles/datapath-echo.dir
+/home/user/datapath/build/release/samples/CMakeFiles/edit_cache.dir
+/home/user/datapath/build/release/samples/CMakeFiles/rebuild_cache.dir
+/home/user/datapath/build/release/samples/CMakeFiles/list_install_components.dir
+/home/user/datapath/build/release/samples/CMakeFiles/install.dir
+/home/user/datapath/build/release/samples/CMakeFiles/install/local.dir
+/home/user/datapath/build/release/samples/CMakeFiles/install/strip.dir

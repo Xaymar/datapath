@@ -1,18 +1,658 @@
-Start testing: Nov 19 04:37 UTC
+Start testing: Nov 19 04:43 UTC
 ----------------------------------------------------------
-41/42 Testing: test_windows_security.sddl_levels
-41/42 Test: test_windows_security.sddl_levels
-Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_windows_security.exe" "sddl_levels"
+1/42 Testing: test_api.error_to_string
+1/42 Test: test_api.error_to_string
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_api.exe" "error_to_string"
 Directory: /home/user/datapath/build/mingw/tests
-"test_windows_security.sddl_levels" start time: Nov 19 04:37 UTC
+"test_api.error_to_string" start time: Nov 19 04:43 UTC
 Output:
 ----------------------------------------------------------
-[ PASS ] sddl_levels
+[ PASS ] error_to_string
 <end of output>
 Test time =   2.46 sec
 ----------------------------------------------------------
 Test Passed.
-"test_windows_security.sddl_levels" end time: Nov 19 04:37 UTC
+"test_api.error_to_string" end time: Nov 19 04:43 UTC
+"test_api.error_to_string" time elapsed: 00:00:02
+----------------------------------------------------------
+
+2/42 Testing: test_api.options_defaults
+2/42 Test: test_api.options_defaults
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_api.exe" "options_defaults"
+Directory: /home/user/datapath/build/mingw/tests
+"test_api.options_defaults" start time: Nov 19 04:43 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] options_defaults
+<end of output>
+Test time =   2.43 sec
+----------------------------------------------------------
+Test Passed.
+"test_api.options_defaults" end time: Nov 19 04:43 UTC
+"test_api.options_defaults" time elapsed: 00:00:02
+----------------------------------------------------------
+
+3/42 Testing: test_api.default_context_is_shared
+3/42 Test: test_api.default_context_is_shared
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_api.exe" "default_context_is_shared"
+Directory: /home/user/datapath/build/mingw/tests
+"test_api.default_context_is_shared" start time: Nov 19 04:43 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] default_context_is_shared
+<end of output>
+Test time =   2.45 sec
+----------------------------------------------------------
+Test Passed.
+"test_api.default_context_is_shared" end time: Nov 19 04:43 UTC
+"test_api.default_context_is_shared" time elapsed: 00:00:02
+----------------------------------------------------------
+
+4/42 Testing: test_framing.parser_every_split_offset
+4/42 Test: test_framing.parser_every_split_offset
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_framing.exe" "parser_every_split_offset"
+Directory: /home/user/datapath/build/mingw/tests
+"test_framing.parser_every_split_offset" start time: Nov 19 04:43 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] parser_every_split_offset
+<end of output>
+Test time =   2.47 sec
+----------------------------------------------------------
+Test Passed.
+"test_framing.parser_every_split_offset" end time: Nov 19 04:43 UTC
+"test_framing.parser_every_split_offset" time elapsed: 00:00:02
+----------------------------------------------------------
+
+5/42 Testing: test_framing.parser_many_small_per_read
+5/42 Test: test_framing.parser_many_small_per_read
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_framing.exe" "parser_many_small_per_read"
+Directory: /home/user/datapath/build/mingw/tests
+"test_framing.parser_many_small_per_read" start time: Nov 19 04:43 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] parser_many_small_per_read
+<end of output>
+Test time =   2.47 sec
+----------------------------------------------------------
+Test Passed.
+"test_framing.parser_many_small_per_read" end time: Nov 19 04:43 UTC
+"test_framing.parser_many_small_per_read" time elapsed: 00:00:02
+----------------------------------------------------------
+
+6/42 Testing: test_framing.parser_large_frame_beyond_buffer
+6/42 Test: test_framing.parser_large_frame_beyond_buffer
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_framing.exe" "parser_large_frame_beyond_buffer"
+Directory: /home/user/datapath/build/mingw/tests
+"test_framing.parser_large_frame_beyond_buffer" start time: Nov 19 04:43 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] parser_large_frame_beyond_buffer
+<end of output>
+Test time =   2.42 sec
+----------------------------------------------------------
+Test Passed.
+"test_framing.parser_large_frame_beyond_buffer" end time: Nov 19 04:43 UTC
+"test_framing.parser_large_frame_beyond_buffer" time elapsed: 00:00:02
+----------------------------------------------------------
+
+7/42 Testing: test_framing.parser_rejects_oversize_header
+7/42 Test: test_framing.parser_rejects_oversize_header
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_framing.exe" "parser_rejects_oversize_header"
+Directory: /home/user/datapath/build/mingw/tests
+"test_framing.parser_rejects_oversize_header" start time: Nov 19 04:43 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] parser_rejects_oversize_header
+<end of output>
+Test time =   2.51 sec
+----------------------------------------------------------
+Test Passed.
+"test_framing.parser_rejects_oversize_header" end time: Nov 19 04:43 UTC
+"test_framing.parser_rejects_oversize_header" time elapsed: 00:00:02
+----------------------------------------------------------
+
+8/42 Testing: test_framing.hello_roundtrip
+8/42 Test: test_framing.hello_roundtrip
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_framing.exe" "hello_roundtrip"
+Directory: /home/user/datapath/build/mingw/tests
+"test_framing.hello_roundtrip" start time: Nov 19 04:43 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] hello_roundtrip
+<end of output>
+Test time =   2.49 sec
+----------------------------------------------------------
+Test Passed.
+"test_framing.hello_roundtrip" end time: Nov 19 04:43 UTC
+"test_framing.hello_roundtrip" time elapsed: 00:00:02
+----------------------------------------------------------
+
+9/42 Testing: test_framing.hello_bad_magic
+9/42 Test: test_framing.hello_bad_magic
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_framing.exe" "hello_bad_magic"
+Directory: /home/user/datapath/build/mingw/tests
+"test_framing.hello_bad_magic" start time: Nov 19 04:43 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] hello_bad_magic
+<end of output>
+Test time =   2.47 sec
+----------------------------------------------------------
+Test Passed.
+"test_framing.hello_bad_magic" end time: Nov 19 04:44 UTC
+"test_framing.hello_bad_magic" time elapsed: 00:00:02
+----------------------------------------------------------
+
+10/42 Testing: test_framing.hello_bad_version
+10/42 Test: test_framing.hello_bad_version
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_framing.exe" "hello_bad_version"
+Directory: /home/user/datapath/build/mingw/tests
+"test_framing.hello_bad_version" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] hello_bad_version
+<end of output>
+Test time =   2.52 sec
+----------------------------------------------------------
+Test Passed.
+"test_framing.hello_bad_version" end time: Nov 19 04:44 UTC
+"test_framing.hello_bad_version" time elapsed: 00:00:02
+----------------------------------------------------------
+
+11/42 Testing: test_framing.spin_zero_budget_blocks_immediately
+11/42 Test: test_framing.spin_zero_budget_blocks_immediately
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_framing.exe" "spin_zero_budget_blocks_immediately"
+Directory: /home/user/datapath/build/mingw/tests
+"test_framing.spin_zero_budget_blocks_immediately" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] spin_zero_budget_blocks_immediately
+<end of output>
+Test time =   2.48 sec
+----------------------------------------------------------
+Test Passed.
+"test_framing.spin_zero_budget_blocks_immediately" end time: Nov 19 04:44 UTC
+"test_framing.spin_zero_budget_blocks_immediately" time elapsed: 00:00:02
+----------------------------------------------------------
+
+12/42 Testing: test_framing.spin_work_defers_block
+12/42 Test: test_framing.spin_work_defers_block
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_framing.exe" "spin_work_defers_block"
+Directory: /home/user/datapath/build/mingw/tests
+"test_framing.spin_work_defers_block" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] spin_work_defers_block
+<end of output>
+Test time =   2.44 sec
+----------------------------------------------------------
+Test Passed.
+"test_framing.spin_work_defers_block" end time: Nov 19 04:44 UTC
+"test_framing.spin_work_defers_block" time elapsed: 00:00:02
+----------------------------------------------------------
+
+13/42 Testing: test_send_queue.push_rejects_too_large
+13/42 Test: test_send_queue.push_rejects_too_large
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_send_queue.exe" "push_rejects_too_large"
+Directory: /home/user/datapath/build/mingw/tests
+"test_send_queue.push_rejects_too_large" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] push_rejects_too_large
+<end of output>
+Test time =   2.49 sec
+----------------------------------------------------------
+Test Passed.
+"test_send_queue.push_rejects_too_large" end time: Nov 19 04:44 UTC
+"test_send_queue.push_rejects_too_large" time elapsed: 00:00:02
+----------------------------------------------------------
+
+14/42 Testing: test_send_queue.would_block_when_full
+14/42 Test: test_send_queue.would_block_when_full
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_send_queue.exe" "would_block_when_full"
+Directory: /home/user/datapath/build/mingw/tests
+"test_send_queue.would_block_when_full" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] would_block_when_full
+<end of output>
+Test time =   2.48 sec
+----------------------------------------------------------
+Test Passed.
+"test_send_queue.would_block_when_full" end time: Nov 19 04:44 UTC
+"test_send_queue.would_block_when_full" time elapsed: 00:00:02
+----------------------------------------------------------
+
+15/42 Testing: test_send_queue.empty_queue_accepts_frame_above_queue_limit
+15/42 Test: test_send_queue.empty_queue_accepts_frame_above_queue_limit
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_send_queue.exe" "empty_queue_accepts_frame_above_queue_limit"
+Directory: /home/user/datapath/build/mingw/tests
+"test_send_queue.empty_queue_accepts_frame_above_queue_limit" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] empty_queue_accepts_frame_above_queue_limit
+<end of output>
+Test time =   2.41 sec
+----------------------------------------------------------
+Test Passed.
+"test_send_queue.empty_queue_accepts_frame_above_queue_limit" end time: Nov 19 04:44 UTC
+"test_send_queue.empty_queue_accepts_frame_above_queue_limit" time elapsed: 00:00:02
+----------------------------------------------------------
+
+16/42 Testing: test_send_queue.coalesces_small_frames
+16/42 Test: test_send_queue.coalesces_small_frames
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_send_queue.exe" "coalesces_small_frames"
+Directory: /home/user/datapath/build/mingw/tests
+"test_send_queue.coalesces_small_frames" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] coalesces_small_frames
+<end of output>
+Test time =   2.44 sec
+----------------------------------------------------------
+Test Passed.
+"test_send_queue.coalesces_small_frames" end time: Nov 19 04:44 UTC
+"test_send_queue.coalesces_small_frames" time elapsed: 00:00:02
+----------------------------------------------------------
+
+17/42 Testing: test_send_queue.single_writer_slot
+17/42 Test: test_send_queue.single_writer_slot
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_send_queue.exe" "single_writer_slot"
+Directory: /home/user/datapath/build/mingw/tests
+"test_send_queue.single_writer_slot" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] single_writer_slot
+<end of output>
+Test time =   2.44 sec
+----------------------------------------------------------
+Test Passed.
+"test_send_queue.single_writer_slot" end time: Nov 19 04:44 UTC
+"test_send_queue.single_writer_slot" time elapsed: 00:00:02
+----------------------------------------------------------
+
+18/42 Testing: test_send_queue.closed_queue_rejects
+18/42 Test: test_send_queue.closed_queue_rejects
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_send_queue.exe" "closed_queue_rejects"
+Directory: /home/user/datapath/build/mingw/tests
+"test_send_queue.closed_queue_rejects" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] closed_queue_rejects
+<end of output>
+Test time =   2.51 sec
+----------------------------------------------------------
+Test Passed.
+"test_send_queue.closed_queue_rejects" end time: Nov 19 04:44 UTC
+"test_send_queue.closed_queue_rejects" time elapsed: 00:00:02
+----------------------------------------------------------
+
+19/42 Testing: test_send_queue.concurrent_push_no_interleave
+19/42 Test: test_send_queue.concurrent_push_no_interleave
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_send_queue.exe" "concurrent_push_no_interleave"
+Directory: /home/user/datapath/build/mingw/tests
+"test_send_queue.concurrent_push_no_interleave" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] concurrent_push_no_interleave
+<end of output>
+Test time =   2.51 sec
+----------------------------------------------------------
+Test Passed.
+"test_send_queue.concurrent_push_no_interleave" end time: Nov 19 04:44 UTC
+"test_send_queue.concurrent_push_no_interleave" time elapsed: 00:00:02
+----------------------------------------------------------
+
+20/42 Testing: test_integration.connect_missing_is_not_found
+20/42 Test: test_integration.connect_missing_is_not_found
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "connect_missing_is_not_found"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.connect_missing_is_not_found" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] connect_missing_is_not_found
+<end of output>
+Test time =   2.47 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.connect_missing_is_not_found" end time: Nov 19 04:44 UTC
+"test_integration.connect_missing_is_not_found" time elapsed: 00:00:02
+----------------------------------------------------------
+
+21/42 Testing: test_integration.host_twice_is_address_in_use
+21/42 Test: test_integration.host_twice_is_address_in_use
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "host_twice_is_address_in_use"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.host_twice_is_address_in_use" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] host_twice_is_address_in_use
+<end of output>
+Test time =   2.48 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.host_twice_is_address_in_use" end time: Nov 19 04:44 UTC
+"test_integration.host_twice_is_address_in_use" time elapsed: 00:00:02
+----------------------------------------------------------
+
+22/42 Testing: test_integration.echo_small
+22/42 Test: test_integration.echo_small
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "echo_small"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.echo_small" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] echo_small
+<end of output>
+Test time =   2.49 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.echo_small" end time: Nov 19 04:44 UTC
+"test_integration.echo_small" time elapsed: 00:00:02
+----------------------------------------------------------
+
+23/42 Testing: test_integration.zero_length
+23/42 Test: test_integration.zero_length
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "zero_length"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.zero_length" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] zero_length
+<end of output>
+Test time =   2.49 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.zero_length" end time: Nov 19 04:44 UTC
+"test_integration.zero_length" time elapsed: 00:00:02
+----------------------------------------------------------
+
+24/42 Testing: test_integration.large_8mib_intact
+24/42 Test: test_integration.large_8mib_intact
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "large_8mib_intact"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.large_8mib_intact" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] large_8mib_intact
+<end of output>
+Test time =   2.51 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.large_8mib_intact" end time: Nov 19 04:44 UTC
+"test_integration.large_8mib_intact" time elapsed: 00:00:02
+----------------------------------------------------------
+
+25/42 Testing: test_integration.ordered_10000
+25/42 Test: test_integration.ordered_10000
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "ordered_10000"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.ordered_10000" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] ordered_10000
+<end of output>
+Test time =   2.49 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.ordered_10000" end time: Nov 19 04:44 UTC
+"test_integration.ordered_10000" time elapsed: 00:00:02
+----------------------------------------------------------
+
+26/42 Testing: test_integration.concurrent_senders
+26/42 Test: test_integration.concurrent_senders
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "concurrent_senders"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.concurrent_senders" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] concurrent_senders
+<end of output>
+Test time =   2.49 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.concurrent_senders" end time: Nov 19 04:44 UTC
+"test_integration.concurrent_senders" time elapsed: 00:00:02
+----------------------------------------------------------
+
+27/42 Testing: test_integration.many_clients
+27/42 Test: test_integration.many_clients
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "many_clients"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.many_clients" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] many_clients
+<end of output>
+Test time =   2.46 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.many_clients" end time: Nov 19 04:44 UTC
+"test_integration.many_clients" time elapsed: 00:00:02
+----------------------------------------------------------
+
+28/42 Testing: test_integration.too_large_negotiated
+28/42 Test: test_integration.too_large_negotiated
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "too_large_negotiated"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.too_large_negotiated" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] too_large_negotiated
+<end of output>
+Test time =   2.47 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.too_large_negotiated" end time: Nov 19 04:44 UTC
+"test_integration.too_large_negotiated" time elapsed: 00:00:02
+----------------------------------------------------------
+
+29/42 Testing: test_integration.would_block_when_peer_stalls
+29/42 Test: test_integration.would_block_when_peer_stalls
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "would_block_when_peer_stalls"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.would_block_when_peer_stalls" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] would_block_when_peer_stalls
+<end of output>
+Test time =   2.52 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.would_block_when_peer_stalls" end time: Nov 19 04:44 UTC
+"test_integration.would_block_when_peer_stalls" time elapsed: 00:00:02
+----------------------------------------------------------
+
+30/42 Testing: test_integration.messages_wait_for_handler
+30/42 Test: test_integration.messages_wait_for_handler
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "messages_wait_for_handler"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.messages_wait_for_handler" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] messages_wait_for_handler
+<end of output>
+Test time =   2.46 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.messages_wait_for_handler" end time: Nov 19 04:44 UTC
+"test_integration.messages_wait_for_handler" time elapsed: 00:00:02
+----------------------------------------------------------
+
+31/42 Testing: test_integration.rejected_accept_connect_fails
+31/42 Test: test_integration.rejected_accept_connect_fails
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "rejected_accept_connect_fails"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.rejected_accept_connect_fails" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] rejected_accept_connect_fails
+<end of output>
+Test time =   2.47 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.rejected_accept_connect_fails" end time: Nov 19 04:44 UTC
+"test_integration.rejected_accept_connect_fails" time elapsed: 00:00:02
+----------------------------------------------------------
+
+32/42 Testing: test_integration.drop_handle_closes_peer
+32/42 Test: test_integration.drop_handle_closes_peer
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "drop_handle_closes_peer"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.drop_handle_closes_peer" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] drop_handle_closes_peer
+<end of output>
+Test time =   2.50 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.drop_handle_closes_peer" end time: Nov 19 04:44 UTC
+"test_integration.drop_handle_closes_peer" time elapsed: 00:00:02
+----------------------------------------------------------
+
+33/42 Testing: test_integration.close_inside_callback
+33/42 Test: test_integration.close_inside_callback
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "close_inside_callback"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.close_inside_callback" start time: Nov 19 04:44 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] close_inside_callback
+<end of output>
+Test time =   2.49 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.close_inside_callback" end time: Nov 19 04:45 UTC
+"test_integration.close_inside_callback" time elapsed: 00:00:02
+----------------------------------------------------------
+
+34/42 Testing: test_integration.drop_inside_callback
+34/42 Test: test_integration.drop_inside_callback
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "drop_inside_callback"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.drop_inside_callback" start time: Nov 19 04:45 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] drop_inside_callback
+<end of output>
+Test time =   2.50 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.drop_inside_callback" end time: Nov 19 04:45 UTC
+"test_integration.drop_inside_callback" time elapsed: 00:00:02
+----------------------------------------------------------
+
+35/42 Testing: test_integration.on_close_exactly_once
+35/42 Test: test_integration.on_close_exactly_once
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "on_close_exactly_once"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.on_close_exactly_once" start time: Nov 19 04:45 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] on_close_exactly_once
+<end of output>
+Test time =   2.52 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.on_close_exactly_once" end time: Nov 19 04:45 UTC
+"test_integration.on_close_exactly_once" time elapsed: 00:00:02
+----------------------------------------------------------
+
+36/42 Testing: test_integration.server_close_then_rehost
+36/42 Test: test_integration.server_close_then_rehost
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "server_close_then_rehost"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.server_close_then_rehost" start time: Nov 19 04:45 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] server_close_then_rehost
+<end of output>
+Test time =   2.48 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.server_close_then_rehost" end time: Nov 19 04:45 UTC
+"test_integration.server_close_then_rehost" time elapsed: 00:00:02
+----------------------------------------------------------
+
+37/42 Testing: test_integration.bad_handshake_rejected
+37/42 Test: test_integration.bad_handshake_rejected
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "bad_handshake_rejected"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.bad_handshake_rejected" start time: Nov 19 04:45 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] bad_handshake_rejected
+<end of output>
+Test time =   2.50 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.bad_handshake_rejected" end time: Nov 19 04:45 UTC
+"test_integration.bad_handshake_rejected" time elapsed: 00:00:02
+----------------------------------------------------------
+
+38/42 Testing: test_integration.peer_dies_mid_frame
+38/42 Test: test_integration.peer_dies_mid_frame
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "peer_dies_mid_frame"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.peer_dies_mid_frame" start time: Nov 19 04:45 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] peer_dies_mid_frame
+<end of output>
+Test time =   2.48 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.peer_dies_mid_frame" end time: Nov 19 04:45 UTC
+"test_integration.peer_dies_mid_frame" time elapsed: 00:00:02
+----------------------------------------------------------
+
+39/42 Testing: test_integration.oversized_header_disconnects
+39/42 Test: test_integration.oversized_header_disconnects
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "oversized_header_disconnects"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.oversized_header_disconnects" start time: Nov 19 04:45 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] oversized_header_disconnects
+<end of output>
+Test time =   2.53 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.oversized_header_disconnects" end time: Nov 19 04:45 UTC
+"test_integration.oversized_header_disconnects" time elapsed: 00:00:02
+----------------------------------------------------------
+
+40/42 Testing: test_integration.custom_context_shutdown_closes_sockets
+40/42 Test: test_integration.custom_context_shutdown_closes_sockets
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_integration.exe" "custom_context_shutdown_closes_sockets"
+Directory: /home/user/datapath/build/mingw/tests
+"test_integration.custom_context_shutdown_closes_sockets" start time: Nov 19 04:45 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] custom_context_shutdown_closes_sockets
+<end of output>
+Test time =   2.50 sec
+----------------------------------------------------------
+Test Passed.
+"test_integration.custom_context_shutdown_closes_sockets" end time: Nov 19 04:45 UTC
+"test_integration.custom_context_shutdown_closes_sockets" time elapsed: 00:00:02
+----------------------------------------------------------
+
+41/42 Testing: test_windows_security.sddl_levels
+41/42 Test: test_windows_security.sddl_levels
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_windows_security.exe" "sddl_levels"
+Directory: /home/user/datapath/build/mingw/tests
+"test_windows_security.sddl_levels" start time: Nov 19 04:45 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] sddl_levels
+<end of output>
+Test time =   2.54 sec
+----------------------------------------------------------
+Test Passed.
+"test_windows_security.sddl_levels" end time: Nov 19 04:45 UTC
 "test_windows_security.sddl_levels" time elapsed: 00:00:02
 ----------------------------------------------------------
 
@@ -20,16 +660,16 @@ Test Passed.
 42/42 Test: test_windows_security.security_descriptor_builds_for_each_level
 Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_windows_security.exe" "security_descriptor_builds_for_each_level"
 Directory: /home/user/datapath/build/mingw/tests
-"test_windows_security.security_descriptor_builds_for_each_level" start time: Nov 19 04:37 UTC
+"test_windows_security.security_descriptor_builds_for_each_level" start time: Nov 19 04:45 UTC
 Output:
 ----------------------------------------------------------
 [ PASS ] security_descriptor_builds_for_each_level
 <end of output>
-Test time =   2.44 sec
+Test time =   2.48 sec
 ----------------------------------------------------------
 Test Passed.
-"test_windows_security.security_descriptor_builds_for_each_level" end time: Nov 19 04:37 UTC
+"test_windows_security.security_descriptor_builds_for_each_level" end time: Nov 19 04:45 UTC
 "test_windows_security.security_descriptor_builds_for_each_level" time elapsed: 00:00:02
 ----------------------------------------------------------
 
-End testing: Nov 19 04:37 UTC
+End testing: Nov 19 04:45 UTC

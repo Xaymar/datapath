@@ -18,3 +18,12 @@
 /home/user/datapath/build/linux/tests/CMakeFiles/install.dir
 /home/user/datapath/build/linux/tests/CMakeFiles/install/local.dir
 /home/user/datapath/build/linux/tests/CMakeFiles/install/strip.dir
+/home/user/datapath/build/linux/samples/CMakeFiles/datapath-benchmark.dir
+/home/user/datapath/build/linux/samples/CMakeFiles/datapath-echo.dir
+/home/user/datapath/build/linux/samples/CMakeFiles/test.dir
+/home/user/datapath/build/linux/samples/CMakeFiles/edit_cache.dir
+/home/user/datapath/build/linux/samples/CMakeFiles/rebuild_cache.dir
+/home/user/datapath/build/linux/samples/CMakeFiles/list_install_components.dir
+/home/user/datapath/build/linux/samples/CMakeFiles/install.dir
+/home/user/datapath/build/linux/samples/CMakeFiles/install/local.dir
+/home/user/datapath/build/linux/samples/CMakeFiles/install/strip.dir

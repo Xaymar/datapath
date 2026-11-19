@@ -65,16 +65,36 @@ CMAKE_BINARY_DIR = /home/user/datapath/build/mingw
 # The main recursive "all" target.
 all: CMakeFiles/datapath.dir/all
 all: tests/all
+all: samples/all
 .PHONY : all
 
 # The main recursive "preinstall" target.
 preinstall: tests/preinstall
+preinstall: samples/preinstall
 .PHONY : preinstall
 
 # The main recursive "clean" target.
 clean: CMakeFiles/datapath.dir/clean
 clean: tests/clean
+clean: samples/clean
 .PHONY : clean
+
+#=============================================================================
+# Directory level rules for directory samples
+
+# Recursive "all" directory target.
+samples/all: samples/CMakeFiles/datapath-benchmark.dir/all
+samples/all: samples/CMakeFiles/datapath-echo.dir/all
+.PHONY : samples/all
+
+# Recursive "preinstall" directory target.
+samples/preinstall:
+.PHONY : samples/preinstall
+
+# Recursive "clean" directory target.
+samples/clean: samples/CMakeFiles/datapath-benchmark.dir/clean
+samples/clean: samples/CMakeFiles/datapath-echo.dir/clean
+.PHONY : samples/clean
 
 #=============================================================================
 # Directory level rules for directory tests
@@ -132,7 +152,7 @@ CMakeFiles/datapath.dir/clean:
 tests/CMakeFiles/test_api.dir/all: CMakeFiles/datapath.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_api.dir/build.make tests/CMakeFiles/test_api.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_api.dir/build.make tests/CMakeFiles/test_api.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=9,10 "Built target test_api"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=13,14 "Built target test_api"
 .PHONY : tests/CMakeFiles/test_api.dir/all
 
 # Build rule for subdir invocation for target.
@@ -158,7 +178,7 @@ tests/CMakeFiles/test_api.dir/clean:
 tests/CMakeFiles/test_framing.dir/all: CMakeFiles/datapath.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_framing.dir/build.make tests/CMakeFiles/test_framing.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_framing.dir/build.make tests/CMakeFiles/test_framing.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=11,12 "Built target test_framing"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=15,16 "Built target test_framing"
 .PHONY : tests/CMakeFiles/test_framing.dir/all
 
 # Build rule for subdir invocation for target.
@@ -184,7 +204,7 @@ tests/CMakeFiles/test_framing.dir/clean:
 tests/CMakeFiles/test_send_queue.dir/all: CMakeFiles/datapath.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_send_queue.dir/build.make tests/CMakeFiles/test_send_queue.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_send_queue.dir/build.make tests/CMakeFiles/test_send_queue.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=16,17 "Built target test_send_queue"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=20,21 "Built target test_send_queue"
 .PHONY : tests/CMakeFiles/test_send_queue.dir/all
 
 # Build rule for subdir invocation for target.
@@ -210,7 +230,7 @@ tests/CMakeFiles/test_send_queue.dir/clean:
 tests/CMakeFiles/test_integration.dir/all: CMakeFiles/datapath.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_integration.dir/build.make tests/CMakeFiles/test_integration.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=13,14,15 "Built target test_integration"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=17,18,19 "Built target test_integration"
 .PHONY : tests/CMakeFiles/test_integration.dir/all
 
 # Build rule for subdir invocation for target.
@@ -236,7 +256,7 @@ tests/CMakeFiles/test_integration.dir/clean:
 tests/CMakeFiles/test_windows_security.dir/all: CMakeFiles/datapath.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_windows_security.dir/build.make tests/CMakeFiles/test_windows_security.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_windows_security.dir/build.make tests/CMakeFiles/test_windows_security.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=18,19 "Built target test_windows_security"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=22,23 "Built target test_windows_security"
 .PHONY : tests/CMakeFiles/test_windows_security.dir/all
 
 # Build rule for subdir invocation for target.
@@ -254,6 +274,58 @@ test_windows_security: tests/CMakeFiles/test_windows_security.dir/rule
 tests/CMakeFiles/test_windows_security.dir/clean:
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_windows_security.dir/build.make tests/CMakeFiles/test_windows_security.dir/clean
 .PHONY : tests/CMakeFiles/test_windows_security.dir/clean
+
+#=============================================================================
+# Target rules for target samples/CMakeFiles/datapath-benchmark.dir
+
+# All Build rule for target.
+samples/CMakeFiles/datapath-benchmark.dir/all: CMakeFiles/datapath.dir/all
+	$(MAKE) $(MAKESILENT) -f samples/CMakeFiles/datapath-benchmark.dir/build.make samples/CMakeFiles/datapath-benchmark.dir/depend
+	$(MAKE) $(MAKESILENT) -f samples/CMakeFiles/datapath-benchmark.dir/build.make samples/CMakeFiles/datapath-benchmark.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=9,10 "Built target datapath-benchmark"
+.PHONY : samples/CMakeFiles/datapath-benchmark.dir/all
+
+# Build rule for subdir invocation for target.
+samples/CMakeFiles/datapath-benchmark.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/mingw/CMakeFiles 10
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 samples/CMakeFiles/datapath-benchmark.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/mingw/CMakeFiles 0
+.PHONY : samples/CMakeFiles/datapath-benchmark.dir/rule
+
+# Convenience name for target.
+datapath-benchmark: samples/CMakeFiles/datapath-benchmark.dir/rule
+.PHONY : datapath-benchmark
+
+# clean rule for target.
+samples/CMakeFiles/datapath-benchmark.dir/clean:
+	$(MAKE) $(MAKESILENT) -f samples/CMakeFiles/datapath-benchmark.dir/build.make samples/CMakeFiles/datapath-benchmark.dir/clean
+.PHONY : samples/CMakeFiles/datapath-benchmark.dir/clean
+
+#=============================================================================
+# Target rules for target samples/CMakeFiles/datapath-echo.dir
+
+# All Build rule for target.
+samples/CMakeFiles/datapath-echo.dir/all: CMakeFiles/datapath.dir/all
+	$(MAKE) $(MAKESILENT) -f samples/CMakeFiles/datapath-echo.dir/build.make samples/CMakeFiles/datapath-echo.dir/depend
+	$(MAKE) $(MAKESILENT) -f samples/CMakeFiles/datapath-echo.dir/build.make samples/CMakeFiles/datapath-echo.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/user/datapath/build/mingw/CMakeFiles --progress-num=11,12 "Built target datapath-echo"
+.PHONY : samples/CMakeFiles/datapath-echo.dir/all
+
+# Build rule for subdir invocation for target.
+samples/CMakeFiles/datapath-echo.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/mingw/CMakeFiles 10
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 samples/CMakeFiles/datapath-echo.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/user/datapath/build/mingw/CMakeFiles 0
+.PHONY : samples/CMakeFiles/datapath-echo.dir/rule
+
+# Convenience name for target.
+datapath-echo: samples/CMakeFiles/datapath-echo.dir/rule
+.PHONY : datapath-echo
+
+# clean rule for target.
+samples/CMakeFiles/datapath-echo.dir/clean:
+	$(MAKE) $(MAKESILENT) -f samples/CMakeFiles/datapath-echo.dir/build.make samples/CMakeFiles/datapath-echo.dir/clean
+.PHONY : samples/CMakeFiles/datapath-echo.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.
