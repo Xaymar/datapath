@@ -140,5 +140,9 @@ First Windows results, both under Prime95 load (DataPath additionally under `--s
 | DataPath, `--spin 0` | 17.8 / 67 µs | 18.7 / 70 µs |
 | libuv as shipped | 71.9 / 1081 µs | 74.8 / 1072 µs |
 
+## Known issues (work in progress)
+* Linux: `test_integration.drop_context_inside_callback` crashed once (segfault) in a full parallel `ctest` run of a non-sanitizer build. It did not reproduce in 200 runs under AddressSanitizer or in a standalone loop. Under investigation; likely a teardown race when the last context reference is dropped on an I/O thread.
+* No server-side handshake timeout: a local client that connects and never sends its hello holds a connection slot.
+
 ## License
 GNU Affero General Public License v3.0 or later, see `LICENSE`.
