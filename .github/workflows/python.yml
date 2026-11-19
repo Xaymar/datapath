@@ -14,7 +14,7 @@ on:
       - "python/**"
       - "source/**"
   push:
-    branches: [master]
+    branches: [root]
     paths:
       - ".github/workflows/python.yml"
       - "CMakeLists.txt"
