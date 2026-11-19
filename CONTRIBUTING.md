@@ -38,6 +38,7 @@ On Windows, run `build\samples\Release\datapath-benchmark.exe local`. Useful var
 * `--clients 8` runs eight concurrent ping-pong connections.
 * `--threads 2` uses two I/O threads per process.
 * `--threads auto` uses one I/O thread per physical core (`context_options::io_threads = 0`). Compare it with `--ideal-core off` on Windows to see what pairing threads with cores does.
+* `--stress 0` loads every logical core from a separate process; on Linux, `--stress-nice N` runs that process at nice N to test the priority gap.
 * `--sizes 8,64,4096` picks the message sizes. The default is 8 B to 64 KiB; add `1048576,16777216` to measure bulk-sized messages.
 
 You can also run `server <name>` and `client <name>` separately, in two terminals.
