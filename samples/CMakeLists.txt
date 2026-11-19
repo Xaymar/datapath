@@ -12,6 +12,10 @@ add_executable(datapath-benchmark ${BENCH_HARNESS} benchmark/transport_datapath.
 )
 target_link_libraries(datapath-benchmark PRIVATE datapath)
 
+# The same harness over the C API, to measure any core that exports datapath.h.
+add_executable(datapath-benchmark-c ${BENCH_HARNESS} benchmark/transport_datapath_c.cpp)
+target_link_libraries(datapath-benchmark-c PRIVATE datapath)
+
 add_executable(datapath-echo echo/main.cpp)
 target_link_libraries(datapath-echo PRIVATE datapath)
 

@@ -47,6 +47,8 @@ You can also run `server <name>` and `client <name>` separately, in two terminal
 
 Single runs are noisy at microsecond resolution. `--runs 5` repeats every size five times and reports the median, plus the lowest and highest p99.9 of any run. `samples\benchmark\matrix.cmd` (Windows) and `samples/benchmark/matrix.sh` (Linux) run every option combination that way and collect the output in `benchmark-results.txt`.
 
+`datapath-benchmark-c` is the same harness over the C API (`datapath.h`) instead of the C++ API. It accepts the same options and the matrix scripts include it when it exists. A core that only exports the C API (such as the planned Rust core) is compared against these runs.
+
 For stable numbers on Windows, use the High Performance power plan. Run from a foreground console and close CPU-heavy applications.
 
 ### Comparing with libuv

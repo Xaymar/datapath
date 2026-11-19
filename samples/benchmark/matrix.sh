@@ -13,6 +13,17 @@ for opts in "" "--yield" "--spin 0" "--spin 200" "--threads 2" "--threads auto" 
 	# shellcheck disable=SC2086
 	"$BENCH" local --runs "$RUNS" $opts >> "$OUT" 2>&1
 done
+# The same core through the C API (datapath.h). The Rust core is compared
+# against these runs, since it is measured through the same interface.
+CAPI="$(dirname "$BENCH")/datapath-benchmark-c"
+if [ -x "$CAPI" ]; then
+	for opts in "" "--clients 8 --threads auto" "--load --threads 2" "--stress 0"; do
+		printf '\n==== c-api %s\n' "${opts:-defaults}" >> "$OUT"
+		echo "Running: c-api ${opts:-defaults}"
+		# shellcheck disable=SC2086
+		"$CAPI" local --runs "$RUNS" $opts >> "$OUT" 2>&1
+	done
+fi
 LIBUV="$(dirname "$BENCH")/libuv-benchmark"
 if [ -x "$LIBUV" ]; then
 	for opts in "--spin 0" "" "--stress 0 --spin 0" "--stress 0"; do
