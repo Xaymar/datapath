@@ -123,6 +123,8 @@ target_link_libraries(my-app PRIVATE datapath::datapath)
 ```
 Requires CMake 3.16+ and a C++17 compiler (MSVC 2019+, GCC 9+, Clang 10+). To build the library, tests and benchmarks on their own, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
+**Node.js:** `npm install @xaymar/datapath` gives a Node-API addon with TypeScript typings, built on the C++ API. See [bindings/node](bindings/node/README.md).
+
 ## Known issues (work in progress)
 * No server-side handshake timeout: a local client that connects and never sends its hello holds a connection slot.
 

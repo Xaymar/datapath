@@ -1,0 +1,127 @@
+# Low Latency IPC Library for high-speed traffic
+# Copyright (C) 2019 - 2026 Narta Xaymar Dirks <info@xaymar.com>
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+# Builds and tests the Node.js bindings, collects prebuilt binaries per target and
+# packs a publish-ready npm tarball. Publishing itself is not part of this workflow.
+name: Node.js bindings
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+    paths:
+      - 'bindings/node/**'
+      - 'include/**'
+      - 'source/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/node.yml'
+  pull_request:
+    paths:
+      - 'bindings/node/**'
+      - 'include/**'
+      - 'source/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/node.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: bindings/node
+
+jobs:
+  test:
+    name: Test (Node.js ${{ matrix.node }}, ${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+        node: [18, 20, 22, 24]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm install
+      - run: npm test
+      - run: npm run typecheck
+        if: matrix.node == 22
+
+  prebuild:
+    name: Prebuild ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Older Ubuntu = older glibc baseline for the Linux binaries.
+          - { target: linux-x64, os: ubuntu-22.04 }
+          - { target: linux-arm64, os: ubuntu-22.04-arm }
+          - { target: win32-x64, os: windows-2022 }
+          - { target: win32-arm64, os: windows-11-arm }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm test
+      - run: npm run package-prebuild
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-${{ matrix.target }}
+          path: bindings/node/prebuilds/
+          if-no-files-found: error
+
+  prebuild-musl:
+    name: Prebuild linux-x64 (musl)
+    runs-on: ubuntu-24.04
+    container: node:22-alpine
+    steps:
+      - run: apk add --no-cache build-base cmake git
+        working-directory: /
+      - uses: actions/checkout@v4
+      - run: npm install
+      - run: npm test
+      - run: npm run package-prebuild -- --libc musl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-linux-x64-musl
+          path: bindings/node/prebuilds/
+          if-no-files-found: error
+
+  pack:
+    name: Pack
+    needs: [prebuild, prebuild-musl]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: prebuild-*
+          path: bindings/node/prebuilds/
+          merge-multiple: true
+      - run: ls -R prebuilds
+      - run: npm install --ignore-scripts
+      - run: npm pack
+      # Smoke test: install the tarball into an empty project; it must load the
+      # prebuild without compiling.
+      - run: |
+          mkdir -p /tmp/consumer && cd /tmp/consumer
+          npm init -y > /dev/null
+          npm install "$GITHUB_WORKSPACE"/bindings/node/xaymar-datapath-*.tgz
+          test ! -d node_modules/@xaymar/datapath/build
+          node -e "const d = require('@xaymar/datapath'); const s = d.host('pack-smoke', () => {}); s.close(); console.log('ok')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-package
+          path: bindings/node/xaymar-datapath-*.tgz
+          if-no-files-found: error
