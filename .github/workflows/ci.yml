@@ -1,0 +1,176 @@
+# Build and test the C++ library on every supported platform, with coverage.
+#
+# Layout: one job per language. The C++ job is a matrix; adding a platform
+# (e.g. macOS once its backend exists) is one more `include` entry. Bindings
+# (C API, Rust, Node.js, Python) get their own jobs alongside `cpp`.
+# Benchmarks are built (they are part of the default build) but never run here.
+
+name: CI
+
+on:
+  push:
+    branches: [master, dev]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cpp:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    # Ubuntu 26.04 runs as a container so the distro version is pinned exactly.
+    container: ${{ matrix.container }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows / MSVC / Release
+            os: windows-latest
+            build_type: Release
+
+          - name: Windows / MSVC / Coverage
+            os: windows-latest
+            build_type: Debug
+            coverage: opencppcoverage
+
+          - name: Ubuntu 26.04 / GCC / Release
+            os: ubuntu-latest
+            container: ubuntu:26.04
+            cxx: g++
+            build_type: Release
+
+          - name: Ubuntu 26.04 / GCC / Coverage
+            os: ubuntu-latest
+            container: ubuntu:26.04
+            cxx: g++
+            build_type: Debug
+            cxxflags: --coverage -fprofile-update=atomic
+            coverage: gcovr
+            coverage_min: 90
+
+          - name: Ubuntu 26.04 / Clang / Release
+            os: ubuntu-latest
+            container: ubuntu:26.04
+            cxx: clang++
+            build_type: Release
+
+          - name: Ubuntu 26.04 / GCC / ASan+UBSan
+            os: ubuntu-latest
+            container: ubuntu:26.04
+            cxx: g++
+            build_type: RelWithDebInfo
+            cxxflags: -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer
+            ldflags: -fsanitize=address,undefined
+
+          - name: Ubuntu 26.04 / GCC / TSan
+            os: ubuntu-latest
+            container: ubuntu:26.04
+            cxx: g++
+            build_type: RelWithDebInfo
+            cxxflags: -fsanitize=thread
+            ldflags: -fsanitize=thread
+            samples: "OFF"
+
+    env:
+      BUILD_DIR: build
+      UBSAN_OPTIONS: print_stacktrace=1
+      TSAN_OPTIONS: halt_on_error=1 second_deadlock_stack=1
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+    steps:
+      - name: Install packages (Ubuntu)
+        if: matrix.container
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update -q
+          apt-get install -yq --no-install-recommends \
+            ca-certificates git cmake ninja-build g++ clang python3 \
+            ${{ matrix.coverage == 'gcovr' && 'gcovr' || '' }}
+
+      - uses: actions/checkout@v4
+
+      - name: Install OpenCppCoverage (Windows)
+        if: matrix.coverage == 'opencppcoverage'
+        shell: pwsh
+        run: |
+          choco install opencppcoverage -y --no-progress
+          "C:\Program Files\OpenCppCoverage" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Configure
+        shell: bash
+        env:
+          CXX: ${{ matrix.cxx }}
+        run: |
+          args=(-S . -B "$BUILD_DIR"
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+            -DDATAPATH_BUILD_TESTS=ON
+            -DDATAPATH_BUILD_SAMPLES=${{ matrix.samples || 'ON' }})
+          if [ "$RUNNER_OS" != "Windows" ]; then args+=(-G Ninja); fi
+          if [ -n "${{ matrix.cxxflags }}" ]; then args+=("-DCMAKE_CXX_FLAGS=${{ matrix.cxxflags }}"); fi
+          if [ -n "${{ matrix.ldflags }}" ]; then args+=("-DCMAKE_EXE_LINKER_FLAGS=${{ matrix.ldflags }}"); fi
+          cmake "${args[@]}"
+
+      - name: Build
+        shell: bash
+        run: cmake --build "$BUILD_DIR" --config ${{ matrix.build_type }} --parallel
+
+      - name: Test
+        if: matrix.coverage != 'opencppcoverage'
+        shell: bash
+        run: ctest --test-dir "$BUILD_DIR" -C ${{ matrix.build_type }} --output-on-failure --parallel 4
+
+      - name: Test with coverage (Windows)
+        if: matrix.coverage == 'opencppcoverage'
+        shell: pwsh
+        run: |
+          $ws = "${{ github.workspace }}"
+          OpenCppCoverage.exe --quiet --cover_children `
+            --sources "$ws\source" --sources "$ws\include" `
+            --export_type "cobertura:coverage.xml" `
+            -- ctest --test-dir $env:BUILD_DIR -C ${{ matrix.build_type }} --output-on-failure
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Collect coverage (Linux)
+        if: matrix.coverage == 'gcovr'
+        shell: bash
+        run: |
+          mkdir -p coverage-html
+          gcovr --root . --filter source/ --filter include/ "$BUILD_DIR" \
+            --cobertura coverage.xml --html-details coverage-html/index.html --txt
+
+      - name: Coverage summary
+        if: matrix.coverage && !cancelled()
+        shell: bash
+        run: |
+          py=python3; [ "$RUNNER_OS" = Windows ] && py=python
+          "$py" .github/scripts/coverage_summary.py coverage.xml \
+            --root "${{ github.workspace }}" \
+            --title "${{ matrix.name }}" \
+            --min ${{ matrix.coverage_min || 0 }}
+
+      - name: Upload coverage report
+        if: matrix.coverage && !cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ runner.os }}
+          path: |
+            coverage.xml
+            coverage-html/
+          if-no-files-found: ignore
+
+      # Optional: set the CODECOV_TOKEN repository secret to also publish to Codecov.
+      - name: Upload to Codecov
+        if: matrix.coverage && !cancelled() && env.CODECOV_TOKEN != ''
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          flags: ${{ runner.os }}
+          fail_ci_if_error: false
