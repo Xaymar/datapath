@@ -1,0 +1,53 @@
+Start testing: Nov 19 04:10 UTC
+----------------------------------------------------------
+1/3 Testing: test_api.error_to_string
+1/3 Test: test_api.error_to_string
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_api.exe" "error_to_string"
+Directory: /home/user/datapath/build/mingw/tests
+"test_api.error_to_string" start time: Nov 19 04:10 UTC
+Output:
+----------------------------------------------------------
+wine: failed to open L"C:\\windows\\syswow64\\rundll32.exe": c0000135
+wine: configuration in L"/root/.wine" has been updated.
+[ PASS ] error_to_string
+<end of output>
+Test time =   5.39 sec
+----------------------------------------------------------
+Test Passed.
+"test_api.error_to_string" end time: Nov 19 04:10 UTC
+"test_api.error_to_string" time elapsed: 00:00:05
+----------------------------------------------------------
+
+2/3 Testing: test_api.options_defaults
+2/3 Test: test_api.options_defaults
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_api.exe" "options_defaults"
+Directory: /home/user/datapath/build/mingw/tests
+"test_api.options_defaults" start time: Nov 19 04:10 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] options_defaults
+<end of output>
+Test time =   2.45 sec
+----------------------------------------------------------
+Test Passed.
+"test_api.options_defaults" end time: Nov 19 04:10 UTC
+"test_api.options_defaults" time elapsed: 00:00:02
+----------------------------------------------------------
+
+3/3 Testing: test_api.default_context_is_shared
+3/3 Test: test_api.default_context_is_shared
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_api.exe" "default_context_is_shared"
+Directory: /home/user/datapath/build/mingw/tests
+"test_api.default_context_is_shared" start time: Nov 19 04:10 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] default_context_is_shared
+<end of output>
+Test time =   2.46 sec
+----------------------------------------------------------
+Test Passed.
+"test_api.default_context_is_shared" end time: Nov 19 04:10 UTC
+"test_api.default_context_is_shared" time elapsed: 00:00:02
+----------------------------------------------------------
+
+End testing: Nov 19 04:10 UTC

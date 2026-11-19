@@ -1,0 +1,16 @@
+/home/user/datapath/build/linux/CMakeFiles/datapath.dir
+/home/user/datapath/build/linux/CMakeFiles/test.dir
+/home/user/datapath/build/linux/CMakeFiles/edit_cache.dir
+/home/user/datapath/build/linux/CMakeFiles/rebuild_cache.dir
+/home/user/datapath/build/linux/CMakeFiles/list_install_components.dir
+/home/user/datapath/build/linux/CMakeFiles/install.dir
+/home/user/datapath/build/linux/CMakeFiles/install/local.dir
+/home/user/datapath/build/linux/CMakeFiles/install/strip.dir
+/home/user/datapath/build/linux/tests/CMakeFiles/test_api.dir
+/home/user/datapath/build/linux/tests/CMakeFiles/test.dir
+/home/user/datapath/build/linux/tests/CMakeFiles/edit_cache.dir
+/home/user/datapath/build/linux/tests/CMakeFiles/rebuild_cache.dir
+/home/user/datapath/build/linux/tests/CMakeFiles/list_install_components.dir
+/home/user/datapath/build/linux/tests/CMakeFiles/install.dir
+/home/user/datapath/build/linux/tests/CMakeFiles/install/local.dir
+/home/user/datapath/build/linux/tests/CMakeFiles/install/strip.dir

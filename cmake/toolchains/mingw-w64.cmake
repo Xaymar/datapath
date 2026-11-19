@@ -1,0 +1,18 @@
+# Cross-compile for 64-bit Windows with mingw-w64 (posix threads variant).
+# Tests run through Wine when it is installed.
+set(CMAKE_SYSTEM_NAME Windows)
+set(CMAKE_SYSTEM_PROCESSOR x86_64)
+set(_prefix x86_64-w64-mingw32)
+find_program(_cxx NAMES ${_prefix}-g++-posix ${_prefix}-g++ REQUIRED)
+find_program(_cc NAMES ${_prefix}-gcc-posix ${_prefix}-gcc REQUIRED)
+set(CMAKE_CXX_COMPILER ${_cxx})
+set(CMAKE_C_COMPILER ${_cc})
+set(CMAKE_RC_COMPILER ${_prefix}-windres)
+set(CMAKE_FIND_ROOT_PATH /usr/${_prefix})
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+find_program(_wine NAMES wine wine64)
+if(_wine)
+	set(CMAKE_CROSSCOMPILING_EMULATOR "${CMAKE_CURRENT_LIST_DIR}/wine-run.sh")
+endif()

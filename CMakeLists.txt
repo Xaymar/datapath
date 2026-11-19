@@ -1,326 +1,154 @@
 # Low Latency IPC Library for high-speed traffic
-# Copyright (C) 2019 Michael Fabian Dirks <info@xaymar.com>
-# 
+# Copyright (C) 2019 - 2026 Michael Fabian Dirks <info@xaymar.com>
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
 # by the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Affero General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#================================================================================#
-# Define Project
-#================================================================================#
-cmake_minimum_required(VERSION 3.15.0)
+cmake_minimum_required(VERSION 3.16)
 
-# Automatic Versioning
+# Versioning: tweak = commits since the version tag, if available.
 set(VERSION_MAJOR 0)
-set(VERSION_MINOR 1)
+set(VERSION_MINOR 2)
 set(VERSION_PATCH 0)
 set(VERSION_TWEAK 0)
 set(PROJECT_COMMIT "N/A")
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/.git")
-	set(GIT_RESULT "")
-	set(GIT_OUTPUT "")
-	execute_process(
-		COMMAND git rev-list --count --topo-order ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}..HEAD
-		WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
-		RESULT_VARIABLE GIT_RESULT
-		OUTPUT_VARIABLE GIT_OUTPUT
-		OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_STRIP_TRAILING_WHITESPACE ERROR_QUIET
-	)
-	if(GIT_RESULT EQUAL 0)
-		set(VERSION_TWEAK ${GIT_OUTPUT})
-	endif()
 	execute_process(
 		COMMAND git rev-parse HEAD
 		WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
 		RESULT_VARIABLE GIT_RESULT
 		OUTPUT_VARIABLE GIT_OUTPUT
-		OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_STRIP_TRAILING_WHITESPACE ERROR_QUIET
+		OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET
 	)
 	if(GIT_RESULT EQUAL 0)
 		set(PROJECT_COMMIT ${GIT_OUTPUT})
 	endif()
 endif()
 
-# Define Project
-project(
-	datapath
+project(datapath
 	VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.${VERSION_TWEAK}
+	DESCRIPTION "High performance, low latency IPC library"
+	LANGUAGES CXX
 )
-set(PROJECT_FULL_NAME "DataPath IPC Library")
-set(PROJECT_DESCRIPTION "High Performance Synchronous and Asynchronous IPC Library")
-set(PROJECT_AUTHORS "Michael Fabian 'Xaymar' Dirks <info@xaymar.com>")
-set(PROJECT_COPYRIGHT_YEARS "2018 - 2020")
 
-#================================================================================#
-# CMake Tools & Modules
-#================================================================================#
-
-# CMake Modules
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/clang")
-
-include("util")
-include("Clang")
-
-# Detect Build Type
-if(NOT "${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
-	set(PropertyPrefix "${PROJECT_NAME}_")
-else()
-	set(PropertyPrefix "")
+# Optional clang tooling submodule.
+if(EXISTS "${PROJECT_SOURCE_DIR}/cmake/clang/Clang.cmake")
+	list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/clang")
+	include("Clang")
 endif()
 
-# Detect Architecture
-math(EXPR BITS "8*${CMAKE_SIZEOF_VOID_P}")
-if("${BITS}" STREQUAL "32")
-	set(ARCH "x86")
+if("${CMAKE_SOURCE_DIR}" STREQUAL "${PROJECT_SOURCE_DIR}")
+	set(DATAPATH_TOPLEVEL ON)
 else()
-	set(ARCH "x64")
+	set(DATAPATH_TOPLEVEL OFF)
 endif()
 
-#================================================================================#
-# Options
-#================================================================================#
-# Static or Dynamic?
-option(${PropertyPrefix}MAKE_DYNAMIC "Create dynamically linked library instead of static library." OFF)
-option(${PropertyPrefix}MAKE_MODULE "Create dynamically linked module instead of dynamically linked library." OFF)
-option(${PropertyPrefix}BUILD_SAMPLES "Build Samples" ON)
+option(DATAPATH_SHARED "Build a shared library instead of a static one." OFF)
+option(DATAPATH_BUILD_SAMPLES "Build samples and the benchmark." ${DATAPATH_TOPLEVEL})
+option(DATAPATH_BUILD_TESTS "Build tests." ${DATAPATH_TOPLEVEL})
 
-#================================================================================#
-# Sources
-#================================================================================#
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+	set(CMAKE_BUILD_TYPE Release)
+endif()
 
-# Configure Version Header
 configure_file(
 	"${PROJECT_SOURCE_DIR}/cmake/version.hpp.in"
 	"${PROJECT_BINARY_DIR}/generated/version.hpp"
 )
 
-# Source Files
-set(PROJECT_PUBLIC "")
-list(APPEND PROJECT_PUBLIC
-	"include/datapath.hpp"
-	"include/error.hpp"
-	"include/bitmask.hpp"
-	"include/event.hpp"
-	"include/isocket.hpp"
-	"include/iserver.hpp"
-	"include/itask.hpp"
-	"include/waitable.hpp"
-	"include/permissions.hpp"
-	"include/threadpool.hpp"
+set(DATAPATH_PUBLIC_HEADERS
+	include/datapath/context.hpp
+	include/datapath/datapath.hpp
+	include/datapath/error.hpp
+	include/datapath/options.hpp
+	include/datapath/permissions.hpp
+	include/datapath/server.hpp
+	include/datapath/socket.hpp
 )
-
-set(PROJECT_PRIVATE "")
-list(APPEND PROJECT_PRIVATE
-	"source/threadpool.cpp"
+set(DATAPATH_SOURCES
+	source/common/api.cpp
+	source/common/detail.hpp
 )
-
-set(PROJECT_TEMPLATES "")
-list(APPEND PROJECT_TEMPLATES
-	"${PROJECT_SOURCE_DIR}/cmake/version.hpp.in"
-)
-
-set(PROJECT_GENERATED "")
-list(APPEND PROJECT_GENERATED
-	"${PROJECT_BINARY_DIR}/generated/version.hpp"
-)
-
-set(PROJECT_DATA "")
-list(APPEND PROJECT_DATA
-	"README.md"
-	"LICENSE"
-)
-
-set(PROJECT_LIBRARIES "")
-
-set(PROJECT_DEFINES "")
-
-# Platforms
 if(WIN32)
-	# Windows
-	list(APPEND PROJECT_LIBRARIES
-		advapi32
+	list(APPEND DATAPATH_SOURCES
+		source/windows/context.cpp
 	)
-
-	list(APPEND PROJECT_DEFINES
-		_CRT_SECURE_NO_WARNINGS
-		WIN32_LEAN_AND_MEAN
-		NOGPICAPMASKS
-		NOVIRTUALKEYCODES
-		NOWINMESSAGES
-		NOWINSTYLES
-		NOSYSMETRICS
-		NOMENUS
-		NOICONS
-		NOKEYSTATES
-		NOSYSCOMMANDS
-		NORASTEROPS
-		NOSHOWWINDOW
-		NOATOM
-		NOCLIPBOARD
-		NOCOLOR
-		NOCTLMGR
-		NODRAWTEXT
-		NOGDI
-		NOKERNEL
-		#NOUSER
-		#NONLS
-		NOMB
-		NOMEMMGR
-		NOMETAFILE
-		NOMINMAX
-		NOMSG
-		NOOPENFILE
-		NOSCROLL
-		NOSERVICE
-		NOSOUND
-		NOTEXTMETRIC
-		NOWH
-		NOWINOFFSETS
-		NOCOMM
-		NOKANJI
-		NOHELP
-		NOPROFILER
-		NODEFERWINDOWPOS
-		NOMCX
-		NOIME
-		NOMDI
-		NOINOUT
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR ANDROID)
+	list(APPEND DATAPATH_SOURCES
+		source/linux/context.cpp
 	)
-
-	list(APPEND PROJECT_PRIVATE
-		"source/windows/datapath.cpp"
-		"source/windows/overlapped.hpp"
-		"source/windows/overlapped.cpp"
-		"source/windows/socket.hpp"
-		"source/windows/socket.cpp"
-		"source/windows/server.hpp"
-		"source/windows/server.cpp"
-		"source/windows/task.hpp"
-		"source/windows/task.cpp"
-		"source/windows/utility.hpp"
-		"source/windows/waitable.cpp"
-	)
-elseif(APPLE)
-	# MacOSX
-
-	list(APPEND PROJECT_PRIVATE
-	)
-elseif("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
-	# Linux
-
-	list(APPEND PROJECT_PRIVATE
-	)
-elseif("${CMAKE_SYSTEM_NAME}" MATCHES "FreeBSD")
-	# FreeBSD
-
-	list(APPEND PROJECT_PRIVATE
-	)
-endif()
-
-# Grouping
-source_group(TREE "${PROJECT_SOURCE_DIR}" PREFIX "Data Files" FILES ${PROJECT_DATA})
-source_group(TREE "${PROJECT_SOURCE_DIR}/cmake" PREFIX "Template Files" FILES ${PROJECT_TEMPLATES})
-source_group(TREE "${PROJECT_BINARY_DIR}/generated" PREFIX "Generated Files" FILES ${PROJECT_GENERATED})
-source_group(TREE "${PROJECT_SOURCE_DIR}/include" PREFIX "Exported Files" FILES ${PROJECT_PUBLIC})
-
-# Filter Sources
-set(_TMP_SOURCE ${PROJECT_PRIVATE})
-list(FILTER _TMP_SOURCE INCLUDE REGEX "\.(c|cpp)$")
-source_group(TREE "${PROJECT_SOURCE_DIR}/source" PREFIX "Source Files" FILES ${_TMP_SOURCE})
-
-# Filter Headers
-set(_TMP_HEADER ${PROJECT_PRIVATE})
-list(FILTER _TMP_HEADER INCLUDE REGEX "\.(h|hpp)$")
-source_group(TREE "${PROJECT_SOURCE_DIR}/source" PREFIX "Header Files" FILES ${_TMP_HEADER})
-
-#================================================================================#
-# Building
-#================================================================================#
-
-# Library definition
-set(_BUILD_TYPE)
-if(${PropertyPrefix}MAKE_DYNAMIC)
-	if(${PropertyPrefix}MAKE_MODULE)
-		set(_BUILD_TYPE MODULE)
-	else()
-		set(_BUILD_TYPE SHARED)
-	endif()
 else()
-	set(_BUILD_TYPE STATIC)
+	message(FATAL_ERROR "DataPath: unsupported platform ${CMAKE_SYSTEM_NAME}")
 endif()
 
-add_library(${PROJECT_NAME} ${_BUILD_TYPE}
-	${PROJECT_PUBLIC}
-	${PROJECT_PRIVATE}
-	${PROJECT_GENERATED}
-	${PROJECT_TEMPLATES}
-	${PROJECT_DATA}
-)
-
-# Clang
-if("${PropertyPrefix}" STREQUAL "")
-	clang_format(
-		TARGETS ${PROJECT_NAME}
-		DEPENDENCY
-		VERSION 9.0.0
-	)
+if(DATAPATH_SHARED)
+	add_library(datapath SHARED ${DATAPATH_PUBLIC_HEADERS} ${DATAPATH_SOURCES})
+else()
+	add_library(datapath STATIC ${DATAPATH_PUBLIC_HEADERS} ${DATAPATH_SOURCES})
 endif()
+add_library(datapath::datapath ALIAS datapath)
 
-# Includes
-target_include_directories(${PROJECT_NAME}
-	INTERFACE
-		"${PROJECT_SOURCE_DIR}/include"
+target_include_directories(datapath
 	PUBLIC
-		"${PROJECT_SOURCE_DIR}/include"
+		"$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
+		"$<INSTALL_INTERFACE:include>"
 	PRIVATE
 		"${PROJECT_SOURCE_DIR}/source"
+		"${PROJECT_BINARY_DIR}/generated"
+)
+set_target_properties(datapath PROPERTIES
+	CXX_VISIBILITY_PRESET hidden
+	POSITION_INDEPENDENT_CODE ON
+	WINDOWS_EXPORT_ALL_SYMBOLS ON
 )
 
-# Defines
-target_compile_definitions(${PROJECT_NAME}
-	PRIVATE ${PROJECT_DEFINES}
-)
-
-# Linking Directories
-link_directories(
-)
-
-# Linking
-target_link_libraries(${PROJECT_NAME}
-	${PROJECT_LIBRARIES}
-)
-
-# File Version
-if(WIN32)
-	set_target_properties(
-		${PROJECT_NAME}
-		PROPERTIES
-		VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}.${PROJECT_VERSION_TWEAK}
-		SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}.${PROJECT_VERSION_TWEAK}
-	)
+if(MSVC)
+	target_compile_options(datapath PRIVATE /W4 /permissive- /Zc:__cplusplus /utf-8)
 else()
-	set_target_properties(
-		${PROJECT_NAME}
-		PROPERTIES
-		VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}.${PROJECT_VERSION_TWEAK}
-		SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}.${PROJECT_VERSION_TWEAK}
-	)
+	target_compile_options(datapath PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-#================================================================================#
-# Samples
-#================================================================================#
-if(${PropertyPrefix}BUILD_SAMPLES)
-	add_subdirectory(${PROJECT_SOURCE_DIR}/samples)
+if(WIN32)
+	target_compile_definitions(datapath PRIVATE
+		WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00
+	)
+	target_link_libraries(datapath PRIVATE advapi32 kernel32)
+else()
+	find_package(Threads REQUIRED)
+	target_link_libraries(datapath PUBLIC Threads::Threads)
+endif()
+
+if(MINGW)
+	# Self-contained executables (no libstdc++/winpthread DLLs needed under Wine or on Windows).
+	target_link_options(datapath PUBLIC -static -static-libgcc -static-libstdc++)
+endif()
+
+include(GNUInstallDirs)
+install(TARGETS datapath EXPORT datapath-targets
+	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+install(DIRECTORY include/datapath DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(EXPORT datapath-targets NAMESPACE datapath:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/datapath)
+
+if(DATAPATH_BUILD_TESTS)
+	enable_testing()
+	add_subdirectory(tests)
+endif()
+if(DATAPATH_BUILD_SAMPLES AND EXISTS "${PROJECT_SOURCE_DIR}/samples/CMakeLists.txt")
+	add_subdirectory(samples)
 endif()

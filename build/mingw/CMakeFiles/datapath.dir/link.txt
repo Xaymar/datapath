@@ -1,0 +1,2 @@
+/usr/bin/x86_64-w64-mingw32-ar qc libdatapath.a CMakeFiles/datapath.dir/source/common/api.cpp.obj CMakeFiles/datapath.dir/source/windows/context.cpp.obj
+/usr/bin/x86_64-w64-mingw32-ranlib libdatapath.a

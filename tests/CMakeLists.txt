@@ -1,0 +1,14 @@
+# Each test_*.cpp becomes one executable; each TEST() inside it one ctest entry.
+function(datapath_add_test NAME)
+	add_executable(${NAME} ${NAME}.cpp ${ARGN})
+	target_link_libraries(${NAME} PRIVATE datapath)
+	target_include_directories(${NAME} PRIVATE "${PROJECT_SOURCE_DIR}/source")
+	file(STRINGS ${NAME}.cpp _lines REGEX "^TEST\\(")
+	foreach(_line ${_lines})
+		string(REGEX REPLACE "^TEST\\(([A-Za-z0-9_]+)\\).*" "\\1" _test "${_line}")
+		add_test(NAME ${NAME}.${_test} COMMAND ${NAME} ${_test})
+		set_tests_properties(${NAME}.${_test} PROPERTIES TIMEOUT 120)
+	endforeach()
+endfunction()
+
+datapath_add_test(test_api)

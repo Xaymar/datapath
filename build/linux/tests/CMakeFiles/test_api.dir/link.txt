@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/test_api.dir/test_api.cpp.o -o test_api  ../libdatapath.a 
