@@ -212,4 +212,56 @@ TEST(concurrent_push_no_interleave)
 	CHECK_EQ(count, size_t(threads * per_thread));
 }
 
+TEST(try_acquire_and_state_accessors)
+{
+	send_queue q(1000, 1 << 20);
+	CHECK_EQ(q.limit(), uint64_t(1000));
+	q.set_limit(2000);
+	CHECK_EQ(q.limit(), uint64_t(2000));
+	CHECK(!q.closed());
+
+	CHECK(q.try_acquire());  // nobody holds the slot
+	CHECK(!q.try_acquire()); // now we do
+	bool w = true;
+	CHECK(push(q, 1, w) == error::Success);
+	CHECK(!w); // the slot was already taken
+	std::vector<uint8_t> batch;
+	CHECK(q.take(batch));
+	CHECK(!q.take(batch)); // releases the slot
+	CHECK(q.try_acquire());
+	CHECK(!q.take(batch));
+
+	q.close();
+	CHECK(q.closed());
+	CHECK(!q.try_acquire());
+}
+
+TEST(recycled_blocks_are_reused)
+{
+	send_queue q(1 << 20, 1 << 20);
+	// Recycling keeps only small, non-empty buffers, and only a few of them.
+	for (int i = 0; i < 8; i++) {
+		std::vector<uint8_t> b;
+		b.reserve(1024);
+		q.recycle(std::move(b));
+	}
+	q.recycle(std::vector<uint8_t>());
+	std::vector<uint8_t> huge;
+	huge.reserve(send_queue::coalesce_limit * 2);
+	q.recycle(std::move(huge));
+
+	bool w = false;
+	for (uint8_t i = 0; i < 4; i++) {
+		CHECK(push(q, 16, w, i) == error::Success);
+		std::vector<uint8_t> batch;
+		CHECK(q.take(batch));
+		CHECK_EQ(batch.size(), size_t(16 + datapath::detail::frame_header_size));
+		CHECK_EQ(batch.back(), i);
+		q.recycle(std::move(batch));
+		CHECK(!q.take(batch));
+	}
+	q.close();
+	q.recycle(std::vector<uint8_t>(16));
+}
+
 TEST_MAIN()

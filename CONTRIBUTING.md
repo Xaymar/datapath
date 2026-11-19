@@ -54,6 +54,18 @@ Configure with `-DDATAPATH_BUILD_COMPARE=ON` to also build `libuv-benchmark`; CM
 
 When you report numbers, lead with p99.9, say which machine, OS and power plan they came from, and give the flags. A p50 improvement that costs tail latency is a regression for this project.
 
+## Python bindings
+The bindings live in `python/` (nanobind, built by scikit-build-core from `pyproject.toml` in the repository root). Build and test them with:
+```bash
+pip install . pytest
+```
+```bash
+pytest python/tests
+```
+For quicker iteration, configure CMake with `-DDATAPATH_BUILD_PYTHON=ON`; the build tree then has an importable package in `build/python/package`, so `PYTHONPATH=build/python/package pytest python/tests` tests it without installing. Release wheels are built by `.github/workflows/python.yml` with cibuildwheel (settings in `pyproject.toml`); it only uploads to PyPI when started by hand with `publish` set.
+
+`python/benchmarks/pingpong.py local` measures Python round trips; add `--cpp-server build/samples/datapath-benchmark` to echo from the C++ server, and `--mode callback` to receive in callbacks instead of `recv()`.
+
 ## Pull requests
 * Keep a pull request to one change, and say in the description what you measured before and after if it touches the data path.
 * Format C++ changes with the repository's `.clang-format`.
