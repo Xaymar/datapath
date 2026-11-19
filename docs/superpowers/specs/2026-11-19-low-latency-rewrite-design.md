@@ -1,7 +1,7 @@
 # DataPath low-latency rewrite — design
 
 Date: 2026-11-19
-Status: draft, awaiting approval
+Status: approved 2026-11-19
 
 ## Intent
 
@@ -23,6 +23,10 @@ regressions come from DataPath's own waiting and allocation, not the transport.
 - **Full round trip p99.9 under 100 µs** on Windows 10/11 and Linux. Stretch:
   return to the original ~12 µs round-trip p99.9 on Windows with spinning
   enabled.
+- **Throughput under load:** sustain at least the predecessor's
+  (lib-streamlabs-datalane, overlapped I/O) ~1 GiB/s with round-trip latency
+  staying under 10 ms while saturated. That was the ceiling on an AMD
+  Bulldozer system; modern hardware should exceed it.
 - Windows first, Linux second, in this project.
 - Small to large messages up to a configurable maximum; tiny messages are not
   penalized by large-message support. Larger payloads are the application's
@@ -222,6 +226,9 @@ samples/benchmark/  cross-process ping-pong: server and client modes
   original 11.9 µs measurement), plus throughput.
 - Size sweep default: 8 B, 64 B, 4 KiB, 64 KiB, 1 MiB, 16 MiB.
 - Mode for N concurrent clients to exercise many-to-many.
+- Load mode: saturate with bulk traffic on one or more connections while a
+  separate ping-pong stream measures latency; reports GiB/s and the latency
+  percentiles under load (target: ≥ 1 GiB/s, p99.9 RTT < 10 ms).
 
 ### Tests
 
