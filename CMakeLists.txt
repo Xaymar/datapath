@@ -1,5 +1,5 @@
 # Low Latency IPC Library for high-speed traffic
-# Copyright (C) 2019 - 2026 Michael Fabian Dirks <info@xaymar.com>
+# Copyright (C) 2019 - 2026 Narta Xaymar Dirks <info@xaymar.com>
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
