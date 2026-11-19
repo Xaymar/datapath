@@ -14,6 +14,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include "permissions.hpp"
 #include "server.hpp"
 #include "socket.hpp"
+#include <datapath/version.hpp>
 
 namespace datapath {
 	// Connect to a server. Blocks until the handshake completes or
