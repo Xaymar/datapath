@@ -4,7 +4,7 @@
   "description": "Node.js bindings for DataPath, a high performance, low latency IPC library (Windows named pipes, Unix domain sockets).",
   "license": "BSD-3-Clause",
   "author": "Narta Xaymar Dirks <info@xaymar.com>",
-  "homepage": "https://github.com/Xaymar/datapath/tree/master/bindings/node#readme",
+  "homepage": "https://github.com/Xaymar/datapath/tree/root/bindings/node#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Xaymar/datapath.git",

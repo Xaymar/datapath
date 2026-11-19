@@ -9,7 +9,7 @@ name: Node.js bindings
 
 on:
   push:
-    branches: [master]
+    branches: [root]
     tags: ['v*']
     paths:
       - 'bindings/node/**'
