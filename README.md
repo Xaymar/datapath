@@ -1,7 +1,7 @@
 # DataPath
 **Fast, predictable message passing between processes on the same machine.**
 
-DataPath is a C++17 IPC library for programs that talk to each other locally and care about the worst case, not just the average. It moves whole, length-framed messages, from a few bytes to many megabytes, between one server and any number of clients, with any number of threads sending at once. It uses each OS's native transport (named pipes with I/O completion ports on Windows, Unix domain sockets with epoll on Linux) behind one small API, and keeps small-message round trips at 7–13 µs p99.9 on an idle machine.
+DataPath is a C++17 IPC library for programs that talk to each other locally and care about the worst case, not just the average. It moves whole, length-framed messages, from a few bytes to many megabytes, between one server and any number of clients, with any number of threads sending at once. It uses each OS's native transport (named pipes with I/O completion ports on Windows, Unix domain sockets with epoll on Linux and kqueue on macOS) behind one small API, and keeps small-message round trips at 7–13 µs p99.9 on an idle machine.
 
 ![Round-trip p99.9 latency: DataPath vs libuv](docs/images/latency-p999.svg)
 
@@ -10,7 +10,7 @@ Small messages are where DataPath is strongest. On Windows, its 8 B round trip h
 ## Features
 **Latency**
 * No timers or sleeps on the data path. An I/O thread busy-polls for a short, tunable time (`spin`, default 50 µs) after the last event, then sleeps in the kernel, so tail latency stays low under traffic and idle connections cost no CPU.
-* Scheduling tuned for the tail: elevated I/O thread priority (thread priority on Windows, nice value on Linux where `RLIMIT_NICE` allows), opt-out of Windows EcoQoS throttling, and one I/O thread per physical core without sharing hyper-threads.
+* Scheduling tuned for the tail: elevated I/O thread priority (thread priority on Windows, nice value on Linux where `RLIMIT_NICE` allows, quality-of-service class on macOS), opt-out of Windows EcoQoS throttling, and one I/O thread per physical core without sharing hyper-threads.
 * Zero-copy receive: handlers get a pointer straight into the receive buffer, and several small messages arrive per system call.
 
 **Messaging**
@@ -22,7 +22,7 @@ Small messages are where DataPath is strongest. On Windows, its 8 B round trip h
 **Safety and setup**
 * Per-server access control (`User`, `Group`, `World`), a version handshake, and peer validation before `on_accept` runs.
 * Clean shutdown: destroying a handle waits for running handlers, and no handler fires afterwards.
-* One API on Windows and Linux, no dependencies outside the C++ standard library and the OS, usable as a CMake subdirectory.
+* One API on Windows, Linux and macOS, no dependencies outside the C++ standard library and the OS, usable as a CMake subdirectory.
 
 ## Platforms
 | Platform | Transport | Status |
@@ -30,7 +30,8 @@ Small messages are where DataPath is strongest. On Windows, its 8 B round trip h
 | Windows 10 / 11 | Named pipes, IOCP | Supported |
 | Linux | Unix domain sockets, epoll | Supported |
 | Android | Unix domain sockets, epoll | Planned (backend should apply) |
-| macOS / iOS | Unix domain sockets, kqueue | Planned |
+| macOS | Unix domain sockets, kqueue | Supported (not benchmarked yet) |
+| iOS | Unix domain sockets, kqueue | Planned (backend should apply) |
 
 ## Benchmarks
 Full round trip (send, echo, receive), ping-pong between two processes, measured on 2026-11-19 at commit `1e4be58`, release builds, median of 5 runs. The benchmark ships a second transport over libuv 1.52.1 named pipes / Unix sockets with the same framing, clock, sizes and harness, so both libraries are measured the same way. How to reproduce these runs is in [CONTRIBUTING.md](CONTRIBUTING.md#benchmarking).
@@ -110,10 +111,11 @@ See `samples/echo/main.cpp` for a complete program.
 * **Contexts.** All sockets share one process-wide context (I/O threads) by default. Create your own with `datapath::context::create({spin, io_threads})` and pass it to `connect`/`host` for separate tuning. Destroying a context closes everything on it.
 * **Windows scheduling.** I/O threads run at `THREAD_PRIORITY_HIGHEST` (`context_options::priority`, 0–3). Under full CPU load, normal priority let single round trips stall for up to 12 ms; highest kept p99.9 under 100 µs. `context_options::mmcss` (registering with the Multimedia Class Scheduler) is off: on a busy system MMCSS throttles threads that use their CPU share, which measured as a fixed ~2 ms p99.9 stall, and on an idle system it made no difference. `yield` and `alertable` showed no consistent gain and are off.
 * **Linux scheduling.** The same `context_options::priority` (default 2) lowers each I/O thread's nice value by 0, 4, 12 or 19 from the one it inherited. Unprivileged processes only get as far as `RLIMIT_NICE` allows, which is often not at all; `CAP_SYS_NICE` lifts the limit. Under full CPU load, a 12-step gap took 64 B p99.9 from about 8 ms to about 200 µs. No real-time scheduling policy is used.
+* **macOS scheduling.** macOS picks threads, performance or efficiency cores and timer coalescing by quality-of-service class, so `priority` 1 sets `QOS_CLASS_USER_INITIATED` and 2 and 3 set `QOS_CLASS_USER_INTERACTIVE` (the class of a UI's main thread). No privileges are needed. Real-time (time constraint) threads are not used: the kernel demotes one that spins past its computation budget. `io_threads = 0` starts one I/O thread per physical core (`hw.physicalcpu`, which counts both core types on Apple silicon).
 * **Core placement (Windows).** By default (`context_options::ideal_core = -1`) each I/O thread gets its own physical core as a soft hint (ideal processor, not hard affinity), never two on the hyper-threads of one core, and core 0, which handles most interrupts, is skipped when there are more than two cores. A busy hyper-thread sibling roughly halves the speed of the other one; on the test machine this cut 64 KiB p99.9 from 72 to 52 µs and 8 B from 12 to 7 µs. `-2` leaves placement to the OS, `N` starts at physical core N. `io_threads = 0` starts exactly one I/O thread per physical core (on Windows, the cores this placement uses), so no two I/O threads ever share a core's hyper-threads.
-* **Buffers.** `options::receive_buffer` (256 KiB) holds incoming frames; reads adapt their size to the traffic, so a large buffer doesn't slow down small messages. `options::pipe_buffer` (1 MiB) is the Windows kernel pipe buffer.
+* **Buffers.** `options::receive_buffer` (256 KiB) holds incoming frames; reads adapt their size to the traffic, so a large buffer doesn't slow down small messages. `options::pipe_buffer` (1 MiB) is the Windows kernel pipe buffer, and on macOS the kernel socket buffer of each connection (the macOS default is 8 KiB). Linux keeps its default socket buffers.
 * **Tuning.** `context_options::spin` (default 50 µs) is how long an I/O thread busy-polls after the last event before sleeping in the kernel. Higher values cut tail latency for bursty traffic and cost CPU only while traffic flows. `0` disables spinning. Spinning only helps while spare CPUs exist: when spinning I/O threads cover every CPU (for example client and server on one machine, both with `io_threads = 0`), a woken thread waits for a spinner's budget to run out, and on Linux 64 B p99.9 measured about 116 µs with the default spin versus 23 µs with `0`. `context_options::yield` also fixes that case (24 µs) but gives a timeslice away on every yield under full CPU load. On Windows the I/O threads also opt out of EcoQoS power throttling.
-* **Paths.** A bare name maps to `\\.\pipe\<name>` on Windows and to the abstract socket `datapath.<name>` on Linux. On Linux, a path starting with `/` is a filesystem socket instead, created with mode `0600`/`0660`/`0666` for `User`/`Group`/`World` and removed on close.
+* **Paths.** A bare name maps to `\\.\pipe\<name>` on Windows, to the abstract socket `datapath.<name>` on Linux, and to the socket file `/tmp/datapath.<name>` on macOS, which has no abstract namespace (`/tmp` rather than the per-user `$TMPDIR`, so other users can still reach a `Group` or `World` server). On Linux and macOS, a path starting with `/` is a filesystem socket, created with mode `0600`/`0660`/`0666` for `User`/`Group`/`World` (`Group` is the server's group) and removed on close. On macOS a server whose backlog is full refuses connections like a missing server does, so `connect()` keeps retrying while the socket file exists and returns `TimedOut` at `connect_timeout`.
 
 ### C API
 `#include <datapath/datapath.h>` gives the same features as a plain C ABI for C programs and for other languages' FFI. Objects are opaque handles that you release yourself, every call returns a `datapath_error` code (no exceptions cross the boundary), and callbacks take a `void* user` plus an optional destructor for it. Option structs carry their size, so call `datapath_options_init()` before changing fields; passing `NULL` uses the defaults.

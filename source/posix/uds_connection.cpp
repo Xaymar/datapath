@@ -6,12 +6,12 @@ SPDX-License-Identifier: BSD-3-Clause
 */
 
 #include "uds_connection.hpp"
-#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sched.h>
 #include <unistd.h>
 #include <algorithm>
 #include <cerrno>
+#include "platform.hpp"
 #include "uds_server.hpp"
 
 namespace {
@@ -30,19 +30,19 @@ namespace {
 	}
 } // namespace
 
-datapath::linux_::uds_connection::uds_connection(std::shared_ptr<epoll_context> ctx, event_loop& loop, int fd,
+datapath::posix::uds_connection::uds_connection(std::shared_ptr<event_context> ctx, event_loop& loop, int fd,
 												 const datapath::options& opts, uint64_t negotiated_limit)
 	: connection_base(opts, negotiated_limit), _ctx(std::move(ctx)), _loop(loop), _fd(fd),
-	  _mask(EPOLLRDHUP | EPOLLET)
+	  _mask(ev::rdhup)
 {}
 
-datapath::linux_::uds_connection::~uds_connection()
+datapath::posix::uds_connection::~uds_connection()
 {
 	if (_fd >= 0)
 		::close(_fd);
 }
 
-bool datapath::linux_::uds_connection::start(bool handshake, std::weak_ptr<uds_listener> listener,
+bool datapath::posix::uds_connection::start(bool handshake, std::weak_ptr<uds_listener> listener,
 											 uint64_t own_limit)
 {
 	if (handshake) {
@@ -50,12 +50,12 @@ bool datapath::linux_::uds_connection::start(bool handshake, std::weak_ptr<uds_l
 		_listener    = std::move(listener);
 		_own_limit   = own_limit;
 		_queue.try_acquire(); // the reply goes out before anything the user queues
-		_mask |= EPOLLIN;
+		_mask |= ev::in;
 	}
 	return _loop.add(_fd, _mask, self());
 }
 
-void datapath::linux_::uds_connection::update_mask(uint32_t add, uint32_t remove)
+void datapath::posix::uds_connection::update_mask(uint32_t add, uint32_t remove)
 {
 	std::shared_lock<std::shared_mutex> fl(_fd_lock);
 	if (_fd < 0)
@@ -64,11 +64,11 @@ void datapath::linux_::uds_connection::update_mask(uint32_t add, uint32_t remove
 	uint32_t                    mask = (_mask | add) & ~remove;
 	if (mask == _mask)
 		return;
+	_loop.modify(_fd, _mask, mask, this);
 	_mask = mask;
-	_loop.modify(_fd, _mask, this);
 }
 
-void datapath::linux_::uds_connection::read_loop()
+void datapath::posix::uds_connection::read_loop()
 {
 	for (;;) {
 		if (_closed.load(std::memory_order_acquire)) {
@@ -108,7 +108,7 @@ void datapath::linux_::uds_connection::read_loop()
 	}
 }
 
-void datapath::linux_::uds_connection::write_loop()
+void datapath::posix::uds_connection::write_loop()
 {
 	for (;;) {
 		if (_woff >= _wbatch.size()) {
@@ -125,7 +125,7 @@ void datapath::linux_::uds_connection::write_loop()
 			std::shared_lock<std::shared_mutex> fl(_fd_lock);
 			if (_fd < 0)
 				return;
-			n   = ::send(_fd, _wbatch.data() + _woff, _wbatch.size() - _woff, MSG_DONTWAIT | MSG_NOSIGNAL);
+			n   = ::send(_fd, _wbatch.data() + _woff, _wbatch.size() - _woff, send_flags);
 			err = errno;
 		}
 		if (n > 0) {
@@ -135,10 +135,10 @@ void datapath::linux_::uds_connection::write_loop()
 		if (n < 0 && err == EINTR)
 			continue;
 		if (n < 0 && (err == EAGAIN || err == EWOULDBLOCK)) {
-			// Hand the writer slot to the loop: it resumes on EPOLLOUT. Adding
-			// EPOLLOUT via MOD re-checks readiness, so no wake-up is lost.
+			// Hand the writer slot to the loop: it resumes on ev::out. Enabling
+			// ev::out re-checks readiness, so no wake-up is lost.
 			_write_parked.store(true, std::memory_order_release);
-			update_mask(EPOLLOUT, 0);
+			update_mask(ev::out, 0);
 			return;
 		}
 		close_with(map_errno(err));
@@ -146,7 +146,7 @@ void datapath::linux_::uds_connection::write_loop()
 	}
 }
 
-void datapath::linux_::uds_connection::hello_read()
+void datapath::posix::uds_connection::hello_read()
 {
 	while (_handshaking && !_closed.load(std::memory_order_acquire)) {
 		ssize_t n;
@@ -163,7 +163,7 @@ void datapath::linux_::uds_connection::hello_read()
 			if (_hello_got < sizeof(_hello))
 				continue;
 			_handshaking = false;
-			update_mask(0, EPOLLIN); // data waits in the kernel until reads are armed
+			update_mask(0, ev::in); // data waits in the kernel until reads are armed
 			datapath::detail::hello h{};
 			if (datapath::detail::decode_hello(_hello, h) != datapath::error::Success) {
 				// Answer with our own hello so the client can report
@@ -190,7 +190,7 @@ void datapath::linux_::uds_connection::hello_read()
 	}
 }
 
-void datapath::linux_::uds_connection::complete_accept()
+void datapath::posix::uds_connection::complete_accept()
 {
 	_wbatch.resize(datapath::detail::hello_size);
 	datapath::detail::encode_hello(_wbatch.data(), {datapath::detail::protocol_version, _own_limit});
@@ -198,7 +198,7 @@ void datapath::linux_::uds_connection::complete_accept()
 	write_loop();
 }
 
-void datapath::linux_::uds_connection::platform_close()
+void datapath::posix::uds_connection::platform_close()
 {
 	{
 		std::unique_lock<std::shared_mutex> fl(_fd_lock);
@@ -214,7 +214,7 @@ void datapath::linux_::uds_connection::platform_close()
 		finish_close();
 }
 
-void datapath::linux_::uds_connection::platform_arm()
+void datapath::posix::uds_connection::platform_arm()
 {
 	if (!_loop.post(self(), k_arm)) {
 		close_with(datapath::error::Closed);
@@ -222,37 +222,37 @@ void datapath::linux_::uds_connection::platform_arm()
 	}
 }
 
-void datapath::linux_::uds_connection::platform_post_close()
+void datapath::posix::uds_connection::platform_post_close()
 {
 	// platform_close() already posted k_closed.
 }
 
-void datapath::linux_::uds_connection::platform_write()
+void datapath::posix::uds_connection::platform_write()
 {
 	write_loop();
 }
 
-void datapath::linux_::uds_connection::after_inline_write()
+void datapath::posix::uds_connection::after_inline_write()
 {
 	if (_ctx->yield_enabled())
 		sched_yield();
 }
 
-void datapath::linux_::uds_connection::on_finished()
+void datapath::posix::uds_connection::on_finished()
 {
 	if (auto l = _listener.lock())
 		l->connection_finished();
 }
 
-void datapath::linux_::uds_connection::on_event(uint32_t events)
+void datapath::posix::uds_connection::on_event(uint32_t events)
 {
-	if (events & (EPOLLOUT | EPOLLERR | EPOLLHUP)) {
+	if (events & (ev::out | ev::err | ev::hup)) {
 		if (_write_parked.exchange(false, std::memory_order_acq_rel)) {
-			update_mask(0, EPOLLOUT);
+			update_mask(0, ev::out);
 			write_loop();
 		}
 	}
-	if (events & (EPOLLIN | EPOLLRDHUP | EPOLLHUP | EPOLLERR)) {
+	if (events & (ev::in | ev::rdhup | ev::hup | ev::err)) {
 		if (_handshaking)
 			hello_read();
 		else if (armed())
@@ -260,11 +260,11 @@ void datapath::linux_::uds_connection::on_event(uint32_t events)
 	}
 }
 
-void datapath::linux_::uds_connection::on_post(int kind)
+void datapath::posix::uds_connection::on_post(int kind)
 {
 	switch (kind) {
 	case k_arm:
-		update_mask(EPOLLIN, 0);
+		update_mask(ev::in, 0);
 		read_loop();
 		break;
 	case k_closed:

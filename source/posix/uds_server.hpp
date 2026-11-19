@@ -11,10 +11,10 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <mutex>
 #include <vector>
 #include "common/detail.hpp"
-#include "epoll_context.hpp"
+#include "event_context.hpp"
 #include "path.hpp"
 
-namespace datapath::linux_ {
+namespace datapath::posix {
 	class uds_connection;
 
 	class uds_listener : public datapath::detail::listener,
@@ -22,7 +22,7 @@ namespace datapath::linux_ {
 						 public std::enable_shared_from_this<uds_listener> {
 		enum post_kind : int { k_offer = 1 };
 
-		std::shared_ptr<epoll_context> _ctx;
+		std::shared_ptr<event_context> _ctx;
 		event_loop&                    _loop;
 		socket_address                 _addr;
 		datapath::options              _opts;
@@ -41,7 +41,7 @@ namespace datapath::linux_ {
 		bool peer_allowed(int fd) const;
 
 		public:
-		uds_listener(std::shared_ptr<epoll_context> ctx, event_loop& loop, socket_address addr,
+		uds_listener(std::shared_ptr<event_context> ctx, event_loop& loop, socket_address addr,
 					 const datapath::options& opts);
 		~uds_listener() override;
 
@@ -57,4 +57,4 @@ namespace datapath::linux_ {
 		void on_event(uint32_t events) override;
 		void on_post(int kind) override;
 	};
-} // namespace datapath::linux_
+} // namespace datapath::posix

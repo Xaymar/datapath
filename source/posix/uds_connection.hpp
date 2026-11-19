@@ -13,15 +13,15 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <vector>
 #include "common/connection_base.hpp"
 #include "common/handshake.hpp"
-#include "epoll_context.hpp"
+#include "event_context.hpp"
 
-namespace datapath::linux_ {
+namespace datapath::posix {
 	class uds_listener;
 
 	class uds_connection : public datapath::detail::connection_base, public fd_target {
 		enum post_kind : int { k_arm = 1, k_closed };
 
-		std::shared_ptr<epoll_context> _ctx;
+		std::shared_ptr<event_context> _ctx;
 		event_loop&                    _loop;
 		mutable std::shared_mutex      _fd_lock;
 		int                            _fd;
@@ -60,7 +60,7 @@ namespace datapath::linux_ {
 		void on_finished() override;
 
 		public:
-		uds_connection(std::shared_ptr<epoll_context> ctx, event_loop& loop, int fd, const datapath::options& opts,
+		uds_connection(std::shared_ptr<event_context> ctx, event_loop& loop, int fd, const datapath::options& opts,
 					   uint64_t negotiated_limit);
 		~uds_connection() override;
 
@@ -72,4 +72,4 @@ namespace datapath::linux_ {
 		void on_event(uint32_t events) override;
 		void on_post(int kind) override;
 	};
-} // namespace datapath::linux_
+} // namespace datapath::posix

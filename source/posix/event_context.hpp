@@ -15,30 +15,30 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <vector>
 #include "common/detail.hpp"
 
-namespace datapath::linux_ {
+namespace datapath::posix {
 	// Anything registered with an event loop.
 	class fd_target {
 		public:
 		virtual ~fd_target() = default;
-		// epoll readiness for the target's fd. Runs on the target's loop thread.
+		// Readiness (ev:: bits) for the target's fd. Runs on the target's loop thread.
 		virtual void on_event(uint32_t events) = 0;
 		// A posted notification. Runs on the target's loop thread.
 		virtual void on_post(int kind) = 0;
 	};
 
-	class epoll_context;
+	class event_context;
 
 	class event_loop {
-		friend class epoll_context;
+		friend class event_context;
 
 		struct post_item {
 			std::shared_ptr<fd_target> target; // null = quit
 			int                        kind;
 		};
 
-		epoll_context*         _ctx;
-		int                    _ep  = -1;
-		int                    _efd = -1;
+		event_context*         _ctx;
+		int                    _poll = -1; // epoll or kqueue descriptor
+		int                    _efd  = -1; // epoll: eventfd that wakes the loop
 		std::thread            _thread;
 		std::mutex             _post_lock;
 		std::vector<post_item> _posts;
@@ -51,15 +51,26 @@ namespace datapath::linux_ {
 		bool drain_posts(bool& quit);
 		void run();
 
+		// Implemented by the poller backend (event_loop_epoll.cpp or
+		// event_loop_kqueue.cpp).
+		bool open_poller();
+		void close_poller();
+		void wake();
+		// Wait up to `timeout` ms (-1 = forever, 0 = poll) and dispatch. False if
+		// nothing happened.
+		bool pump(int timeout, bool& quit);
+
 		public:
-		explicit event_loop(epoll_context* ctx);
+		explicit event_loop(event_context* ctx);
 		~event_loop();
 		bool start();
 
-		// Register `fd` for `events` (edge-triggered). The loop keeps `target`
-		// alive until unregister().
+		// Register `fd` for `events` (ev:: bits, edge-triggered). The loop keeps
+		// `target` alive until unregister(). modify() changes the registration
+		// from `old_events` to `events` and re-checks readiness, so enabling
+		// ev::out on a socket that is already writable reports it.
 		bool add(int fd, uint32_t events, std::shared_ptr<fd_target> target);
-		bool modify(int fd, uint32_t events, fd_target* target);
+		bool modify(int fd, uint32_t old_events, uint32_t events, fd_target* target);
 		void remove_fd(int fd);
 		// Drop the loop's reference. Call on the loop thread.
 		void unregister(fd_target* target);
@@ -67,7 +78,7 @@ namespace datapath::linux_ {
 		bool post(std::shared_ptr<fd_target> target, int kind);
 	};
 
-	class epoll_context : public datapath::detail::context_impl, public std::enable_shared_from_this<epoll_context> {
+	class event_context : public datapath::detail::context_impl, public std::enable_shared_from_this<event_context> {
 		datapath::context_options                _opts;
 		std::vector<std::unique_ptr<event_loop>> _loops;
 		std::atomic<size_t>                      _next{0};
@@ -80,8 +91,8 @@ namespace datapath::linux_ {
 		void shutdown_now();
 
 		public:
-		explicit epoll_context(const datapath::context_options& opts);
-		~epoll_context() override;
+		explicit event_context(const datapath::context_options& opts);
+		~event_context() override;
 		bool start();
 		// True on any I/O thread of this context.
 		bool on_io_thread() const noexcept;
@@ -114,4 +125,4 @@ namespace datapath::linux_ {
 							   const datapath::options& options) override;
 		void            shutdown() override;
 	};
-} // namespace datapath::linux_
+} // namespace datapath::posix

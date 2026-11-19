@@ -41,6 +41,8 @@ namespace datapath {
 		// inherited. Unprivileged processes only get as far as RLIMIT_NICE allows
 		// (often not at all; CAP_SYS_NICE lifts the limit). Under full CPU load a
 		// 12-step gap took 64 B p99.9 from ~8 ms to ~200 us (p50 63 -> 7 us).
+		// macOS: quality-of-service class, 1 = user-initiated, 2 and 3 =
+		// user-interactive. Needs no privileges.
 		int priority = 2;
 		// Windows only: steer I/O threads to physical cores (soft hint via the ideal
 		// processor, not hard affinity), one thread per core and never two on the
@@ -53,7 +55,7 @@ namespace datapath {
 		// Windows only: block in an alertable wait (GetQueuedCompletionStatusEx with
 		// fAlertable = TRUE), so the scheduler may run the I/O thread early.
 		bool alertable = false;
-		// Yield the CPU (Windows: Sleep(0), Linux: sched_yield) after a send has
+		// Yield the CPU (Windows: Sleep(0), Linux/macOS: sched_yield) after a send has
 		// written its data and between busy-poll iterations. Off by default: 5-run
 		// medians on Windows showed no gain (slightly higher p50 and p99). On Linux
 		// it fixes the oversubscribed-spin tail above (116 -> 24 us), but under
@@ -81,7 +83,9 @@ namespace datapath {
 		// Reads adapt their size to the traffic, so a large buffer does not slow
 		// down small messages.
 		size_t receive_buffer = size_t(256) * 1024;
-		// Kernel pipe buffer on Windows (host() only); 0 = same as receive_buffer.
+		// Kernel pipe buffer on Windows (host() only), and kernel socket buffer of
+		// each connection on macOS (both ends; the OS default is 8 KiB). 0 = same
+		// as receive_buffer. Unused on Linux.
 		size_t pipe_buffer = size_t(1) << 20;
 	};
 } // namespace datapath

@@ -56,8 +56,11 @@ SPDX-License-Identifier: BSD-3-Clause
 #ifdef _WIN32
 #include <process.h>
 #else
+#include <signal.h>
 #include <spawn.h>
+#ifdef __linux__
 #include <sys/prctl.h>
+#endif
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -86,8 +89,10 @@ namespace {
 
 	const char* platform_name()
 	{
-#ifdef _WIN32
+#if defined(_WIN32)
 		return "windows";
+#elif defined(__APPLE__)
+		return "macos";
 #else
 		return "linux";
 #endif
@@ -480,9 +485,18 @@ namespace {
 #ifndef _WIN32
 		// The client leaves with std::exit(), skipping child cleanup: die with the
 		// parent instead of loading the machine forever (Windows uses a job object).
+#ifdef __linux__
 		prctl(PR_SET_PDEATHSIG, SIGKILL);
 		if (getppid() == 1)
 			return 0;
+#else
+		// No parent-death signal: watch for being re-parented.
+		std::thread([parent = getppid()] {
+			while (getppid() == parent)
+				std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			_exit(0);
+		}).detach();
+#endif
 		// Threads created below inherit the nice value.
 		if (c.stress_nice != 0 && setpriority(PRIO_PROCESS, 0, c.stress_nice) != 0)
 			std::fprintf(stderr, "stress: setpriority(%d) failed: %s\n", c.stress_nice, std::strerror(errno));
