@@ -6,10 +6,6 @@ SPDX-License-Identifier: BSD-3-Clause
 */
 
 #include "epoll_context.hpp"
-#include <algorithm>
-#include <cerrno>
-#include <cstdio>
-#include <fcntl.h>
 #include <poll.h>
 #include <sched.h>
 #include <sys/epoll.h>
@@ -17,8 +13,12 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/syscall.h>
-#include <thread>
 #include <unistd.h>
+#include <algorithm>
+#include <cerrno>
+#include <cstdio>
+#include <fcntl.h>
+#include <thread>
 #include "common/handshake.hpp"
 #include "common/spin.hpp"
 #include "path.hpp"
@@ -60,7 +60,7 @@ namespace {
 		if (floor > want && floor < base)
 			::setpriority(PRIO_PROCESS, id_t(tid), floor);
 	}
-} // namespace
+}
 
 // event_loop -------------------------------------------------------------------
 
@@ -206,8 +206,8 @@ void datapath::linux_::event_loop::run()
 				pump(-1);
 		};
 		if (_ctx->yield_enabled())
-			datapath::detail::spin_then_block(
-				_ctx->spin(), [&] { return !quit && pump(0); }, block, [] { sched_yield(); });
+			datapath::detail::spin_then_block(_ctx->spin(), [&] { return !quit && pump(0); }, block,
+											  [] { sched_yield(); });
 		else
 			datapath::detail::spin_then_block(_ctx->spin(), [&] { return !quit && pump(0); }, block);
 	}
@@ -282,9 +282,8 @@ void datapath::linux_::epoll_context::add_member(std::weak_ptr<datapath::detail:
 {
 	std::lock_guard<std::mutex> l(_members_lock);
 	if (_connections.size() >= 64 && (_connections.size() & (_connections.size() - 1)) == 0)
-		_connections.erase(
-			std::remove_if(_connections.begin(), _connections.end(), [](auto& w) { return w.expired(); }),
-			_connections.end());
+		_connections.erase(std::remove_if(_connections.begin(), _connections.end(), [](auto& w) { return w.expired(); }),
+						   _connections.end());
 	_connections.push_back(std::move(c));
 }
 
@@ -460,8 +459,8 @@ datapath::error datapath::linux_::epoll_context::listen(std::shared_ptr<datapath
 	return datapath::error::Success;
 }
 
-std::shared_ptr<datapath::detail::context_impl>
-	datapath::detail::make_platform_context(const datapath::context_options& options)
+std::shared_ptr<datapath::detail::context_impl> datapath::detail::make_platform_context(
+	const datapath::context_options& options)
 {
 	auto ctx = std::make_shared<datapath::linux_::epoll_context>(options);
 	if (!ctx->start())
