@@ -1,11 +1,11 @@
 # DataPath
 **Fast, predictable message passing between processes on the same machine.**
 
-DataPath is a C++17 IPC library for programs that talk to each other locally and care about the worst case, not just the average. It moves whole, length-framed messages, from a few bytes to many megabytes, between one server and any number of clients, with any number of threads sending at once. It uses each OS's native transport (named pipes with I/O completion ports on Windows, Unix domain sockets with epoll on Linux) behind one small API, and keeps round trips in the single-digit to low double-digit microseconds at the 99.9th percentile.
+DataPath is a C++17 IPC library for programs that talk to each other locally and care about the worst case, not just the average. It moves whole, length-framed messages, from a few bytes to many megabytes, between one server and any number of clients, with any number of threads sending at once. It uses each OS's native transport (named pipes with I/O completion ports on Windows, Unix domain sockets with epoll on Linux) behind one small API, and keeps small-message round trips at 7–13 µs p99.9 on an idle machine.
 
 ![Round-trip p99.9 latency: DataPath vs libuv](docs/images/latency-p999.svg)
 
-On a Windows PC under full CPU load, DataPath's 8-byte round trip stays at 23 µs p99.9, while libuv as shipped stalls past 1 ms. On Linux, where both libraries sit on the same epoll and Unix-socket stack, DataPath's defaults keep the tail about 5× lower than libuv's, and stay ahead when libuv is given the same busy-poll policy. Details and the configs behind each bar are under [Comparison with libuv](#comparison-with-libuv).
+Small messages are where DataPath is strongest. On Windows, its 8 B round trip has a p99.9 of 10 µs idle and 110 µs with every core busy, against 114 µs and 757 µs for libuv as shipped. Much of that comes from DataPath's defaults (a short busy-poll and a raised I/O thread priority): give libuv the same policy and it gets close on Linux, and at 64 KiB it is ahead on both platforms. The [benchmarks](#benchmarks) section has the full tables and what each configuration means.
 
 ## Features
 **Latency**
@@ -17,7 +17,7 @@ On a Windows PC under full CPU load, DataPath's 8-byte round trip stays at 23 µ
 * Whole messages, never byte streams: each `send()` arrives as one `on_message` call, and messages from different threads never interleave.
 * One server, many clients; `send()` is thread-safe and non-blocking from any thread, including from inside handlers.
 * Bounded queues with explicit backpressure: `send()` returns `TooLarge` or `WouldBlock` instead of blocking or growing without limit.
-* Large messages at 3.6–4 GiB/s per direction, without slowing down small messages on other connections.
+* Large messages at about 4 GiB/s per direction on both platforms.
 
 **Safety and setup**
 * Per-server access control (`User`, `Group`, `World`), a version handshake, and peer validation before `on_accept` runs.
@@ -32,30 +32,50 @@ On a Windows PC under full CPU load, DataPath's 8-byte round trip stays at 23 µ
 | Android | Unix domain sockets, epoll | Planned (backend should apply) |
 | macOS / iOS | Unix domain sockets, kqueue | Planned |
 
-## Measured latency
-Full round trip (send → echo → receive), ping-pong between two processes, release build, default settings (`spin` 50 µs, one I/O thread). Ranges span several runs on a shared cloud VM, where tail latency varies with neighbour load:
+## Benchmarks
+Full round trip (send, echo, receive), ping-pong between two processes, measured on 2026-11-19 at commit `1e4be58`, release builds, median of 5 runs. The benchmark ships a second transport over libuv 1.52.1 named pipes / Unix sockets with the same framing, clock, sizes and harness, so both libraries are measured the same way. How to reproduce these runs is in [CONTRIBUTING.md](CONTRIBUTING.md#benchmarking).
 
-| Linux, 4 vCPU Xeon VM | p50 | p99 | p99.9 |
-|---|---|---|---|
-| 8 B | 4.7–5.1 µs | 8–11 µs | 28–48 µs |
-| 4 KiB | 7.6 µs | 19 µs | 35–45 µs |
-| 64 KiB | 37.5 µs | 60–68 µs | 95–190 µs |
-| 8 B, `spin` 0 | 26 µs | 52 µs | 95 µs |
+* **DataPath**: defaults (`spin` 50 µs, `priority` 2, one I/O thread).
+* **libuv as shipped**: `--spin 0 --no-mmcss --priority 0`, libuv's own loop.
+* **libuv + policy**: libuv's loop thread given DataPath's spin and priority settings.
+* **Stress**: `--stress 0`, one busy thread per logical core in a separate process. On Linux the stress process runs at nice 12 (`--stress-nice 12`), which is the gap `priority` 2 gives when the system lets the process raise its priority. The test container had `RLIMIT_NICE` 0, so the gap was created from the other side; at equal nice every variant measured 4–8 ms, one scheduler timeslice.
 
-While another connection streams 1 MiB messages at 4–5 GiB/s, small-message round trips stay at p99.9 ≈ 2 ms with one I/O thread, and ≈ 0.25 ms with two.
+**Windows: Irkela**, AMD Ryzen 9 7940HS (8 cores / 16 threads), Windows 10 22H2, Balanced power plan. p99.9 in µs:
 
-| Windows 10 desktop PC, idle (5-run medians) | p50 | p99 | p99.9 (range) |
-|---|---|---|---|
-| 8 B | 3.0 µs | 4.5 µs | 7.5 µs (6.6–8.5) |
-| 64 B | 3.0 µs | 4.5 µs | 7.3 µs (7.3–9.1) |
-| 4 KiB | 6.4 µs | 10.0 µs | 18.6 µs (17.7–19.5) |
-| 64 KiB | 19.9 µs | 33.8 µs | 75 µs (56–100) |
-| 1 MiB | 0.54 ms | 0.92 ms | 1.07 ms |
-| 16 MiB | 8.4 ms | 9.3 ms | 9.7 ms |
+| | 8 B | 64 B | 4 KiB | 64 KiB |
+|---|---|---|---|---|
+| DataPath, idle | **10.2** | **7.4** | **12.3** | 326 |
+| libuv as shipped, idle | 114 | 306 | 305 | 513 |
+| libuv + policy, idle | 16.6 | 15.9 | 22.1 | **101** |
+| DataPath, stress | **110** | **58** | **1001** | 1453 |
+| libuv as shipped, stress | 757 | 960 | 1038 | **1287** |
+| libuv + policy, stress | 667 | 656 | 1071 | 1316 |
 
-Under load (Prime95 plus `--stress 0` on every core) the defaults hold: p50 3.3 µs and p99.9 23 µs for 8 B, 60 µs for 4 KiB and 37 µs for 64 KiB.
+**Linux: merenka-gpu0**, AMD EPYC 7313P container limited to 8 cores / 16 threads, Linux 6.12, GCC 15.2. p99.9 in µs:
 
-Large messages move at about 3.6 GiB/s per direction on Windows. With a 1 MiB bulk stream running at 2.1 GiB/s on another connection (two I/O threads), small-message round trips stay at p99.9 16–27 µs. The original DataPath reached 11.9 µs round-trip p99.9 on Windows 10; this version reaches 7–8 µs for small messages with a 3.0 µs median (5-run medians). Single runs vary a lot at this resolution, so compare with `--runs 5`.
+| | 8 B | 64 B | 4 KiB | 64 KiB |
+|---|---|---|---|---|
+| DataPath, idle | **13.1** | **13.0** | 20.0 | 85 |
+| libuv as shipped, idle | 18.5 | 16.7 | 22.7 | **56** |
+| libuv + policy, idle | 13.7 | 13.8 | **19.8** | 69 |
+| DataPath, stress | 128 | **35** | 86 | **458** |
+| libuv as shipped, stress | 152 | 115 | 203 | 4172 |
+| libuv + policy, stress | **55** | 53 | **20** | 596 |
+
+What the numbers say:
+* On Windows, DataPath has the lowest tail up to 4 KiB in every case: 1.6–2× lower than libuv with the same policy when idle, and 6–11× lower at 8 B and 64 B under stress. At 4 KiB under stress all three sit near 1 ms.
+* On Linux both libraries sit on the same epoll and Unix-socket stack. Idle, DataPath's lead over libuv as shipped comes from its spin policy, and libuv with the same policy ties it. Under stress the results are mixed and vary a lot between runs (single-run p99.9 ranged from 12 to 190 µs for DataPath at 64 B).
+* At 64 KiB, libuv is ahead when idle on both platforms (Windows: 101 vs 326 µs and 5.9 vs 4.0 GiB/s). This is a known gap.
+* Single runs are noisy at microsecond resolution; compare medians of several runs (`--runs 5`).
+
+DataPath-only percentiles on the same machines, idle, in µs:
+
+| | Irkela p50 | p99 | p99.9 | merenka-gpu0 p50 | p99 | p99.9 |
+|---|---|---|---|---|---|---|
+| 8 B | 3.2 | 8.0 | 10.2 | 9.0 | 9.8 | 13.1 |
+| 64 B | 3.0 | 4.1 | 7.4 | 9.0 | 9.7 | 13.0 |
+| 4 KiB | 4.9 | 7.2 | 12.3 | 14.5 | 15.5 | 20.0 |
+| 64 KiB | 33.1 | 47.4 | 326 | 42.5 | 61.8 | 85 |
 
 ## Usage
 ```cpp
@@ -102,28 +122,6 @@ add_subdirectory(datapath)
 target_link_libraries(my-app PRIVATE datapath::datapath)
 ```
 Requires CMake 3.16+ and a C++17 compiler (MSVC 2019+, GCC 9+, Clang 10+). To build the library, tests and benchmarks on their own, see [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Comparison with libuv
-The benchmark ships a second transport over libuv 1.52.1 named pipes / Unix sockets with the same framing, clock, message sizes and harness, so both libraries are measured the same way. "libuv as shipped" means libuv's own event loop with no busy-polling and normal thread priority; "same spin policy" gives libuv's loop thread DataPath's spin and priority settings. How to reproduce these runs is in [CONTRIBUTING.md](CONTRIBUTING.md#benchmarking).
-
-First Linux results (4 vCPU VM, 3-run medians, round trip):
-
-| | 8 B p50 | 8 B p99.9 | 4 KiB p50 | 64 KiB p50 |
-|---|---|---|---|---|
-| DataPath, defaults | 4.8 µs | 27 µs | 7.5 µs | 28 µs |
-| libuv, same spin policy | 5.5 µs | 35 µs | 8.3 µs | 28 µs |
-| DataPath, `--spin 0` | 25.8 µs | 127 µs | 28.3 µs | 46 µs |
-| libuv as shipped (no spin) | 27.0 µs | 142 µs | 29.1 µs | 46 µs |
-
-On Linux both sit on epoll and Unix sockets, so the difference comes from the defaults (spinning, scheduling) and per-message overhead. Large messages tie at about 4 GiB/s.
-
-First Windows results, both under Prime95 load (DataPath additionally under `--stress 0`), p50 / p99.9:
-
-| | 8 B | 64 B |
-|---|---|---|
-| DataPath, defaults | 3.3 / 23 µs | 3.4 / 27 µs |
-| DataPath, `--spin 0` | 17.8 / 67 µs | 18.7 / 70 µs |
-| libuv as shipped | 71.9 / 1081 µs | 74.8 / 1072 µs |
 
 ## Known issues (work in progress)
 * No server-side handshake timeout: a local client that connects and never sends its hello holds a connection slot.
