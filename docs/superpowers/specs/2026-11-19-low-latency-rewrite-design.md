@@ -13,18 +13,20 @@ The library predates Windows 10 2004/11 and was never modernized. Its wait
 loops are millisecond-granular (`wait(0)` then `wait(1ms)` / `sleep_for(1ms)`),
 which on modern Windows turns into 1–16 ms stalls whenever the poll misses, and
 it allocates kernel events and heap objects per message. The original
-implementation measured **11.9 µs at the 99.9th percentile** (QueryPerformanceCounter,
-ping-pong, Windows 10). That number shows named pipes are fast enough; the
+implementation measured **11.9 µs full round trip at the 99.9th percentile**
+(QueryPerformanceCounter, ping-pong, Windows 10) — about 100× faster than the
+libuv-based messaging it was compared against. That number shows named pipes are fast enough; the
 regressions come from DataPath's own waiting and allocation, not the transport.
 
 ## Goals
 
-- Send→receive (one-way, measured as ping-pong RTT/2 and full RTT) **p99.9
-  under 100 µs** on Windows 10/11 and Linux. Stretch: return to ~12 µs p99.9 on
-  Windows with spinning enabled.
+- **Full round trip p99.9 under 100 µs** on Windows 10/11 and Linux. Stretch:
+  return to the original ~12 µs round-trip p99.9 on Windows with spinning
+  enabled.
 - Windows first, Linux second, in this project.
-- All message sizes: tiny messages are not penalized by large-message support,
-  large messages stream without whole-message double copies on the send side.
+- Small to large messages up to a configurable maximum; tiny messages are not
+  penalized by large-message support. Larger payloads are the application's
+  job to split (user decision).
 - Many-to-many: one server, many clients; `send()` safe from any number of
   threads on one connection; messages are atomic on the wire (never interleaved).
 - Zero CPU use on idle connections by default.
@@ -87,7 +89,8 @@ namespace datapath {
   struct options {
     std::chrono::microseconds spin{50};   // busy-poll budget before blocking; 0 = never spin
     size_t   io_threads = 1;              // completion/epoll threads per context
-    uint64_t max_message_size = 0;        // 0 = unlimited; larger => connection closed
+    uint64_t max_message_size = 64 << 20; // send() rejects larger with TooLarge; peer closes on violation
+    uint64_t max_queued_bytes = 64 << 20; // send() returns WouldBlock when the queue is this full
     datapath::permissions permissions = permissions::User;
     size_t   backlog = 8;                 // pending accept instances (Windows) / listen backlog
     size_t   max_clients = 0;             // 0 = unlimited
@@ -98,7 +101,7 @@ namespace datapath {
     // Called on an I/O thread. The span is valid only during the call.
     void on_message(std::function<void(const uint8_t* data, size_t size)>);
     void on_close(std::function<void(datapath::error)>);
-    datapath::error send(const void* data, size_t size);          // thread-safe, copies small, queues
+    datapath::error send(const void* data, size_t size);          // thread-safe, copies, queues; never blocks
     datapath::error send(const iovec_like* parts, size_t count);  // gather: header+payload pieces
     datapath::error close();
     bool good() const;
@@ -123,6 +126,11 @@ namespace datapath {
 - `itask`, `waitable`, `threadpool`, `event`, `overlapped-queue` are removed.
   Completion of an individual send is not reported; `send` returns `Closed` /
   `Failure` synchronously, and failures after queuing surface via `on_close`.
+- Backpressure (user decision: return errors, never block): `send()` returns
+  `error::TooLarge` if the message exceeds `max_message_size` (the smaller of
+  the two peers' limits, exchanged in the handshake) and `error::WouldBlock`
+  if accepting it would push the queue past `max_queued_bytes`. A message is
+  either fully queued or rejected, never partially.
 - Ordering: messages from one thread on one socket arrive in order. Messages
   from different threads are each atomic; their relative order is the order
   they acquired the send queue.
@@ -150,9 +158,9 @@ so the frame header stays minimal.
 - Per-connection send queue guarded by a mutex (lock held only to enqueue).
   Small messages (< 64 KiB) are copied with their header into pooled buffers;
   consecutive small messages are coalesced into one write.
-- Large messages: the header goes in a pooled buffer, the payload is written
-  from a single owned copy (Windows pipes have no gather write; Linux uses
-  `writev`). One write is outstanding per connection at a time.
+- Large messages (up to `max_message_size`): header and payload copied into one
+  owned buffer and written as a unit. One write is outstanding per connection
+  at a time.
 - Fast path: if the queue is empty and no write is in flight, the calling
   thread issues the write itself (no hand-off to the I/O thread).
 
@@ -210,8 +218,9 @@ samples/benchmark/  cross-process ping-pong: server and client modes
 - `datapath-benchmark server <name>` / `client <name> --size N --count N
   --spin us`. Client sends, server echoes, client timestamps with QPC
   (Windows) / `clock_gettime(CLOCK_MONOTONIC)` (Linux).
-- Reports min, median, p99, p99.9, max of RTT and RTT/2, plus throughput.
-- Size sweep default: 8 B, 64 B, 4 KiB, 64 KiB, 1 MiB, 64 MiB.
+- Reports min, median, p99, p99.9, max of full RTT (the headline, matching the
+  original 11.9 µs measurement), plus throughput.
+- Size sweep default: 8 B, 64 B, 4 KiB, 64 KiB, 1 MiB, 16 MiB.
 - Mode for N concurrent clients to exercise many-to-many.
 
 ### Tests
@@ -219,8 +228,8 @@ samples/benchmark/  cross-process ping-pong: server and client modes
 Framing round-trip (including split reads at every byte offset), zero-length
 messages, messages larger than the receive buffer, concurrent senders on one
 socket (no interleaving), many clients on one server, peer killed mid-message,
-server close with clients attached, `max_message_size` enforcement, rejected
-accept.
+server close with clients attached, `TooLarge` and `WouldBlock` returns,
+peer violating the negotiated limit is disconnected, rejected accept.
 
 ### Runtime context (builder's call, marked)
 
@@ -235,7 +244,7 @@ Destroying a context closes its sockets/servers and joins its threads.
 
 ### Handshake (builder's call, marked)
 
-The client sends `"DPTH" + uint32 version` immediately after the pipe opens;
+The client sends `"DPTH" + uint32 version + uint64 max_message_size` immediately after the pipe opens;
 the server validates it **before** calling `on_accept` and replies with the
 same structure. `connect()` blocks until the reply arrives (bounded, default
 1 s → `TimedOut`). A mismatch makes `connect` return `error::VersionMismatch`
