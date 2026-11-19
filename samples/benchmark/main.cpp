@@ -19,7 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 // DataPath latency / throughput benchmark.
 //
 //   datapath-benchmark local  [client options]       server + client, two processes
-//   datapath-benchmark server <name> [--spin us] [--threads n]
+//   datapath-benchmark server <name> [--spin us] [--threads n|auto]
 //   datapath-benchmark client <name> [options]
 //
 // Client options:
@@ -27,7 +27,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //   --count 100000                              round trips per size (large sizes use fewer)
 //   --clients 1                                 concurrent ping-pong connections
 //   --spin 50                                   I/O thread spin budget in microseconds
-//   --threads 1                                 I/O threads
+//   --threads 1|auto                            I/O threads; auto = one per physical core
 //   --load                                      stream 1 MiB messages on an extra connection meanwhile
 //   --buffer 65536                              receive buffer per connection
 //   --yield / --no-yield                        Sleep(0)/sched_yield after sends and while spinning (default off)
@@ -137,7 +137,8 @@ namespace {
 			} else if (a == "--spin") {
 				c.spin = std::strtol(next(), nullptr, 10);
 			} else if (a == "--threads") {
-				c.threads = size_t(std::strtoull(next(), nullptr, 10));
+				std::string v = next();
+				c.threads     = v == "auto" ? 0 : size_t(std::strtoull(v.c_str(), nullptr, 10));
 			} else if (a == "--pipe-buffer") {
 				c.pipe_buffer = size_t(std::strtoull(next(), nullptr, 10));
 			} else if (a == "--buffer") {
@@ -360,8 +361,8 @@ namespace {
 			bulk->start();
 		}
 
-		std::printf("IPC benchmark: transport=%s platform=%s spin=%ldus io_threads=%zu clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s mmcss=%s priority=%d stress=%s ideal_core=%s load=%s\n",
-					tp->name(), platform_name(), c.spin, c.threads, c.clients, c.buffer, c.pipe_buffer, c.yield ? "on" : "off", c.alertable ? "on" : "off", c.mmcss ? "on" : "off", c.priority,
+		std::printf("IPC benchmark: transport=%s platform=%s spin=%ldus io_threads=%s clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s mmcss=%s priority=%d stress=%s ideal_core=%s load=%s\n",
+					tp->name(), platform_name(), c.spin, c.threads ? std::to_string(c.threads).c_str() : "auto", c.clients, c.buffer, c.pipe_buffer, c.yield ? "on" : "off", c.alertable ? "on" : "off", c.mmcss ? "on" : "off", c.priority,
 					c.stress < 0 ? "off" : (c.stress == 0 ? "all cores" : std::to_string(c.stress).c_str()),
 					c.ideal_core == -2 ? "off" : c.ideal_core == -1 ? "auto" : std::to_string(c.ideal_core).c_str(), c.load ? "1MiB stream" : "off");
 		std::printf("Full round-trip latency in microseconds.\n");
@@ -572,7 +573,7 @@ namespace {
 		c.name = "dp-bench-" + std::to_string(current_pid());
 		std::vector<std::string> args = {"server",     c.name,
 										 "--spin",     std::to_string(c.spin),
-										 "--threads",  std::to_string(c.threads),
+										 "--threads",  c.threads ? std::to_string(c.threads) : "auto",
 										 "--buffer",   std::to_string(c.buffer),
 										 "--pipe-buffer", std::to_string(c.pipe_buffer),
 										 c.yield ? "--yield" : "--no-yield",
@@ -580,7 +581,8 @@ namespace {
 										 "--priority", std::to_string(c.priority)};
 		if (c.alertable)
 			args.push_back("--alertable");
-		// The server's I/O threads take the physical cores after the client's.
+		// The server's I/O threads take the physical cores after the client's. With
+		// --threads auto each process covers every core, so both start at N.
 		args.push_back("--ideal-core");
 		args.push_back(c.ideal_core == -2   ? "off"
 					   : c.ideal_core == -1 ? "auto"
@@ -612,7 +614,7 @@ int main(int argc, char** argv)
 	if (!parse(argc, argv, c)) {
 		std::fprintf(stderr,
 					 "usage: %s local|server <name>|client <name> [--sizes a,b,..] [--count n] [--clients n]\n"
-					 "       [--spin us] [--threads n] [--buffer bytes] [--pipe-buffer bytes] [--yield|--no-yield] [--alertable] [--runs n] [--stress n] [--ideal-core off|auto|n] [--mmcss|--no-mmcss] [--priority 0..3] [--load]\n",
+					 "       [--spin us] [--threads n|auto] [--buffer bytes] [--pipe-buffer bytes] [--yield|--no-yield] [--alertable] [--runs n] [--stress n] [--ideal-core off|auto|n] [--mmcss|--no-mmcss] [--priority 0..3] [--load]\n",
 					 argc > 0 ? argv[0] : "datapath-benchmark");
 		return 2;
 	}

@@ -98,6 +98,13 @@ namespace {
 		}
 	}
 
+	// Physical cores that I/O threads are spread over: all of them, minus core 0
+	// (interrupt/DPC heavy) when there are more than two.
+	size_t first_io_core(size_t cores)
+	{
+		return cores > 2 ? 1 : 0;
+	}
+
 	void apply_ideal_core(const datapath::context_options& opts, const std::vector<PROCESSOR_NUMBER>& cores,
 						  size_t index)
 	{
@@ -110,7 +117,7 @@ namespace {
 			pn = cores[(size_t(opts.ideal_core) + index) % cores.size()];
 		} else {
 			// Automatic: skip core 0 (interrupt/DPC heavy) when there is room.
-			size_t first = cores.size() > 2 ? 1 : 0;
+			size_t first = first_io_core(cores.size());
 			size_t span  = cores.size() - first;
 			size_t start = size_t(GetCurrentProcessId() * 2654435761u) % span;
 			pn           = cores[first + (start + index) % span];
@@ -170,6 +177,11 @@ namespace {
 
 datapath::windows::iocp_context::iocp_context(const datapath::context_options& opts) : _opts(opts)
 {
+	if (_opts.io_threads == 0) {
+		// Automatic: one I/O thread per physical core that ideal_core would use.
+		auto cores       = physical_cores();
+		_opts.io_threads = cores.size() - first_io_core(cores.size());
+	}
 	if (_opts.io_threads == 0)
 		_opts.io_threads = 1;
 }

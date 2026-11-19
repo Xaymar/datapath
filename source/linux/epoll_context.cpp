@@ -25,7 +25,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <unistd.h>
 #include <algorithm>
 #include <cerrno>
+#include <cstdio>
 #include <fcntl.h>
+#include <thread>
 #include "common/handshake.hpp"
 #include "common/spin.hpp"
 #include "path.hpp"
@@ -189,8 +191,45 @@ void datapath::linux_::event_loop::run()
 
 // epoll_context ----------------------------------------------------------------
 
+namespace {
+	// Physical cores this process may run on: CPUs in the affinity mask that are
+	// the first hyper-thread of their core. 0 if the topology is unavailable.
+	size_t physical_core_count()
+	{
+		cpu_set_t set;
+		CPU_ZERO(&set);
+		if (sched_getaffinity(0, sizeof(set), &set) != 0)
+			return 0;
+		size_t n = 0;
+		for (int cpu = 0; cpu < CPU_SETSIZE; cpu++) {
+			if (!CPU_ISSET(cpu, &set))
+				continue;
+			char path[96];
+			std::snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu%d/topology/thread_siblings_list", cpu);
+			FILE* f = std::fopen(path, "r");
+			if (!f)
+				return 0;
+			int  sibling = -1;
+			bool ok      = std::fscanf(f, "%d", &sibling) == 1;
+			std::fclose(f);
+			if (!ok)
+				return 0;
+			// The first sibling counts for the core, unless it is outside the mask.
+			if (sibling == cpu || !CPU_ISSET(sibling, &set))
+				n++;
+		}
+		return n;
+	}
+} // namespace
+
 datapath::linux_::epoll_context::epoll_context(const datapath::context_options& opts) : _opts(opts)
 {
+	if (_opts.io_threads == 0) {
+		// Automatic: one I/O thread per physical core.
+		_opts.io_threads = physical_core_count();
+		if (_opts.io_threads == 0)
+			_opts.io_threads = std::thread::hardware_concurrency();
+	}
 	if (_opts.io_threads == 0)
 		_opts.io_threads = 1;
 }

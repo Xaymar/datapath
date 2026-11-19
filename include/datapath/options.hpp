@@ -28,7 +28,12 @@ namespace datapath {
 		// How long an idle I/O thread busy-polls before it blocks in the kernel.
 		// Spinning trades CPU for tail latency; 0 disables it.
 		std::chrono::microseconds spin{50};
-		// Number of I/O threads.
+		// Number of I/O threads. 0 = automatic: one per physical core, so no two
+		// I/O threads share the hyper-threads of one core (a busy sibling roughly
+		// halves the speed of the other, and SMT only helps a thread that waits).
+		// On Windows core 0 is left out when there are more than two cores, the
+		// same cores ideal_core's automatic placement uses. Default 1: a single
+		// I/O thread had the lowest round-trip latency for one connection.
 		size_t io_threads = 1;
 		// Windows only: register I/O threads with the Multimedia Class Scheduler
 		// Service ("Pro Audio" task, critical priority). Off by default: on a busy
