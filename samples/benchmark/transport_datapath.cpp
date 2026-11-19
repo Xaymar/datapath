@@ -66,6 +66,7 @@ namespace {
 			o.alertable  = c.alertable;
 			o.mmcss      = c.mmcss;
 			o.priority   = c.priority;
+			o.ideal_core = c.ideal_core;
 			_ctx         = datapath::context::create(o);
 
 			_opts.max_message_size = uint64_t(1) << 30;

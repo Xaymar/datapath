@@ -34,6 +34,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //   --alertable                                 Windows: alertable completion-port waits
 //   --runs 1                                    repeat each size N times; report the median of the runs
 //                                               and the lowest/highest p99.9 across them
+//   --ideal-core off|auto|N                     Windows: one I/O thread per physical core (soft hint);
+//                                               local mode gives the server the cores after the client's
 //   --stress N                                  local mode: load all cores with N busy threads in a
 //                                               separate process (0 = one per logical core)
 //   --mmcss / --no-mmcss                        Windows: register I/O threads with MMCSS (default on)
@@ -146,6 +148,9 @@ namespace {
 				c.yield = false;
 			} else if (a == "--alertable") {
 				c.alertable = true;
+			} else if (a == "--ideal-core") {
+				std::string v = next();
+				c.ideal_core  = v == "off" ? -2 : v == "auto" ? -1 : int(std::strtol(v.c_str(), nullptr, 10));
 			} else if (a == "--stress") {
 				c.stress = int(std::strtol(next(), nullptr, 10));
 			} else if (a == "--runs") {
@@ -355,9 +360,10 @@ namespace {
 			bulk->start();
 		}
 
-		std::printf("IPC benchmark: transport=%s platform=%s spin=%ldus io_threads=%zu clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s mmcss=%s priority=%d stress=%s load=%s\n",
+		std::printf("IPC benchmark: transport=%s platform=%s spin=%ldus io_threads=%zu clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s mmcss=%s priority=%d stress=%s ideal_core=%s load=%s\n",
 					tp->name(), platform_name(), c.spin, c.threads, c.clients, c.buffer, c.pipe_buffer, c.yield ? "on" : "off", c.alertable ? "on" : "off", c.mmcss ? "on" : "off", c.priority,
-					c.stress < 0 ? "off" : (c.stress == 0 ? "all cores" : std::to_string(c.stress).c_str()), c.load ? "1MiB stream" : "off");
+					c.stress < 0 ? "off" : (c.stress == 0 ? "all cores" : std::to_string(c.stress).c_str()),
+					c.ideal_core == -2 ? "off" : c.ideal_core == -1 ? "auto" : std::to_string(c.ideal_core).c_str(), c.load ? "1MiB stream" : "off");
 		std::printf("Full round-trip latency in microseconds.\n");
 		if (c.runs > 1)
 			std::printf("Each row: median of %zu runs; p99.9 lo/hi = lowest/highest p99.9 of any run.\n", c.runs);
@@ -574,6 +580,11 @@ namespace {
 										 "--priority", std::to_string(c.priority)};
 		if (c.alertable)
 			args.push_back("--alertable");
+		// The server's I/O threads take the physical cores after the client's.
+		args.push_back("--ideal-core");
+		args.push_back(c.ideal_core == -2   ? "off"
+					   : c.ideal_core == -1 ? "auto"
+											: std::to_string(c.ideal_core + int(c.threads)));
 
 		std::unique_ptr<child_process> stress;
 		if (c.stress >= 0) {
@@ -601,7 +612,7 @@ int main(int argc, char** argv)
 	if (!parse(argc, argv, c)) {
 		std::fprintf(stderr,
 					 "usage: %s local|server <name>|client <name> [--sizes a,b,..] [--count n] [--clients n]\n"
-					 "       [--spin us] [--threads n] [--buffer bytes] [--pipe-buffer bytes] [--yield|--no-yield] [--alertable] [--runs n] [--stress n] [--mmcss|--no-mmcss] [--priority 0..3] [--load]\n",
+					 "       [--spin us] [--threads n] [--buffer bytes] [--pipe-buffer bytes] [--yield|--no-yield] [--alertable] [--runs n] [--stress n] [--ideal-core off|auto|n] [--mmcss|--no-mmcss] [--priority 0..3] [--load]\n",
 					 argc > 0 ? argv[0] : "datapath-benchmark");
 		return 2;
 	}

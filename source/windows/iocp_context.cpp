@@ -65,6 +65,50 @@ namespace {
 							   1 /*THREAD_POWER_THROTTLING_EXECUTION_SPEED*/, 0};
 		fn(GetCurrentThread(), 3 /*ThreadPowerThrottling*/, &state, sizeof(state));
 	}
+	// First logical processor of every physical core, in system order.
+	const std::vector<PROCESSOR_NUMBER>& physical_cores()
+	{
+		static const std::vector<PROCESSOR_NUMBER> cores = [] {
+			std::vector<PROCESSOR_NUMBER> out;
+			DWORD                         len = 0;
+			GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &len);
+			std::vector<uint8_t> buf(len);
+			auto* info = reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buf.data());
+			if (!len || !GetLogicalProcessorInformationEx(RelationProcessorCore, info, &len))
+				return out;
+			for (DWORD off = 0; off < len;) {
+				auto* e = reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buf.data() + off);
+				if (e->Relationship == RelationProcessorCore && e->Processor.GroupCount > 0) {
+					const GROUP_AFFINITY& g    = e->Processor.GroupMask[0];
+					KAFFINITY             mask = g.Mask;
+					BYTE                  bit  = 0;
+					while (mask && !(mask & 1)) {
+						mask >>= 1;
+						bit++;
+					}
+					if (mask)
+						out.push_back(PROCESSOR_NUMBER{g.Group, bit, 0});
+				}
+				off += e->Size;
+			}
+			return out;
+		}();
+		return cores;
+	}
+
+	void apply_ideal_core(const datapath::context_options& opts, size_t index)
+	{
+		if (opts.ideal_core < -1)
+			return;
+		const auto& cores = physical_cores();
+		if (cores.empty())
+			return;
+		size_t start = opts.ideal_core >= 0 ? size_t(opts.ideal_core)
+											: size_t(GetCurrentProcessId() * 2654435761u) % cores.size();
+		PROCESSOR_NUMBER pn = cores[(start + index) % cores.size()];
+		SetThreadIdealProcessorEx(GetCurrentThread(), &pn, nullptr);
+	}
+
 	// Scheduling tweaks for an I/O thread. Returns the MMCSS handle to revert.
 	HANDLE apply_thread_scheduling(const datapath::context_options& opts)
 	{
@@ -136,8 +180,9 @@ bool datapath::windows::iocp_context::start()
 	// Each thread keeps its context alive, so the context is never destroyed on
 	// one of its own I/O threads (dispatch and run keep using `this`).
 	for (size_t i = 0; i < _opts.io_threads; i++)
-		_threads.emplace_back([this, keep = shared_from_this()] {
+		_threads.emplace_back([this, i, keep = shared_from_this()] {
 			tl_context = keep.get();
+			apply_ideal_core(_opts, i);
 			run();
 		});
 	return true;

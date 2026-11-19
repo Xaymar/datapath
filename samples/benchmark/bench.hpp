@@ -47,6 +47,7 @@ namespace bench {
 		int                 priority    = datapath::context_options{}.priority;
 		size_t              runs        = 1;
 		int                 stress      = -1; // -1 off, 0 = one thread per logical core
+		int                 ideal_core  = datapath::context_options{}.ideal_core;
 	};
 
 	enum class status { ok, would_block, closed, not_found, failed };
