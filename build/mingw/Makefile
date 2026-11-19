@@ -210,6 +210,19 @@ test_framing/fast:
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_framing.dir/build.make tests/CMakeFiles/test_framing.dir/build
 .PHONY : test_framing/fast
 
+#=============================================================================
+# Target rules for targets named test_send_queue
+
+# Build rule for target.
+test_send_queue: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_send_queue
+.PHONY : test_send_queue
+
+# fast build rule for target.
+test_send_queue/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_send_queue.dir/build.make tests/CMakeFiles/test_send_queue.dir/build
+.PHONY : test_send_queue/fast
+
 source/common/api.obj: source/common/api.cpp.obj
 .PHONY : source/common/api.obj
 
@@ -233,6 +246,30 @@ source/common/api.s: source/common/api.cpp.s
 source/common/api.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/common/api.cpp.s
 .PHONY : source/common/api.cpp.s
+
+source/common/send_queue.obj: source/common/send_queue.cpp.obj
+.PHONY : source/common/send_queue.obj
+
+# target to build an object file
+source/common/send_queue.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/common/send_queue.cpp.obj
+.PHONY : source/common/send_queue.cpp.obj
+
+source/common/send_queue.i: source/common/send_queue.cpp.i
+.PHONY : source/common/send_queue.i
+
+# target to preprocess a source file
+source/common/send_queue.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/common/send_queue.cpp.i
+.PHONY : source/common/send_queue.cpp.i
+
+source/common/send_queue.s: source/common/send_queue.cpp.s
+.PHONY : source/common/send_queue.s
+
+# target to generate assembly for a file
+source/common/send_queue.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/datapath.dir/build.make CMakeFiles/datapath.dir/source/common/send_queue.cpp.s
+.PHONY : source/common/send_queue.cpp.s
 
 source/windows/context.obj: source/windows/context.cpp.obj
 .PHONY : source/windows/context.obj
@@ -274,9 +311,13 @@ help:
 	@echo "... datapath"
 	@echo "... test_api"
 	@echo "... test_framing"
+	@echo "... test_send_queue"
 	@echo "... source/common/api.obj"
 	@echo "... source/common/api.i"
 	@echo "... source/common/api.s"
+	@echo "... source/common/send_queue.obj"
+	@echo "... source/common/send_queue.i"
+	@echo "... source/common/send_queue.s"
 	@echo "... source/windows/context.obj"
 	@echo "... source/windows/context.i"
 	@echo "... source/windows/context.s"

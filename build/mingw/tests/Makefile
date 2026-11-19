@@ -199,6 +199,20 @@ test_framing/fast:
 	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_framing.dir/build.make tests/CMakeFiles/test_framing.dir/build
 .PHONY : test_framing/fast
 
+# Convenience name for target.
+tests/CMakeFiles/test_send_queue.dir/rule:
+	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_send_queue.dir/rule
+.PHONY : tests/CMakeFiles/test_send_queue.dir/rule
+
+# Convenience name for target.
+test_send_queue: tests/CMakeFiles/test_send_queue.dir/rule
+.PHONY : test_send_queue
+
+# fast build rule for target.
+test_send_queue/fast:
+	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_send_queue.dir/build.make tests/CMakeFiles/test_send_queue.dir/build
+.PHONY : test_send_queue/fast
+
 test_api.obj: test_api.cpp.obj
 .PHONY : test_api.obj
 
@@ -247,6 +261,30 @@ test_framing.cpp.s:
 	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_framing.dir/build.make tests/CMakeFiles/test_framing.dir/test_framing.cpp.s
 .PHONY : test_framing.cpp.s
 
+test_send_queue.obj: test_send_queue.cpp.obj
+.PHONY : test_send_queue.obj
+
+# target to build an object file
+test_send_queue.cpp.obj:
+	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_send_queue.dir/build.make tests/CMakeFiles/test_send_queue.dir/test_send_queue.cpp.obj
+.PHONY : test_send_queue.cpp.obj
+
+test_send_queue.i: test_send_queue.cpp.i
+.PHONY : test_send_queue.i
+
+# target to preprocess a source file
+test_send_queue.cpp.i:
+	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_send_queue.dir/build.make tests/CMakeFiles/test_send_queue.dir/test_send_queue.cpp.i
+.PHONY : test_send_queue.cpp.i
+
+test_send_queue.s: test_send_queue.cpp.s
+.PHONY : test_send_queue.s
+
+# target to generate assembly for a file
+test_send_queue.cpp.s:
+	cd /home/user/datapath/build/mingw && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_send_queue.dir/build.make tests/CMakeFiles/test_send_queue.dir/test_send_queue.cpp.s
+.PHONY : test_send_queue.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -262,12 +300,16 @@ help:
 	@echo "... test"
 	@echo "... test_api"
 	@echo "... test_framing"
+	@echo "... test_send_queue"
 	@echo "... test_api.obj"
 	@echo "... test_api.i"
 	@echo "... test_api.s"
 	@echo "... test_framing.obj"
 	@echo "... test_framing.i"
 	@echo "... test_framing.s"
+	@echo "... test_send_queue.obj"
+	@echo "... test_send_queue.i"
+	@echo "... test_send_queue.s"
 .PHONY : help
 
 

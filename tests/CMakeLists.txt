@@ -13,3 +13,4 @@ endfunction()
 
 datapath_add_test(test_api)
 datapath_add_test(test_framing)
+datapath_add_test(test_send_queue)

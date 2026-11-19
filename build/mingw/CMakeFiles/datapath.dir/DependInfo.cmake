@@ -9,6 +9,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/home/user/datapath/source/common/api.cpp" "CMakeFiles/datapath.dir/source/common/api.cpp.obj" "gcc" "CMakeFiles/datapath.dir/source/common/api.cpp.obj.d"
+  "/home/user/datapath/source/common/send_queue.cpp" "CMakeFiles/datapath.dir/source/common/send_queue.cpp.obj" "gcc" "CMakeFiles/datapath.dir/source/common/send_queue.cpp.obj.d"
   "/home/user/datapath/source/windows/context.cpp" "CMakeFiles/datapath.dir/source/windows/context.cpp.obj" "gcc" "CMakeFiles/datapath.dir/source/windows/context.cpp.obj.d"
   )
 

@@ -81,6 +81,12 @@ set(DATAPATH_PUBLIC_HEADERS
 set(DATAPATH_SOURCES
 	source/common/api.cpp
 	source/common/detail.hpp
+	source/common/endian.hpp
+	source/common/framing.hpp
+	source/common/handshake.hpp
+	source/common/send_queue.cpp
+	source/common/send_queue.hpp
+	source/common/spin.hpp
 )
 if(WIN32)
 	list(APPEND DATAPATH_SOURCES

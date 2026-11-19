@@ -1,2 +1,2 @@
-/usr/bin/ar qc libdatapath.a CMakeFiles/datapath.dir/source/common/api.cpp.o CMakeFiles/datapath.dir/source/linux/context.cpp.o
+/usr/bin/ar qc libdatapath.a CMakeFiles/datapath.dir/source/common/api.cpp.o CMakeFiles/datapath.dir/source/common/send_queue.cpp.o CMakeFiles/datapath.dir/source/linux/context.cpp.o
 /usr/bin/ranlib libdatapath.a

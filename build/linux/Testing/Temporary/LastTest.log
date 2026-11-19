@@ -1,10 +1,10 @@
-Start testing: Nov 19 04:11 UTC
+Start testing: Nov 19 04:12 UTC
 ----------------------------------------------------------
-1/12 Testing: test_api.error_to_string
-1/12 Test: test_api.error_to_string
+1/19 Testing: test_api.error_to_string
+1/19 Test: test_api.error_to_string
 Command: "/home/user/datapath/build/linux/tests/test_api" "error_to_string"
 Directory: /home/user/datapath/build/linux/tests
-"test_api.error_to_string" start time: Nov 19 04:11 UTC
+"test_api.error_to_string" start time: Nov 19 04:12 UTC
 Output:
 ----------------------------------------------------------
 [ PASS ] error_to_string
@@ -12,15 +12,15 @@ Output:
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"test_api.error_to_string" end time: Nov 19 04:11 UTC
+"test_api.error_to_string" end time: Nov 19 04:12 UTC
 "test_api.error_to_string" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-2/12 Testing: test_api.options_defaults
-2/12 Test: test_api.options_defaults
+2/19 Testing: test_api.options_defaults
+2/19 Test: test_api.options_defaults
 Command: "/home/user/datapath/build/linux/tests/test_api" "options_defaults"
 Directory: /home/user/datapath/build/linux/tests
-"test_api.options_defaults" start time: Nov 19 04:11 UTC
+"test_api.options_defaults" start time: Nov 19 04:12 UTC
 Output:
 ----------------------------------------------------------
 [ PASS ] options_defaults
@@ -28,15 +28,15 @@ Output:
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"test_api.options_defaults" end time: Nov 19 04:11 UTC
+"test_api.options_defaults" end time: Nov 19 04:12 UTC
 "test_api.options_defaults" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-3/12 Testing: test_api.default_context_is_shared
-3/12 Test: test_api.default_context_is_shared
+3/19 Testing: test_api.default_context_is_shared
+3/19 Test: test_api.default_context_is_shared
 Command: "/home/user/datapath/build/linux/tests/test_api" "default_context_is_shared"
 Directory: /home/user/datapath/build/linux/tests
-"test_api.default_context_is_shared" start time: Nov 19 04:11 UTC
+"test_api.default_context_is_shared" start time: Nov 19 04:12 UTC
 Output:
 ----------------------------------------------------------
 [ PASS ] default_context_is_shared
@@ -44,15 +44,15 @@ Output:
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"test_api.default_context_is_shared" end time: Nov 19 04:11 UTC
+"test_api.default_context_is_shared" end time: Nov 19 04:12 UTC
 "test_api.default_context_is_shared" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-4/12 Testing: test_framing.parser_every_split_offset
-4/12 Test: test_framing.parser_every_split_offset
+4/19 Testing: test_framing.parser_every_split_offset
+4/19 Test: test_framing.parser_every_split_offset
 Command: "/home/user/datapath/build/linux/tests/test_framing" "parser_every_split_offset"
 Directory: /home/user/datapath/build/linux/tests
-"test_framing.parser_every_split_offset" start time: Nov 19 04:11 UTC
+"test_framing.parser_every_split_offset" start time: Nov 19 04:12 UTC
 Output:
 ----------------------------------------------------------
 [ PASS ] parser_every_split_offset
@@ -60,15 +60,15 @@ Output:
 Test time =   0.01 sec
 ----------------------------------------------------------
 Test Passed.
-"test_framing.parser_every_split_offset" end time: Nov 19 04:11 UTC
+"test_framing.parser_every_split_offset" end time: Nov 19 04:12 UTC
 "test_framing.parser_every_split_offset" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-5/12 Testing: test_framing.parser_many_small_per_read
-5/12 Test: test_framing.parser_many_small_per_read
+5/19 Testing: test_framing.parser_many_small_per_read
+5/19 Test: test_framing.parser_many_small_per_read
 Command: "/home/user/datapath/build/linux/tests/test_framing" "parser_many_small_per_read"
 Directory: /home/user/datapath/build/linux/tests
-"test_framing.parser_many_small_per_read" start time: Nov 19 04:11 UTC
+"test_framing.parser_many_small_per_read" start time: Nov 19 04:12 UTC
 Output:
 ----------------------------------------------------------
 [ PASS ] parser_many_small_per_read
@@ -76,15 +76,15 @@ Output:
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"test_framing.parser_many_small_per_read" end time: Nov 19 04:11 UTC
+"test_framing.parser_many_small_per_read" end time: Nov 19 04:12 UTC
 "test_framing.parser_many_small_per_read" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-6/12 Testing: test_framing.parser_large_frame_beyond_buffer
-6/12 Test: test_framing.parser_large_frame_beyond_buffer
+6/19 Testing: test_framing.parser_large_frame_beyond_buffer
+6/19 Test: test_framing.parser_large_frame_beyond_buffer
 Command: "/home/user/datapath/build/linux/tests/test_framing" "parser_large_frame_beyond_buffer"
 Directory: /home/user/datapath/build/linux/tests
-"test_framing.parser_large_frame_beyond_buffer" start time: Nov 19 04:11 UTC
+"test_framing.parser_large_frame_beyond_buffer" start time: Nov 19 04:12 UTC
 Output:
 ----------------------------------------------------------
 [ PASS ] parser_large_frame_beyond_buffer
@@ -92,15 +92,15 @@ Output:
 Test time =   0.02 sec
 ----------------------------------------------------------
 Test Passed.
-"test_framing.parser_large_frame_beyond_buffer" end time: Nov 19 04:11 UTC
+"test_framing.parser_large_frame_beyond_buffer" end time: Nov 19 04:12 UTC
 "test_framing.parser_large_frame_beyond_buffer" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-7/12 Testing: test_framing.parser_rejects_oversize_header
-7/12 Test: test_framing.parser_rejects_oversize_header
+7/19 Testing: test_framing.parser_rejects_oversize_header
+7/19 Test: test_framing.parser_rejects_oversize_header
 Command: "/home/user/datapath/build/linux/tests/test_framing" "parser_rejects_oversize_header"
 Directory: /home/user/datapath/build/linux/tests
-"test_framing.parser_rejects_oversize_header" start time: Nov 19 04:11 UTC
+"test_framing.parser_rejects_oversize_header" start time: Nov 19 04:12 UTC
 Output:
 ----------------------------------------------------------
 [ PASS ] parser_rejects_oversize_header
@@ -108,15 +108,15 @@ Output:
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"test_framing.parser_rejects_oversize_header" end time: Nov 19 04:11 UTC
+"test_framing.parser_rejects_oversize_header" end time: Nov 19 04:12 UTC
 "test_framing.parser_rejects_oversize_header" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-8/12 Testing: test_framing.hello_roundtrip
-8/12 Test: test_framing.hello_roundtrip
+8/19 Testing: test_framing.hello_roundtrip
+8/19 Test: test_framing.hello_roundtrip
 Command: "/home/user/datapath/build/linux/tests/test_framing" "hello_roundtrip"
 Directory: /home/user/datapath/build/linux/tests
-"test_framing.hello_roundtrip" start time: Nov 19 04:11 UTC
+"test_framing.hello_roundtrip" start time: Nov 19 04:12 UTC
 Output:
 ----------------------------------------------------------
 [ PASS ] hello_roundtrip
@@ -124,15 +124,15 @@ Output:
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"test_framing.hello_roundtrip" end time: Nov 19 04:11 UTC
+"test_framing.hello_roundtrip" end time: Nov 19 04:12 UTC
 "test_framing.hello_roundtrip" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-9/12 Testing: test_framing.hello_bad_magic
-9/12 Test: test_framing.hello_bad_magic
+9/19 Testing: test_framing.hello_bad_magic
+9/19 Test: test_framing.hello_bad_magic
 Command: "/home/user/datapath/build/linux/tests/test_framing" "hello_bad_magic"
 Directory: /home/user/datapath/build/linux/tests
-"test_framing.hello_bad_magic" start time: Nov 19 04:11 UTC
+"test_framing.hello_bad_magic" start time: Nov 19 04:12 UTC
 Output:
 ----------------------------------------------------------
 [ PASS ] hello_bad_magic
@@ -140,15 +140,15 @@ Output:
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"test_framing.hello_bad_magic" end time: Nov 19 04:11 UTC
+"test_framing.hello_bad_magic" end time: Nov 19 04:12 UTC
 "test_framing.hello_bad_magic" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-10/12 Testing: test_framing.hello_bad_version
-10/12 Test: test_framing.hello_bad_version
+10/19 Testing: test_framing.hello_bad_version
+10/19 Test: test_framing.hello_bad_version
 Command: "/home/user/datapath/build/linux/tests/test_framing" "hello_bad_version"
 Directory: /home/user/datapath/build/linux/tests
-"test_framing.hello_bad_version" start time: Nov 19 04:11 UTC
+"test_framing.hello_bad_version" start time: Nov 19 04:12 UTC
 Output:
 ----------------------------------------------------------
 [ PASS ] hello_bad_version
@@ -156,15 +156,15 @@ Output:
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"test_framing.hello_bad_version" end time: Nov 19 04:11 UTC
+"test_framing.hello_bad_version" end time: Nov 19 04:12 UTC
 "test_framing.hello_bad_version" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-11/12 Testing: test_framing.spin_zero_budget_blocks_immediately
-11/12 Test: test_framing.spin_zero_budget_blocks_immediately
+11/19 Testing: test_framing.spin_zero_budget_blocks_immediately
+11/19 Test: test_framing.spin_zero_budget_blocks_immediately
 Command: "/home/user/datapath/build/linux/tests/test_framing" "spin_zero_budget_blocks_immediately"
 Directory: /home/user/datapath/build/linux/tests
-"test_framing.spin_zero_budget_blocks_immediately" start time: Nov 19 04:11 UTC
+"test_framing.spin_zero_budget_blocks_immediately" start time: Nov 19 04:12 UTC
 Output:
 ----------------------------------------------------------
 [ PASS ] spin_zero_budget_blocks_immediately
@@ -172,15 +172,15 @@ Output:
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"test_framing.spin_zero_budget_blocks_immediately" end time: Nov 19 04:11 UTC
+"test_framing.spin_zero_budget_blocks_immediately" end time: Nov 19 04:12 UTC
 "test_framing.spin_zero_budget_blocks_immediately" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-12/12 Testing: test_framing.spin_work_defers_block
-12/12 Test: test_framing.spin_work_defers_block
+12/19 Testing: test_framing.spin_work_defers_block
+12/19 Test: test_framing.spin_work_defers_block
 Command: "/home/user/datapath/build/linux/tests/test_framing" "spin_work_defers_block"
 Directory: /home/user/datapath/build/linux/tests
-"test_framing.spin_work_defers_block" start time: Nov 19 04:11 UTC
+"test_framing.spin_work_defers_block" start time: Nov 19 04:12 UTC
 Output:
 ----------------------------------------------------------
 [ PASS ] spin_work_defers_block
@@ -188,8 +188,120 @@ Output:
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"test_framing.spin_work_defers_block" end time: Nov 19 04:11 UTC
+"test_framing.spin_work_defers_block" end time: Nov 19 04:12 UTC
 "test_framing.spin_work_defers_block" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-End testing: Nov 19 04:11 UTC
+13/19 Testing: test_send_queue.push_rejects_too_large
+13/19 Test: test_send_queue.push_rejects_too_large
+Command: "/home/user/datapath/build/linux/tests/test_send_queue" "push_rejects_too_large"
+Directory: /home/user/datapath/build/linux/tests
+"test_send_queue.push_rejects_too_large" start time: Nov 19 04:12 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] push_rejects_too_large
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_send_queue.push_rejects_too_large" end time: Nov 19 04:12 UTC
+"test_send_queue.push_rejects_too_large" time elapsed: 00:00:00
+----------------------------------------------------------
+
+14/19 Testing: test_send_queue.would_block_when_full
+14/19 Test: test_send_queue.would_block_when_full
+Command: "/home/user/datapath/build/linux/tests/test_send_queue" "would_block_when_full"
+Directory: /home/user/datapath/build/linux/tests
+"test_send_queue.would_block_when_full" start time: Nov 19 04:12 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] would_block_when_full
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_send_queue.would_block_when_full" end time: Nov 19 04:12 UTC
+"test_send_queue.would_block_when_full" time elapsed: 00:00:00
+----------------------------------------------------------
+
+15/19 Testing: test_send_queue.empty_queue_accepts_frame_above_queue_limit
+15/19 Test: test_send_queue.empty_queue_accepts_frame_above_queue_limit
+Command: "/home/user/datapath/build/linux/tests/test_send_queue" "empty_queue_accepts_frame_above_queue_limit"
+Directory: /home/user/datapath/build/linux/tests
+"test_send_queue.empty_queue_accepts_frame_above_queue_limit" start time: Nov 19 04:12 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] empty_queue_accepts_frame_above_queue_limit
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_send_queue.empty_queue_accepts_frame_above_queue_limit" end time: Nov 19 04:12 UTC
+"test_send_queue.empty_queue_accepts_frame_above_queue_limit" time elapsed: 00:00:00
+----------------------------------------------------------
+
+16/19 Testing: test_send_queue.coalesces_small_frames
+16/19 Test: test_send_queue.coalesces_small_frames
+Command: "/home/user/datapath/build/linux/tests/test_send_queue" "coalesces_small_frames"
+Directory: /home/user/datapath/build/linux/tests
+"test_send_queue.coalesces_small_frames" start time: Nov 19 04:12 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] coalesces_small_frames
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_send_queue.coalesces_small_frames" end time: Nov 19 04:12 UTC
+"test_send_queue.coalesces_small_frames" time elapsed: 00:00:00
+----------------------------------------------------------
+
+17/19 Testing: test_send_queue.single_writer_slot
+17/19 Test: test_send_queue.single_writer_slot
+Command: "/home/user/datapath/build/linux/tests/test_send_queue" "single_writer_slot"
+Directory: /home/user/datapath/build/linux/tests
+"test_send_queue.single_writer_slot" start time: Nov 19 04:12 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] single_writer_slot
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_send_queue.single_writer_slot" end time: Nov 19 04:12 UTC
+"test_send_queue.single_writer_slot" time elapsed: 00:00:00
+----------------------------------------------------------
+
+18/19 Testing: test_send_queue.closed_queue_rejects
+18/19 Test: test_send_queue.closed_queue_rejects
+Command: "/home/user/datapath/build/linux/tests/test_send_queue" "closed_queue_rejects"
+Directory: /home/user/datapath/build/linux/tests
+"test_send_queue.closed_queue_rejects" start time: Nov 19 04:12 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] closed_queue_rejects
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_send_queue.closed_queue_rejects" end time: Nov 19 04:12 UTC
+"test_send_queue.closed_queue_rejects" time elapsed: 00:00:00
+----------------------------------------------------------
+
+19/19 Testing: test_send_queue.concurrent_push_no_interleave
+19/19 Test: test_send_queue.concurrent_push_no_interleave
+Command: "/home/user/datapath/build/linux/tests/test_send_queue" "concurrent_push_no_interleave"
+Directory: /home/user/datapath/build/linux/tests
+"test_send_queue.concurrent_push_no_interleave" start time: Nov 19 04:12 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] concurrent_push_no_interleave
+<end of output>
+Test time =   0.11 sec
+----------------------------------------------------------
+Test Passed.
+"test_send_queue.concurrent_push_no_interleave" end time: Nov 19 04:12 UTC
+"test_send_queue.concurrent_push_no_interleave" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 19 04:12 UTC

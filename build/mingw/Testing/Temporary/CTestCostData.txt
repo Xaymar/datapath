@@ -1,13 +1,13 @@
-test_api.error_to_string 3 1.5104
-test_api.options_defaults 3 0.980086
-test_api.default_context_is_shared 3 1.6714
-test_framing.parser_every_split_offset 1 0.48039
-test_framing.parser_many_small_per_read 1 0.0407489
-test_framing.parser_large_frame_beyond_buffer 1 0.0564693
-test_framing.parser_rejects_oversize_header 1 0.0415619
-test_framing.hello_roundtrip 1 0.0493493
-test_framing.hello_bad_magic 1 0.0364651
-test_framing.hello_bad_version 1 0.0330202
-test_framing.spin_zero_budget_blocks_immediately 1 0.0318896
-test_framing.spin_work_defers_block 1 0.0349665
+test_api.error_to_string 4 1.75111
+test_api.options_defaults 4 0.841303
+test_api.default_context_is_shared 4 1.3587
+test_framing.parser_every_split_offset 2 0.447611
+test_framing.parser_many_small_per_read 2 0.0378542
+test_framing.parser_large_frame_beyond_buffer 2 0.0520172
+test_framing.parser_rejects_oversize_header 2 0.0420736
+test_framing.hello_roundtrip 2 0.04616
+test_framing.hello_bad_magic 2 0.0355414
+test_framing.hello_bad_version 2 0.0321613
+test_framing.spin_zero_budget_blocks_immediately 2 0.0309054
+test_framing.spin_work_defers_block 2 0.0373346
 ---

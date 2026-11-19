@@ -8,6 +8,7 @@
 /home/user/datapath/build/linux/CMakeFiles/install/strip.dir
 /home/user/datapath/build/linux/tests/CMakeFiles/test_api.dir
 /home/user/datapath/build/linux/tests/CMakeFiles/test_framing.dir
+/home/user/datapath/build/linux/tests/CMakeFiles/test_send_queue.dir
 /home/user/datapath/build/linux/tests/CMakeFiles/test.dir
 /home/user/datapath/build/linux/tests/CMakeFiles/edit_cache.dir
 /home/user/datapath/build/linux/tests/CMakeFiles/rebuild_cache.dir

@@ -1,6 +1,8 @@
 file(REMOVE_RECURSE
   "CMakeFiles/datapath.dir/source/common/api.cpp.o"
   "CMakeFiles/datapath.dir/source/common/api.cpp.o.d"
+  "CMakeFiles/datapath.dir/source/common/send_queue.cpp.o"
+  "CMakeFiles/datapath.dir/source/common/send_queue.cpp.o.d"
   "CMakeFiles/datapath.dir/source/linux/context.cpp.o"
   "CMakeFiles/datapath.dir/source/linux/context.cpp.o.d"
   "libdatapath.a"

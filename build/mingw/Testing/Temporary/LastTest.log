@@ -9,11 +9,27 @@ Output:
 ----------------------------------------------------------
 [ PASS ] parser_every_split_offset
 <end of output>
-Test time =   0.48 sec
+Test time =   0.41 sec
 ----------------------------------------------------------
 Test Passed.
 "test_framing.parser_every_split_offset" end time: Nov 19 04:11 UTC
 "test_framing.parser_every_split_offset" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/12 Testing: test_api.default_context_is_shared
+3/12 Test: test_api.default_context_is_shared
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_api.exe" "default_context_is_shared"
+Directory: /home/user/datapath/build/mingw/tests
+"test_api.default_context_is_shared" start time: Nov 19 04:11 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] default_context_is_shared
+<end of output>
+Test time =   0.42 sec
+----------------------------------------------------------
+Test Passed.
+"test_api.default_context_is_shared" end time: Nov 19 04:11 UTC
+"test_api.default_context_is_shared" time elapsed: 00:00:00
 ----------------------------------------------------------
 
 2/12 Testing: test_api.options_defaults
@@ -25,27 +41,27 @@ Output:
 ----------------------------------------------------------
 [ PASS ] options_defaults
 <end of output>
-Test time =   0.49 sec
+Test time =   0.42 sec
 ----------------------------------------------------------
 Test Passed.
 "test_api.options_defaults" end time: Nov 19 04:11 UTC
 "test_api.options_defaults" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-5/12 Testing: test_framing.parser_many_small_per_read
-5/12 Test: test_framing.parser_many_small_per_read
-Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_framing.exe" "parser_many_small_per_read"
+8/12 Testing: test_framing.hello_roundtrip
+8/12 Test: test_framing.hello_roundtrip
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_framing.exe" "hello_roundtrip"
 Directory: /home/user/datapath/build/mingw/tests
-"test_framing.parser_many_small_per_read" start time: Nov 19 04:11 UTC
+"test_framing.hello_roundtrip" start time: Nov 19 04:11 UTC
 Output:
 ----------------------------------------------------------
-[ PASS ] parser_many_small_per_read
+[ PASS ] hello_roundtrip
 <end of output>
 Test time =   0.04 sec
 ----------------------------------------------------------
 Test Passed.
-"test_framing.parser_many_small_per_read" end time: Nov 19 04:11 UTC
-"test_framing.parser_many_small_per_read" time elapsed: 00:00:00
+"test_framing.hello_roundtrip" end time: Nov 19 04:11 UTC
+"test_framing.hello_roundtrip" time elapsed: 00:00:00
 ----------------------------------------------------------
 
 6/12 Testing: test_framing.parser_large_frame_beyond_buffer
@@ -57,7 +73,7 @@ Output:
 ----------------------------------------------------------
 [ PASS ] parser_large_frame_beyond_buffer
 <end of output>
-Test time =   0.06 sec
+Test time =   0.05 sec
 ----------------------------------------------------------
 Test Passed.
 "test_framing.parser_large_frame_beyond_buffer" end time: Nov 19 04:11 UTC
@@ -80,20 +96,20 @@ Test Passed.
 "test_framing.parser_rejects_oversize_header" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-8/12 Testing: test_framing.hello_roundtrip
-8/12 Test: test_framing.hello_roundtrip
-Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_framing.exe" "hello_roundtrip"
+5/12 Testing: test_framing.parser_many_small_per_read
+5/12 Test: test_framing.parser_many_small_per_read
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_framing.exe" "parser_many_small_per_read"
 Directory: /home/user/datapath/build/mingw/tests
-"test_framing.hello_roundtrip" start time: Nov 19 04:11 UTC
+"test_framing.parser_many_small_per_read" start time: Nov 19 04:11 UTC
 Output:
 ----------------------------------------------------------
-[ PASS ] hello_roundtrip
+[ PASS ] parser_many_small_per_read
 <end of output>
-Test time =   0.05 sec
+Test time =   0.03 sec
 ----------------------------------------------------------
 Test Passed.
-"test_framing.hello_roundtrip" end time: Nov 19 04:11 UTC
-"test_framing.hello_roundtrip" time elapsed: 00:00:00
+"test_framing.parser_many_small_per_read" end time: Nov 19 04:11 UTC
+"test_framing.parser_many_small_per_read" time elapsed: 00:00:00
 ----------------------------------------------------------
 
 9/12 Testing: test_framing.hello_bad_magic
@@ -105,11 +121,27 @@ Output:
 ----------------------------------------------------------
 [ PASS ] hello_bad_magic
 <end of output>
-Test time =   0.04 sec
+Test time =   0.03 sec
 ----------------------------------------------------------
 Test Passed.
 "test_framing.hello_bad_magic" end time: Nov 19 04:11 UTC
 "test_framing.hello_bad_magic" time elapsed: 00:00:00
+----------------------------------------------------------
+
+12/12 Testing: test_framing.spin_work_defers_block
+12/12 Test: test_framing.spin_work_defers_block
+Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_framing.exe" "spin_work_defers_block"
+Directory: /home/user/datapath/build/mingw/tests
+"test_framing.spin_work_defers_block" start time: Nov 19 04:11 UTC
+Output:
+----------------------------------------------------------
+[ PASS ] spin_work_defers_block
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"test_framing.spin_work_defers_block" end time: Nov 19 04:11 UTC
+"test_framing.spin_work_defers_block" time elapsed: 00:00:00
 ----------------------------------------------------------
 
 10/12 Testing: test_framing.hello_bad_version
@@ -144,22 +176,6 @@ Test Passed.
 "test_framing.spin_zero_budget_blocks_immediately" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-12/12 Testing: test_framing.spin_work_defers_block
-12/12 Test: test_framing.spin_work_defers_block
-Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_framing.exe" "spin_work_defers_block"
-Directory: /home/user/datapath/build/mingw/tests
-"test_framing.spin_work_defers_block" start time: Nov 19 04:11 UTC
-Output:
-----------------------------------------------------------
-[ PASS ] spin_work_defers_block
-<end of output>
-Test time =   0.03 sec
-----------------------------------------------------------
-Test Passed.
-"test_framing.spin_work_defers_block" end time: Nov 19 04:11 UTC
-"test_framing.spin_work_defers_block" time elapsed: 00:00:00
-----------------------------------------------------------
-
 1/12 Testing: test_api.error_to_string
 1/12 Test: test_api.error_to_string
 Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_api.exe" "error_to_string"
@@ -169,27 +185,11 @@ Output:
 ----------------------------------------------------------
 [ PASS ] error_to_string
 <end of output>
-Test time =   2.05 sec
+Test time =   2.47 sec
 ----------------------------------------------------------
 Test Passed.
 "test_api.error_to_string" end time: Nov 19 04:11 UTC
 "test_api.error_to_string" time elapsed: 00:00:02
-----------------------------------------------------------
-
-3/12 Testing: test_api.default_context_is_shared
-3/12 Test: test_api.default_context_is_shared
-Command: "/home/user/datapath/cmake/toolchains/wine-run.sh" "/home/user/datapath/build/mingw/tests/test_api.exe" "default_context_is_shared"
-Directory: /home/user/datapath/build/mingw/tests
-"test_api.default_context_is_shared" start time: Nov 19 04:11 UTC
-Output:
-----------------------------------------------------------
-[ PASS ] default_context_is_shared
-<end of output>
-Test time =   2.56 sec
-----------------------------------------------------------
-Test Passed.
-"test_api.default_context_is_shared" end time: Nov 19 04:11 UTC
-"test_api.default_context_is_shared" time elapsed: 00:00:02
 ----------------------------------------------------------
 
 End testing: Nov 19 04:11 UTC

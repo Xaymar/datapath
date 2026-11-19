@@ -1,0 +1,163 @@
+/*
+Low Latency IPC Library for high-speed traffic
+Copyright (C) 2019 - 2026 Michael Fabian Dirks <info@xaymar.com>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
+#include "send_queue.hpp"
+#include <cstring>
+#include "framing.hpp"
+
+datapath::detail::send_queue::send_queue(uint64_t max_message_size, uint64_t max_queued_bytes)
+	: _limit(max_message_size), _max_queued(max_queued_bytes)
+{}
+
+std::vector<uint8_t> datapath::detail::send_queue::new_block_locked(size_t reserve)
+{
+	std::vector<uint8_t> block;
+	if (reserve <= coalesce_limit && !_free.empty()) {
+		block = std::move(_free.back());
+		_free.pop_back();
+		block.clear();
+	}
+	block.reserve(reserve);
+	return block;
+}
+
+datapath::error datapath::detail::send_queue::push(const buffer_view* parts, size_t count, bool& acquired_writer)
+{
+	acquired_writer = false;
+	uint64_t total  = 0;
+	for (size_t i = 0; i < count; i++)
+		total += parts[i].size;
+	const uint64_t frame = total + frame_header_size;
+
+	auto append = [&](std::vector<uint8_t>& block) {
+		size_t at = block.size();
+		block.resize(at + size_t(frame));
+		encode_frame_header(block.data() + at, total);
+		at += frame_header_size;
+		for (size_t i = 0; i < count; i++) {
+			if (parts[i].size) {
+				std::memcpy(block.data() + at, parts[i].data, parts[i].size);
+				at += parts[i].size;
+			}
+		}
+	};
+
+	std::unique_lock<std::mutex> ul(_lock);
+	if (_closed)
+		return datapath::error::Closed;
+	if (total > _limit)
+		return datapath::error::TooLarge;
+	if (_queued > 0 && _queued + frame > _max_queued)
+		return datapath::error::WouldBlock;
+
+	if (frame <= coalesce_limit) {
+		// Small: pack into the tail block when it has room, all under the lock.
+		if (_blocks.empty() || _blocks.back().size() + frame > coalesce_limit
+			|| _blocks.back().capacity() > coalesce_limit) {
+			_blocks.push_back(new_block_locked(coalesce_limit));
+		}
+		append(_blocks.back());
+		_queued += frame;
+	} else {
+		// Large: reserve queue space, copy outside the lock, then publish.
+		_queued += frame;
+		ul.unlock();
+		std::vector<uint8_t> block;
+		try {
+			block.reserve(size_t(frame));
+			append(block);
+		} catch (...) {
+			ul.lock();
+			_queued -= frame;
+			return datapath::error::Failure;
+		}
+		ul.lock();
+		if (_closed)
+			return datapath::error::Closed;
+		_blocks.push_back(std::move(block));
+	}
+
+	if (!_writing) {
+		_writing        = true;
+		acquired_writer = true;
+	}
+	return datapath::error::Success;
+}
+
+bool datapath::detail::send_queue::take(std::vector<uint8_t>& batch)
+{
+	std::unique_lock<std::mutex> ul(_lock);
+	if (batch.capacity() > 0 && batch.capacity() <= coalesce_limit && _free.size() < 4) {
+		batch.clear();
+		_free.push_back(std::move(batch));
+	}
+	batch = std::vector<uint8_t>();
+	if (_blocks.empty() || _closed) {
+		_writing = false;
+		return false;
+	}
+	batch = std::move(_blocks.front());
+	_blocks.pop_front();
+	_queued -= batch.size();
+	return true;
+}
+
+bool datapath::detail::send_queue::try_acquire()
+{
+	std::unique_lock<std::mutex> ul(_lock);
+	if (_writing || _closed)
+		return false;
+	_writing = true;
+	return true;
+}
+
+void datapath::detail::send_queue::recycle(std::vector<uint8_t>&& buffer)
+{
+	std::unique_lock<std::mutex> ul(_lock);
+	if (buffer.capacity() > 0 && buffer.capacity() <= coalesce_limit && _free.size() < 4) {
+		buffer.clear();
+		_free.push_back(std::move(buffer));
+	}
+}
+
+void datapath::detail::send_queue::set_limit(uint64_t max_message_size)
+{
+	std::unique_lock<std::mutex> ul(_lock);
+	_limit = max_message_size;
+}
+
+uint64_t datapath::detail::send_queue::limit() const
+{
+	std::unique_lock<std::mutex> ul(_lock);
+	return _limit;
+}
+
+void datapath::detail::send_queue::close()
+{
+	std::unique_lock<std::mutex> ul(_lock);
+	_closed = true;
+	_blocks.clear();
+	_free.clear();
+	_queued = 0;
+}
+
+bool datapath::detail::send_queue::closed() const
+{
+	std::unique_lock<std::mutex> ul(_lock);
+	return _closed;
+}
