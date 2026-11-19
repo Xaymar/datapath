@@ -5,36 +5,16 @@
 
 cmake_minimum_required(VERSION 3.16)
 
-# Versioning: tweak = commits since the version tag, if available.
-set(VERSION_MAJOR 0)
-set(VERSION_MINOR 2)
-set(VERSION_PATCH 0)
-set(VERSION_TWEAK 0)
-set(PROJECT_COMMIT "N/A")
-if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/.git")
-	execute_process(
-		COMMAND git rev-parse HEAD
-		WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
-		RESULT_VARIABLE GIT_RESULT
-		OUTPUT_VARIABLE GIT_OUTPUT
-		OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET
-	)
-	if(GIT_RESULT EQUAL 0)
-		set(PROJECT_COMMIT ${GIT_OUTPUT})
-	endif()
-endif()
+# Versioning: ABI version (bump on any binary-incompatible change, and reset
+# the patch version to 0) and patch version (bump on compatible changes).
+set(DATAPATH_VERSION_ABI 2)
+set(DATAPATH_VERSION_PATCH 0)
 
 project(datapath
-	VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.${VERSION_TWEAK}
+	VERSION ${DATAPATH_VERSION_ABI}.${DATAPATH_VERSION_PATCH}
 	DESCRIPTION "High performance, low latency IPC library"
-	LANGUAGES CXX
+	LANGUAGES C CXX
 )
-
-# Optional clang tooling submodule.
-if(EXISTS "${PROJECT_SOURCE_DIR}/cmake/clang/Clang.cmake")
-	list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/clang")
-	include("Clang")
-endif()
 
 if("${CMAKE_SOURCE_DIR}" STREQUAL "${PROJECT_SOURCE_DIR}")
 	set(DATAPATH_TOPLEVEL ON)
@@ -45,6 +25,7 @@ endif()
 option(DATAPATH_SHARED "Build a shared library instead of a static one." OFF)
 option(DATAPATH_BUILD_SAMPLES "Build samples and the benchmark." ${DATAPATH_TOPLEVEL})
 option(DATAPATH_BUILD_TESTS "Build tests." ${DATAPATH_TOPLEVEL})
+option(DATAPATH_BUILD_PYTHON "Build the Python extension module (normally driven by pyproject.toml)." OFF)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -55,11 +36,14 @@ endif()
 
 configure_file(
 	"${PROJECT_SOURCE_DIR}/cmake/version.hpp.in"
-	"${PROJECT_BINARY_DIR}/generated/version.hpp"
+	"${PROJECT_BINARY_DIR}/generated/include/datapath/version.hpp"
+	@ONLY
 )
 
 set(DATAPATH_PUBLIC_HEADERS
+	"${PROJECT_BINARY_DIR}/generated/include/datapath/version.hpp"
 	include/datapath/context.hpp
+	include/datapath/datapath.h
 	include/datapath/datapath.hpp
 	include/datapath/error.hpp
 	include/datapath/options.hpp
@@ -69,6 +53,7 @@ set(DATAPATH_PUBLIC_HEADERS
 )
 set(DATAPATH_SOURCES
 	source/common/api.cpp
+	source/common/c_api.cpp
 	source/common/connection_base.hpp
 	source/common/detail.hpp
 	source/common/endian.hpp
@@ -117,15 +102,22 @@ add_library(datapath::datapath ALIAS datapath)
 target_include_directories(datapath
 	PUBLIC
 		"$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
+		"$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/generated/include>"
 		"$<INSTALL_INTERFACE:include>"
 	PRIVATE
 		"${PROJECT_SOURCE_DIR}/source"
-		"${PROJECT_BINARY_DIR}/generated"
 )
+# C API export macro (see include/datapath/datapath.h).
+target_compile_definitions(datapath PRIVATE DATAPATH_BUILDING)
+if(NOT DATAPATH_SHARED)
+	target_compile_definitions(datapath PUBLIC DATAPATH_STATIC)
+endif()
 set_target_properties(datapath PROPERTIES
 	CXX_VISIBILITY_PRESET hidden
 	POSITION_INDEPENDENT_CODE ON
 	WINDOWS_EXPORT_ALL_SYMBOLS ON
+	VERSION ${DATAPATH_VERSION_ABI}.${DATAPATH_VERSION_PATCH}
+	SOVERSION ${DATAPATH_VERSION_ABI}
 )
 
 if(MSVC)
@@ -156,11 +148,17 @@ install(TARGETS datapath EXPORT datapath-targets
 	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 install(DIRECTORY include/datapath DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES "${PROJECT_BINARY_DIR}/generated/include/datapath/version.hpp"
+	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/datapath
+)
 install(EXPORT datapath-targets NAMESPACE datapath:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/datapath)
 
 if(DATAPATH_BUILD_TESTS)
 	enable_testing()
 	add_subdirectory(tests)
+endif()
+if(DATAPATH_BUILD_PYTHON)
+	add_subdirectory(python)
 endif()
 if(DATAPATH_BUILD_SAMPLES AND EXISTS "${PROJECT_SOURCE_DIR}/samples/CMakeLists.txt")
 	add_subdirectory(samples)

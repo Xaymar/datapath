@@ -115,6 +115,29 @@ See `samples/echo/main.cpp` for a complete program.
 * **Tuning.** `context_options::spin` (default 50 µs) is how long an I/O thread busy-polls after the last event before sleeping in the kernel. Higher values cut tail latency for bursty traffic and cost CPU only while traffic flows. `0` disables spinning. Spinning only helps while spare CPUs exist: when spinning I/O threads cover every CPU (for example client and server on one machine, both with `io_threads = 0`), a woken thread waits for a spinner's budget to run out, and on Linux 64 B p99.9 measured about 116 µs with the default spin versus 23 µs with `0`. `context_options::yield` also fixes that case (24 µs) but gives a timeslice away on every yield under full CPU load. On Windows the I/O threads also opt out of EcoQoS power throttling.
 * **Paths.** A bare name maps to `\\.\pipe\<name>` on Windows and to the abstract socket `datapath.<name>` on Linux. On Linux, a path starting with `/` is a filesystem socket instead, created with mode `0600`/`0660`/`0666` for `User`/`Group`/`World` and removed on close.
 
+### C API
+`#include <datapath/datapath.h>` gives the same features as a plain C ABI for C programs and for other languages' FFI. Objects are opaque handles that you release yourself, every call returns a `datapath_error` code (no exceptions cross the boundary), and callbacks take a `void* user` plus an optional destructor for it. Option structs carry their size, so call `datapath_options_init()` before changing fields; passing `NULL` uses the defaults.
+
+```c
+static void echo(void* user, datapath_socket* s, const uint8_t* data, size_t size) {
+    datapath_socket_send(s, data, size);
+}
+static int on_accept(void* user, datapath_server* server, datapath_socket* client) {
+    datapath_socket_set_on_message(client, echo, NULL, NULL);
+    keep(client);                                  // yours now; datapath_socket_release() it later
+    return 1;                                      // 0 rejects (the library releases it)
+}
+
+datapath_server* server;
+datapath_host("my-service", NULL, NULL, &server);
+datapath_server_set_on_accept(server, on_accept, NULL, NULL);
+
+datapath_socket* sock;
+if (datapath_connect("my-service", NULL, NULL, &sock) == DATAPATH_SUCCESS)
+    datapath_socket_send(sock, "hello", 5);
+```
+Built with `DATAPATH_SHARED=ON`, the library exports only the C API on Linux. The header documents threading and ownership rules in full.
+
 ## Getting DataPath
 Add the repository as a subdirectory and link the `datapath::datapath` target:
 ```cmake
@@ -123,7 +146,29 @@ target_link_libraries(my-app PRIVATE datapath::datapath)
 ```
 Requires CMake 3.16+ and a C++17 compiler (MSVC 2019+, GCC 9+, Clang 10+). To build the library, tests and benchmarks on their own, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-**Node.js:** `npm install @xaymar/datapath` gives a Node-API addon with TypeScript typings, built on the C++ API. See [bindings/node](bindings/node/README.md).
+### Python
+```bash
+pip install com.xaymar.datapath
+```
+```python
+import datapath
+with datapath.connect("my-service") as sock:
+    sock.send(b"hello")
+    print(sock.recv(timeout=1.0))
+```
+Wheels cover CPython 3.10+ (including free-threaded builds) on Windows and Linux. See [python/README.md](python/README.md) for the API, the two ways to receive and their latency.
+
+### Node.js
+```bash
+npm install @xaymar/datapath
+```
+```js
+const datapath = require('@xaymar/datapath');
+const sock = await datapath.connect('my-service');
+sock.on('message', (data) => console.log(data.toString()));
+sock.send('hello');
+```
+A Node-API addon built on the C++ API, with TypeScript typings and prebuilt binaries for Windows and Linux, for Node.js 18+. See [bindings/node/README.md](bindings/node/README.md) for the API and how it differs from C++.
 
 ## Known issues (work in progress)
 * No server-side handshake timeout: a local client that connects and never sends its hello holds a connection slot.

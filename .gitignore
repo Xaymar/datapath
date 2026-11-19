@@ -1,3 +1,6 @@
 /build
 /build-*
 /.superpowers
+/wheelhouse
+/dist
+__pycache__/
