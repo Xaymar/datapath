@@ -128,6 +128,32 @@ TEST(parser_alternating_large_and_small_frames)
 	CHECK(feed(stream, {999}, 4096) == msgs);
 }
 
+TEST(parser_read_size_adapts)
+{
+	datapath::detail::frame_parser p(1ull << 30, 1 << 20);
+	CHECK_EQ(p.prepare().second, size_t(64 * 1024)); // starts small
+	// Reads that fill the request grow it (bulk traffic)...
+	bytes  big = frame(pattern(900000, 1));
+	size_t pos = 0, last = 0;
+	while (pos < big.size()) {
+		auto   a = p.prepare();
+		size_t n = std::min(a.second, big.size() - pos);
+		std::memcpy(a.first, big.data() + pos, n);
+		pos += n;
+		last = std::max(last, a.second);
+		CHECK(p.commit(n, [](const uint8_t*, size_t) {}) == error::Success);
+	}
+	CHECK(last > size_t(64 * 1024));
+	// ...and small reads shrink it back.
+	for (int i = 0; i < 20; i++) {
+		auto f = frame(pattern(8, 2));
+		auto a = p.prepare();
+		std::memcpy(a.first, f.data(), f.size());
+		CHECK(p.commit(f.size(), [](const uint8_t*, size_t) {}) == error::Success);
+	}
+	CHECK_EQ(p.prepare().second, size_t(64 * 1024));
+}
+
 TEST(parser_rejects_oversize_header)
 {
 	error st = error::Unknown;

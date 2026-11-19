@@ -144,7 +144,9 @@ void datapath::windows::iocp_context::run()
 	bool             quit = false;
 	auto             pump = [&](DWORD timeout) {
         ULONG n = 0;
-        if (!GetQueuedCompletionStatusEx(_port, entries, 64, &n, timeout, FALSE))
+        // Alertable waits may return early with WAIT_IO_COMPLETION after an APC;
+        // that is simply "no completions yet".
+        if (!GetQueuedCompletionStatusEx(_port, entries, 64, &n, timeout, _opts.alertable ? TRUE : FALSE))
             return false;
         for (ULONG i = 0; i < n; i++) {
             if (!entries[i].lpOverlapped) {

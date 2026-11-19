@@ -30,7 +30,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //   --threads 1                                 I/O threads
 //   --load                                      stream 1 MiB messages on an extra connection meanwhile
 //   --buffer 65536                              receive buffer per connection
-//   --yield                                     Sleep(0)/sched_yield after sends and while spinning
+//   --yield / --no-yield                        Sleep(0)/sched_yield after sends and while spinning
+//                                               (default: on for Windows, off elsewhere)
+//   --alertable                                 Windows: alertable completion-port waits
 //   --pipe-buffer 0                             Windows kernel pipe buffer (0 = same as --buffer)
 //
 // Latency is the full round trip (send -> echo -> receive), measured with
@@ -78,9 +80,10 @@ namespace {
 		long                  spin    = 50;
 		size_t                threads = 1;
 		bool                  load    = false;
-		size_t                buffer  = 64 * 1024;
-		size_t                pipe_buffer = 0;
-		bool                  yield       = false;
+		size_t                buffer      = datapath::options{}.receive_buffer;
+		size_t                pipe_buffer = datapath::options{}.pipe_buffer;
+		bool                  yield       = datapath::context_options{}.yield;
+		bool                  alertable   = false;
 	};
 
 	int current_pid()
@@ -143,6 +146,10 @@ namespace {
 				c.buffer = size_t(std::strtoull(next(), nullptr, 10));
 			} else if (a == "--yield") {
 				c.yield = true;
+			} else if (a == "--no-yield") {
+				c.yield = false;
+			} else if (a == "--alertable") {
+				c.alertable = true;
 			} else if (a == "--load") {
 				c.load = true;
 			} else {
@@ -161,6 +168,7 @@ namespace {
 		o.spin       = std::chrono::microseconds(c.spin);
 		o.io_threads = c.threads;
 		o.yield      = c.yield;
+		o.alertable  = c.alertable;
 		return datapath::context::create(o);
 	}
 
@@ -366,8 +374,8 @@ namespace {
 			bulk->start();
 		}
 
-		std::printf("DataPath benchmark: platform=%s spin=%ldus io_threads=%zu clients=%zu buffer=%zu pipe_buffer=%zu yield=%s load=%s\n",
-					platform_name(), c.spin, c.threads, c.clients, c.buffer, c.pipe_buffer, c.yield ? "on" : "off", c.load ? "1MiB stream" : "off");
+		std::printf("DataPath benchmark: platform=%s spin=%ldus io_threads=%zu clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s load=%s\n",
+					platform_name(), c.spin, c.threads, c.clients, c.buffer, c.pipe_buffer, c.yield ? "on" : "off", c.alertable ? "on" : "off", c.load ? "1MiB stream" : "off");
 		std::printf("Full round-trip latency in microseconds.\n");
 		std::printf("%10s %8s %9s %9s %9s %9s %9s %10s\n", "size", "count", "min", "p50", "p99", "p99.9", "max",
 					"MiB/s");
@@ -431,7 +439,8 @@ namespace {
 						   + L" --spin " + std::wstring(spin.begin(), spin.end()) + L" --threads "
 						   + std::wstring(threads.begin(), threads.end()) + L" --buffer "
 						   + std::wstring(buffer.begin(), buffer.end()) + L" --pipe-buffer "
-						   + std::wstring(pipebuf.begin(), pipebuf.end()) + (c.yield ? L" --yield" : L"");
+						   + std::wstring(pipebuf.begin(), pipebuf.end()) + (c.yield ? L" --yield" : L" --no-yield")
+						   + (c.alertable ? L" --alertable" : L"");
 		STARTUPINFOW        si{};
 		PROCESS_INFORMATION pi{};
 		si.cb = sizeof(si);
@@ -450,8 +459,9 @@ namespace {
 		(void)argv;
 		std::vector<std::string> args = {"datapath-benchmark", "server", c.name, "--spin",  spin,
 										  "--threads",          threads, "--buffer", buffer, "--pipe-buffer", pipebuf};
-		if (c.yield)
-			args.push_back("--yield");
+		args.push_back(c.yield ? "--yield" : "--no-yield");
+		if (c.alertable)
+			args.push_back("--alertable");
 		std::vector<char*>       cargv;
 		for (auto& a : args)
 			cargv.push_back(&a[0]);
@@ -481,7 +491,7 @@ int main(int argc, char** argv)
 	if (!parse(argc, argv, c)) {
 		std::fprintf(stderr,
 					 "usage: %s local|server <name>|client <name> [--sizes a,b,..] [--count n] [--clients n]\n"
-					 "       [--spin us] [--threads n] [--buffer bytes] [--pipe-buffer bytes] [--yield] [--load]\n",
+					 "       [--spin us] [--threads n] [--buffer bytes] [--pipe-buffer bytes] [--yield|--no-yield] [--alertable] [--load]\n",
 					 argc > 0 ? argv[0] : "datapath-benchmark");
 		return 2;
 	}

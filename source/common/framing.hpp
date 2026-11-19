@@ -62,6 +62,13 @@ namespace datapath::detail {
 
 		uint64_t _limit;
 
+		// Adaptive read size: small traffic keeps reads small (large read requests
+		// are expensive for Windows pipes even when little data arrives); reads that
+		// fill the request completely double it, up to the buffer size.
+		static constexpr size_t min_read = 64 * 1024;
+		size_t                  _read_hint;
+		size_t                  _last_request = 0;
+
 		void compact() noexcept
 		{
 			if (_rpos == 0)
@@ -86,7 +93,8 @@ namespace datapath::detail {
 
 		public:
 		frame_parser(uint64_t max_message_size, size_t buffer_size)
-			: _buf(buffer_size < 64 ? 64 : buffer_size), _limit(max_message_size)
+			: _buf(buffer_size < 64 ? 64 : buffer_size), _limit(max_message_size),
+			  _read_hint(buffer_size < min_read ? (buffer_size < 64 ? 64 : buffer_size) : min_read)
 		{}
 
 		void set_limit(uint64_t limit) noexcept
@@ -104,7 +112,9 @@ namespace datapath::detail {
 			} else if (_wpos == _buf.size() || (_buf.size() - _wpos) < frame_header_size) {
 				compact();
 			}
-			return {_buf.data() + _wpos, _buf.size() - _wpos};
+			size_t room   = _buf.size() - _wpos;
+			_last_request = room < _read_hint ? room : _read_hint;
+			return {_buf.data() + _wpos, _last_request};
 		}
 
 		// Account for `n` bytes read into the area returned by prepare() and deliver
@@ -125,6 +135,11 @@ namespace datapath::detail {
 			}
 
 			_wpos += n;
+			if (n == _last_request && _read_hint < _buf.size()) {
+				_read_hint = (_read_hint * 2 < _buf.size()) ? _read_hint * 2 : _buf.size();
+			} else if (n < _read_hint / 8 && _read_hint > min_read) {
+				_read_hint /= 2;
+			}
 			for (;;) {
 				size_t avail = _wpos - _rpos;
 				if (avail < frame_header_size)

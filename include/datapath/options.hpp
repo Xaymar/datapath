@@ -34,7 +34,15 @@ namespace datapath {
 		// written its data and between busy-poll iterations, so a peer thread that
 		// was just woken on this core runs at once instead of waiting for our
 		// time slice to end.
+		// Windows only: block in an alertable wait (GetQueuedCompletionStatusEx with
+		// fAlertable = TRUE), so the scheduler may run the I/O thread early.
+		bool alertable = false;
+		// Default on Windows, where it measurably cuts p99 latency; off elsewhere.
+#ifdef _WIN32
+		bool yield = true;
+#else
 		bool yield = false;
+#endif
 	};
 
 	// Per-connection / per-server settings.
@@ -54,8 +62,10 @@ namespace datapath {
 		std::chrono::milliseconds connect_timeout{1000};
 		// Receive buffer per connection. Frames that fit are delivered straight from
 		// it; larger frames use a temporary buffer of their own.
-		size_t receive_buffer = size_t(64) * 1024;
+		// Reads adapt their size to the traffic, so a large buffer does not slow
+		// down small messages.
+		size_t receive_buffer = size_t(256) * 1024;
 		// Kernel pipe buffer on Windows (host() only); 0 = same as receive_buffer.
-		size_t pipe_buffer = 0;
+		size_t pipe_buffer = size_t(1) << 20;
 	};
 } // namespace datapath
