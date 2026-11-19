@@ -27,6 +27,16 @@ TEST(error_to_string)
 	CHECK_EQ(seen.size(), sizeof(all) / sizeof(all[0]));
 }
 
+TEST(version_matches_headers)
+{
+	const auto v = datapath::version();
+	CHECK_EQ(v.abi, DATAPATH_VERSION_ABI);
+	CHECK_EQ(v.patch, DATAPATH_VERSION_PATCH);
+	CHECK_EQ(DATAPATH_VERSION, (DATAPATH_VERSION_ABI << 16) | DATAPATH_VERSION_PATCH);
+	CHECK_EQ(std::string(DATAPATH_VERSION_STRING),
+			 std::to_string(DATAPATH_VERSION_ABI) + "." + std::to_string(DATAPATH_VERSION_PATCH));
+}
+
 TEST(options_defaults)
 {
 	datapath::context_options co;
