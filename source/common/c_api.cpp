@@ -15,7 +15,12 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <memory>
 #include <new>
 #include <string>
+#if __has_include(<datapath/version.hpp>)
+#include <datapath/version.hpp>
+#define DP_HAS_VERSION_INFO 1
+#else
 #include "version.hpp"
+#endif
 
 struct datapath_context {
 	std::shared_ptr<datapath::context> ctx;
@@ -174,13 +179,17 @@ const char* datapath_error_string(datapath_error e)
 
 uint32_t datapath_version(void)
 {
-	return (uint32_t(PROJECT_VERSION_MAJOR & 0xFF) << 16) | (uint32_t(PROJECT_VERSION_MINOR & 0xFF) << 8)
-		   | uint32_t(PROJECT_VERSION_PATCH & 0xFF);
+#ifdef DP_HAS_VERSION_INFO
+	auto v = datapath::version();
+	return (uint32_t(v.abi) << 16) | uint32_t(v.patch);
+#else
+	return (uint32_t(PROJECT_VERSION_MAJOR) << 16) | uint32_t(PROJECT_VERSION_MINOR);
+#endif
 }
 
-uint32_t datapath_abi_version(void)
+uint32_t datapath_c_abi_version(void)
 {
-	return DATAPATH_ABI_VERSION;
+	return DATAPATH_C_ABI_VERSION;
 }
 
 void datapath_context_options_init(datapath_context_options* o)

@@ -55,9 +55,10 @@ SPDX-License-Identifier: BSD-3-Clause
 extern "C" {
 #endif
 
-/* Bumped when this header changes in a way that is not backwards compatible.
- * Compare with datapath_abi_version() at run time. */
-#define DATAPATH_ABI_VERSION 1
+/* Version of this C interface, separate from the C++ library's ABI version:
+ * bumped only when this header changes in a way that breaks binaries built
+ * against an older one. Compare with datapath_c_abi_version() at run time. */
+#define DATAPATH_C_ABI_VERSION 1
 
 /* Errors ------------------------------------------------------------------- */
 
@@ -98,10 +99,11 @@ DATAPATH_C_API const char* datapath_error_string(datapath_error error);
 
 /* Version ------------------------------------------------------------------ */
 
-/* Library version as (major << 16) | (minor << 8) | patch. */
+/* Version of the loaded library as (abi << 16) | patch, the same encoding as
+ * DATAPATH_VERSION in <datapath/version.hpp>. */
 DATAPATH_C_API uint32_t datapath_version(void);
-/* DATAPATH_ABI_VERSION of the library that is actually loaded. */
-DATAPATH_C_API uint32_t datapath_abi_version(void);
+/* DATAPATH_C_ABI_VERSION of the library that is actually loaded. */
+DATAPATH_C_API uint32_t datapath_c_abi_version(void);
 
 /* Handles ------------------------------------------------------------------ */
 

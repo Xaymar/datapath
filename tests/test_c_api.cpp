@@ -150,7 +150,7 @@ TEST(error_strings)
 
 TEST(version)
 {
-	CHECK_EQ(datapath_abi_version(), uint32_t(DATAPATH_ABI_VERSION));
+	CHECK_EQ(datapath_c_abi_version(), uint32_t(DATAPATH_C_ABI_VERSION));
 	CHECK(datapath_version() != 0);
 }
 
