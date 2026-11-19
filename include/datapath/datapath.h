@@ -207,7 +207,12 @@ DATAPATH_C_API datapath_error datapath_connect(const char* path, const datapath_
 											   datapath_context* context, datapath_socket** out_socket);
 
 /* Set the message callback; NULL `callback` clears it. The first non-NULL
- * callback starts receiving; messages that arrive earlier wait in the kernel. */
+ * callback starts receiving; messages that arrive earlier wait in the kernel.
+ * Until then the library does not read, so it also does not notice the peer
+ * closing: set a message callback to learn about remote closes.
+ * The message and close callbacks of one socket never run concurrently with
+ * each other or with themselves, and messages arrive in the order sent.
+ * Callbacks of different sockets may run concurrently. */
 DATAPATH_C_API datapath_error datapath_socket_set_on_message(datapath_socket* socket, datapath_message_fn callback,
 															 void* user, datapath_free_fn user_free);
 /* Set the close callback; NULL `callback` clears it. */
