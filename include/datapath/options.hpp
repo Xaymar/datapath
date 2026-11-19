@@ -36,10 +36,11 @@ namespace datapath {
 		// time slice to end.
 		// Windows only: register I/O threads with the Multimedia Class Scheduler
 		// Service ("Pro Audio" task, critical priority) to reduce preemption.
+		// Recommended with spin = 0: it shortens wake-up tails from a real sleep.
 		bool mmcss = false;
 		// Windows only: I/O thread priority. 0 = normal, 1 = above normal,
-		// 2 = highest, 3 = time critical.
-		int priority = 0;
+		// 2 = highest (default: measurably shortens the p99.9 tail), 3 = time critical.
+		int priority = 2;
 		// Windows only: block in an alertable wait (GetQueuedCompletionStatusEx with
 		// fAlertable = TRUE), so the scheduler may run the I/O thread early.
 		bool alertable = false;

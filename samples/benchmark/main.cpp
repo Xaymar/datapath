@@ -34,7 +34,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //                                               (default: on for Windows, off elsewhere)
 //   --alertable                                 Windows: alertable completion-port waits
 //   --mmcss                                     Windows: register I/O threads with MMCSS ("Pro Audio")
-//   --priority 0..3                             Windows: I/O thread priority (normal .. time critical)
+//   --priority 0..3                             Windows: I/O thread priority (normal .. time critical, default 2)
 //   --pipe-buffer 0                             Windows kernel pipe buffer (0 = same as --buffer)
 //
 // Latency is the full round trip (send -> echo -> receive), measured with
@@ -87,7 +87,7 @@ namespace {
 		bool                  yield       = datapath::context_options{}.yield;
 		bool                  alertable   = false;
 		bool                  mmcss       = false;
-		int                   priority    = 0;
+		int                   priority    = datapath::context_options{}.priority;
 	};
 
 	int current_pid()
