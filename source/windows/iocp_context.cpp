@@ -66,9 +66,12 @@ namespace {
 		fn(GetCurrentThread(), 3 /*ThreadPowerThrottling*/, &state, sizeof(state));
 	}
 	// First logical processor of every physical core, in system order.
-	const std::vector<PROCESSOR_NUMBER>& physical_cores()
+	// Called on the thread that creates the context, never on an I/O thread: a
+	// function-local static here would register its destructor from the I/O
+	// thread, which deadlocks against a process exiting (and joining it).
+	std::vector<PROCESSOR_NUMBER> physical_cores()
 	{
-		static const std::vector<PROCESSOR_NUMBER> cores = [] {
+		{
 			std::vector<PROCESSOR_NUMBER> out;
 			DWORD                         len = 0;
 			GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &len);
@@ -92,15 +95,14 @@ namespace {
 				off += e->Size;
 			}
 			return out;
-		}();
-		return cores;
+		}
 	}
 
-	void apply_ideal_core(const datapath::context_options& opts, size_t index)
+	void apply_ideal_core(const datapath::context_options& opts, const std::vector<PROCESSOR_NUMBER>& cores,
+						  size_t index)
 	{
 		if (opts.ideal_core < -1)
 			return;
-		const auto& cores = physical_cores();
 		if (cores.empty())
 			return;
 		PROCESSOR_NUMBER pn;
@@ -186,10 +188,13 @@ bool datapath::windows::iocp_context::start()
 		return false;
 	// Each thread keeps its context alive, so the context is never destroyed on
 	// one of its own I/O threads (dispatch and run keep using `this`).
+	std::vector<PROCESSOR_NUMBER> cores;
+	if (_opts.ideal_core >= -1)
+		cores = physical_cores();
 	for (size_t i = 0; i < _opts.io_threads; i++)
-		_threads.emplace_back([this, i, keep = shared_from_this()] {
+		_threads.emplace_back([this, i, cores, keep = shared_from_this()] {
 			tl_context = keep.get();
-			apply_ideal_core(_opts, i);
+			apply_ideal_core(_opts, cores, i);
 			run();
 		});
 	return true;
