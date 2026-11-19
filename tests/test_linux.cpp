@@ -18,11 +18,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <datapath/datapath.hpp>
 #include <sys/socket.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/un.h>
 #include <cstdio>
 #include <cstring>
+#include <algorithm>
+#include <atomic>
 #include <chrono>
+#include <thread>
 #include <vector>
 #include <unistd.h>
 #include <string>
@@ -140,6 +144,58 @@ TEST(connect_is_bounded_when_backlog_full)
 	for (int fd : fillers)
 		::close(fd);
 	::close(lfd);
+}
+
+static int thread_nice()
+{
+	return ::getpriority(PRIO_PROCESS, id_t(::gettid()));
+}
+
+// Nice value of the I/O thread that accepts a connection on a context with
+// the given priority.
+static int io_thread_nice(int priority)
+{
+	datapath::context_options co;
+	co.spin       = std::chrono::microseconds(0);
+	co.io_threads = 1;
+	co.priority   = priority;
+	auto ctx      = datapath::context::create(co);
+	CHECK(ctx != nullptr);
+	auto                              path = socket_path("prio");
+	std::shared_ptr<datapath::server> srv;
+	CHECK_EQ(datapath::host(srv, path, {}, ctx), error::Success);
+	std::atomic<int>                  seen{100};
+	std::shared_ptr<datapath::socket> keep;
+	srv->on_accept([&](std::shared_ptr<datapath::socket> s) {
+		keep = s;
+		seen = thread_nice();
+		return true;
+	});
+	std::shared_ptr<datapath::socket> c;
+	CHECK_EQ(datapath::connect(c, path, {}, ctx), error::Success);
+	for (int i = 0; i < 1000 && seen == 100; i++)
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	keep.reset();
+	c.reset();
+	srv.reset();
+	return seen;
+}
+
+TEST(linux_io_thread_priority)
+{
+	int base = thread_nice();
+	CHECK_EQ(io_thread_nice(0), base);
+	// Whether this process may lower a thread's nice value at all depends on
+	// RLIMIT_NICE and CAP_SYS_NICE: probe it on a scratch thread.
+	int  want = std::max(-20, base - 12);
+	bool can  = false;
+	std::thread([&] { can = ::setpriority(PRIO_PROCESS, id_t(::gettid()), want) == 0; }).join();
+	int got = io_thread_nice(2);
+	CHECK(got <= base);
+	if (can)
+		CHECK_EQ(got, want);
+	std::printf("  base nice %d, priority 2 I/O thread nice %d (%s)\n", base, got,
+				can ? "lowering allowed" : "lowering not allowed");
 }
 
 TEST_MAIN()

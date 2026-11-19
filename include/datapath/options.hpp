@@ -26,7 +26,10 @@ namespace datapath {
 	// Settings shared by every socket and server that runs on one context.
 	struct context_options {
 		// How long an idle I/O thread busy-polls before it blocks in the kernel.
-		// Spinning trades CPU for tail latency; 0 disables it.
+		// Spinning trades CPU for tail latency; 0 disables it. When spinning I/O
+		// threads cover every CPU (e.g. client and server on one machine, both
+		// with io_threads = 0), a woken thread waits for a spinner's budget to run
+		// out: on Linux 64 B p99.9 measured ~116 us with 50 us vs ~23 us with 0.
 		std::chrono::microseconds spin{50};
 		// Number of I/O threads. 0 = automatic: one per physical core, so no two
 		// I/O threads share the hyper-threads of one core (a busy sibling roughly
@@ -41,9 +44,14 @@ namespace datapath {
 		// measured as a fixed ~2 ms p99.9 stall (with or without spinning). On an
 		// idle system it made no measurable difference.
 		bool mmcss = false;
-		// Windows only: I/O thread priority, applied before MMCSS and kept if MMCSS
-		// registration fails. 0 = normal, 1 = above normal, 2 = highest,
-		// 3 = time critical. Normal priority made large-message tails 2x worse.
+		// I/O thread priority. 0 = normal, 1 = above normal, 2 = highest,
+		// 3 = time critical.
+		// Windows: thread priority, applied before MMCSS and kept if MMCSS
+		// registration fails. Normal priority made large-message tails 2x worse.
+		// Linux/Android: nice value lowered by 0/4/12/19 from the one the thread
+		// inherited. Unprivileged processes only get as far as RLIMIT_NICE allows
+		// (often not at all; CAP_SYS_NICE lifts the limit). Under full CPU load a
+		// 12-step gap took 64 B p99.9 from ~8 ms to ~200 us (p50 63 -> 7 us).
 		int priority = 2;
 		// Windows only: steer I/O threads to physical cores (soft hint via the ideal
 		// processor, not hard affinity), one thread per core and never two on the
@@ -58,7 +66,9 @@ namespace datapath {
 		bool alertable = false;
 		// Yield the CPU (Windows: Sleep(0), Linux: sched_yield) after a send has
 		// written its data and between busy-poll iterations. Off by default: 5-run
-		// medians on Windows showed no gain (slightly higher p50 and p99).
+		// medians on Windows showed no gain (slightly higher p50 and p99). On Linux
+		// it fixes the oversubscribed-spin tail above (116 -> 24 us), but under
+		// full CPU load every yield gives a timeslice away (64 B p50 7 us -> 4 ms).
 		bool yield = false;
 	};
 

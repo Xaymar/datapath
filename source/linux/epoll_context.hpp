@@ -101,6 +101,10 @@ namespace datapath::linux_ {
 		{
 			return _opts.spin;
 		}
+		int priority() const noexcept
+		{
+			return _opts.priority;
+		}
 		bool yield_enabled() const noexcept
 		{
 			return _opts.yield;

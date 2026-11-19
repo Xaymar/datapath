@@ -21,6 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <sched.h>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <algorithm>
@@ -37,6 +38,37 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 namespace {
 	// The context whose I/O thread is running on this thread, if any.
 	thread_local const datapath::linux_::epoll_context* tl_context = nullptr;
+
+	// Raise the calling thread's priority by lowering its nice value, relative to
+	// the nice value it inherited (like Windows thread priorities are relative to
+	// the process's priority class). The default level 2 needs a large gap: the
+	// scheduler shares CPU by weight, and against a full load at the same nice
+	// value 64 B p99.9 was ~8 ms at a gap of 0, ~4 ms at 8, ~200 us at 12 and
+	// ~160 us at 19. Level 3 matches Android's THREAD_PRIORITY_URGENT_AUDIO.
+	// Unprivileged processes may only go down to 20 - RLIMIT_NICE; the thread then
+	// gets the lowest nice value it is allowed, or stays where it was.
+	// Real-time policies (SCHED_FIFO/RR) are not used: a spinning real-time thread
+	// can starve the rest of the system.
+	void apply_priority(int level)
+	{
+		static const int steps[] = {0, -4, -12, -19};
+		if (level <= 0 || level > 3)
+			return;
+		pid_t tid = ::gettid(); // Linux: PRIO_PROCESS with a thread id affects only that thread
+		errno     = 0;
+		int base  = ::getpriority(PRIO_PROCESS, id_t(tid));
+		if (base == -1 && errno != 0)
+			return;
+		int want = std::max(-20, base + steps[level]);
+		if (::setpriority(PRIO_PROCESS, id_t(tid), want) == 0)
+			return;
+		rlimit rl{};
+		if (::getrlimit(RLIMIT_NICE, &rl) != 0 || rl.rlim_cur == RLIM_INFINITY)
+			return;
+		int floor = 20 - int(std::min<rlim_t>(rl.rlim_cur, 40));
+		if (floor > want && floor < base)
+			::setpriority(PRIO_PROCESS, id_t(tid), floor);
+	}
 }
 
 // event_loop -------------------------------------------------------------------
@@ -66,6 +98,7 @@ bool datapath::linux_::event_loop::start()
 	// one of its own I/O threads.
 	_thread = std::thread([this, keep = _ctx->shared_from_this()] {
 		tl_context = keep.get();
+		apply_priority(keep->priority());
 		run();
 	});
 	return true;
