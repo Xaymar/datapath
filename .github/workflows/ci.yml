@@ -39,6 +39,7 @@ jobs:
             os: windows-latest
             build_type: Debug
             coverage: opencppcoverage
+            coverage_min: 88
 
           - name: Ubuntu 26.04 / GCC / Release
             os: ubuntu-latest
