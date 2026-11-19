@@ -185,6 +185,14 @@ mod tests {
         }
     }
 
+    // Crate versions follow the library's ABI.patch: major = ABI, minor = patch.
+    #[test]
+    fn crate_version_matches_library() {
+        let v = unsafe { datapath_version() };
+        assert_eq!((v >> 16).to_string(), env!("CARGO_PKG_VERSION_MAJOR"));
+        assert_eq!((v & 0xffff).to_string(), env!("CARGO_PKG_VERSION_MINOR"));
+    }
+
     #[test]
     fn abi_version_matches() {
         assert_eq!(unsafe { datapath_c_abi_version() }, DATAPATH_C_ABI_VERSION);
