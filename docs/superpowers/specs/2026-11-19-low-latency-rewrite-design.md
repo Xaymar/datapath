@@ -252,8 +252,9 @@ Destroying a context closes its sockets/servers and joins its threads.
 ### Handshake (builder's call, marked)
 
 The client sends `"DPTH" + uint32 version + uint64 max_message_size` immediately after the pipe opens;
-the server validates it **before** calling `on_accept` and replies with the
-same structure. `connect()` blocks until the reply arrives (bounded, default
+the server validates it **before** calling `on_accept` and, only if
+`on_accept` returns `true`, replies with the same structure (a rejected client
+sees `connect()` return `error::Closed`). `connect()` blocks until the reply arrives (bounded, default
 1 s → `TimedOut`). A mismatch makes `connect` return `error::VersionMismatch`
 (new code) and the server drops the connection without calling `on_accept`.
 
