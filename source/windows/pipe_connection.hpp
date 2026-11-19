@@ -47,6 +47,9 @@ namespace datapath::windows {
 		size_t                       _hello_got                           = 0;
 		uint64_t                     _own_limit                           = 0;
 		std::weak_ptr<pipe_listener> _listener;
+		bool                         _server_side       = false;
+		bool                         _close_when_flushed = false; // writer-slot holder only
+		std::atomic<bool>            _graceful{false};
 
 		std::shared_ptr<pipe_connection> self()
 		{

@@ -20,7 +20,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
+#include <cstdio>
 #include <cstring>
+#include <chrono>
+#include <vector>
 #include <unistd.h>
 #include <string>
 #include "check.hpp"
@@ -88,6 +91,55 @@ TEST(invalid_paths)
 	CHECK_EQ(datapath::host(srv, ""), error::InvalidPath);
 	CHECK_EQ(datapath::host(srv, "/" + std::string(200, 'x')), error::InvalidPath);
 	CHECK_EQ(datapath::host(srv, std::string(200, 'x')), error::InvalidPath);
+}
+
+TEST(host_never_deletes_regular_file)
+{
+	auto path = socket_path("regular");
+	FILE* f   = std::fopen(path.c_str(), "w");
+	CHECK(f != nullptr);
+	std::fputs("precious", f);
+	std::fclose(f);
+	std::shared_ptr<datapath::server> srv;
+	CHECK_EQ(datapath::host(srv, path), error::AddressInUse);
+	struct stat st {};
+	CHECK_EQ(::stat(path.c_str(), &st), 0);
+	CHECK(S_ISREG(st.st_mode));
+	::unlink(path.c_str());
+}
+
+TEST(connect_is_bounded_when_backlog_full)
+{
+	// A server that never accepts: fill its backlog, then connect must time out.
+	std::string name = "dp-test-backlog-" + std::to_string(getpid());
+	int         lfd  = ::socket(AF_UNIX, SOCK_STREAM, 0);
+	sockaddr_un a{};
+	a.sun_family     = AF_UNIX;
+	std::string abs  = "datapath." + name;
+	std::memcpy(a.sun_path + 1, abs.data(), abs.size());
+	socklen_t len = socklen_t(offsetof(sockaddr_un, sun_path) + 1 + abs.size());
+	CHECK_EQ(::bind(lfd, reinterpret_cast<sockaddr*>(&a), len), 0);
+	CHECK_EQ(::listen(lfd, 0), 0);
+	std::vector<int> fillers;
+	for (int i = 0; i < 64; i++) {
+		int fd = ::socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
+		if (::connect(fd, reinterpret_cast<sockaddr*>(&a), len) != 0) {
+			::close(fd);
+			break;
+		}
+		fillers.push_back(fd);
+	}
+	datapath::options o;
+	o.connect_timeout = std::chrono::milliseconds(200);
+	std::shared_ptr<datapath::socket> c;
+	auto  start = std::chrono::steady_clock::now();
+	error ec    = datapath::connect(c, name, o);
+	auto  took  = std::chrono::steady_clock::now() - start;
+	CHECK_EQ(ec, error::TimedOut);
+	CHECK(took < std::chrono::seconds(2));
+	for (int fd : fillers)
+		::close(fd);
+	::close(lfd);
 }
 
 TEST_MAIN()

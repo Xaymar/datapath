@@ -51,10 +51,10 @@ namespace datapath::linux_ {
 		int                    _ep  = -1;
 		int                    _efd = -1;
 		std::thread            _thread;
-		std::atomic<std::thread::id> _thread_id{};
 		std::mutex             _post_lock;
 		std::vector<post_item> _posts;
 		bool                   _signaled = false;
+		bool                   _dead     = false; // thread joined: posts are refused
 
 		std::mutex                                                 _reg_lock;
 		std::unordered_map<fd_target*, std::shared_ptr<fd_target>> _registered;
@@ -76,10 +76,6 @@ namespace datapath::linux_ {
 		void unregister(fd_target* target);
 
 		bool post(std::shared_ptr<fd_target> target, int kind);
-		bool on_loop_thread() const noexcept
-		{
-			return std::this_thread::get_id() == _thread_id.load(std::memory_order_acquire);
-		}
 	};
 
 	class epoll_context : public datapath::detail::context_impl, public std::enable_shared_from_this<epoll_context> {
@@ -92,10 +88,14 @@ namespace datapath::linux_ {
 		std::vector<std::weak_ptr<datapath::detail::connection>> _connections;
 		std::vector<std::weak_ptr<datapath::detail::listener>>   _listeners;
 
+		void shutdown_now();
+
 		public:
 		explicit epoll_context(const datapath::context_options& opts);
 		~epoll_context() override;
 		bool start();
+		// True on any I/O thread of this context.
+		bool on_io_thread() const noexcept;
 
 		std::chrono::microseconds spin() const noexcept
 		{

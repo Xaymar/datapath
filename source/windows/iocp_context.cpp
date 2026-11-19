@@ -33,6 +33,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #endif
 
 namespace {
+	// The context whose I/O thread is running on this thread, if any.
+	thread_local const datapath::windows::iocp_context* tl_context = nullptr;
+
 	using rtl_nt_status_to_dos_error_t = ULONG(WINAPI*)(LONG);
 
 	DWORD status_to_error(ULONG_PTR status)
@@ -82,8 +85,13 @@ bool datapath::windows::iocp_context::start()
 	_port = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, DWORD(_opts.io_threads));
 	if (!_port)
 		return false;
+	// Each thread keeps its context alive, so the context is never destroyed on
+	// one of its own I/O threads (dispatch and run keep using `this`).
 	for (size_t i = 0; i < _opts.io_threads; i++)
-		_threads.emplace_back([this] { run(); });
+		_threads.emplace_back([this, keep = shared_from_this()] {
+			tl_context = keep.get();
+			run();
+		});
 	return true;
 }
 
@@ -177,10 +185,26 @@ void datapath::windows::iocp_context::add_member(std::weak_ptr<datapath::detail:
 	_listeners.push_back(std::move(l));
 }
 
+bool datapath::windows::iocp_context::on_io_thread() const noexcept
+{
+	return tl_context == this;
+}
+
 void datapath::windows::iocp_context::shutdown()
 {
 	if (_stopped.exchange(true))
 		return;
+	if (on_io_thread()) {
+		// An I/O thread cannot drain completions it is supposed to process, nor
+		// join itself: finish on a separate thread.
+		std::thread([self = shared_from_this()] { self->shutdown_now(); }).detach();
+		return;
+	}
+	shutdown_now();
+}
+
+void datapath::windows::iocp_context::shutdown_now()
+{
 
 	std::vector<std::weak_ptr<datapath::detail::connection>> conns;
 	std::vector<std::weak_ptr<datapath::detail::listener>>   lsts;
@@ -203,12 +227,9 @@ void datapath::windows::iocp_context::shutdown()
 	}
 	for (size_t i = 0; i < _threads.size(); i++)
 		PostQueuedCompletionStatus(_port, 0, 0, nullptr);
-	for (auto& t : _threads) {
-		if (t.get_id() == std::this_thread::get_id())
-			t.detach();
-		else if (t.joinable())
+	for (auto& t : _threads)
+		if (t.joinable())
 			t.join();
-	}
 	_threads.clear();
 }
 
@@ -230,8 +251,10 @@ datapath::error datapath::windows::iocp_context::connect(std::shared_ptr<datapat
 
 	HANDLE h;
 	for (;;) {
-		h = CreateFileW(wpath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED,
-						nullptr);
+		// SECURITY_IDENTIFICATION: the server may identify the client but never act
+		// with its token (blocks named-pipe impersonation attacks).
+		h = CreateFileW(wpath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING,
+						FILE_FLAG_OVERLAPPED | SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION, nullptr);
 		if (h != INVALID_HANDLE_VALUE)
 			break;
 		DWORD err = GetLastError();

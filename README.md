@@ -19,13 +19,13 @@ DataPath is a high-performance, low-latency inter-process communication (IPC) li
 | macOS / iOS | Unix domain sockets, kqueue | Planned |
 
 ## Measured latency
-Full round trip (send → echo → receive), ping-pong between two processes, release build, default settings (`spin` 50 µs, one I/O thread):
+Full round trip (send → echo → receive), ping-pong between two processes, release build, default settings (`spin` 50 µs, one I/O thread). Ranges span several runs on a shared cloud VM, where tail latency varies with neighbour load:
 
 | Linux, 4 vCPU Xeon VM | p50 | p99 | p99.9 |
 |---|---|---|---|
-| 8 B | 4.7 µs | 8.4 µs | 28 µs |
-| 4 KiB | 7.6 µs | 18.7 µs | 35 µs |
-| 64 KiB | 37.6 µs | 59.8 µs | 95 µs |
+| 8 B | 4.7–5.1 µs | 8–11 µs | 28–48 µs |
+| 4 KiB | 7.6 µs | 19 µs | 35–45 µs |
+| 64 KiB | 37.5 µs | 60–68 µs | 95–190 µs |
 | 8 B, `spin` 0 | 26 µs | 52 µs | 95 µs |
 
 While another connection streams 1 MiB messages at 4–5 GiB/s, small-message round trips stay at p99.9 ≈ 2 ms with one I/O thread, and ≈ 0.25 ms with two.

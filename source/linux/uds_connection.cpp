@@ -123,8 +123,11 @@ void datapath::linux_::uds_connection::write_loop()
 	for (;;) {
 		if (_woff >= _wbatch.size()) {
 			_woff = 0;
-			if (!_queue.take(_wbatch))
+			if (!_queue.take(_wbatch)) {
+				if (_close_when_flushed)
+					close_with(datapath::error::VersionMismatch);
 				return;
+			}
 		}
 		ssize_t n;
 		int     err = 0;
@@ -173,7 +176,10 @@ void datapath::linux_::uds_connection::hello_read()
 			update_mask(0, EPOLLIN); // data waits in the kernel until reads are armed
 			datapath::detail::hello h{};
 			if (datapath::detail::decode_hello(_hello, h) != datapath::error::Success) {
-				close_with(datapath::error::VersionMismatch);
+				// Answer with our own hello so the client can report
+				// VersionMismatch, then close once it is written.
+				_close_when_flushed = true;
+				complete_accept();
 				return;
 			}
 			uint64_t limit = std::min(_own_limit, h.max_message_size);

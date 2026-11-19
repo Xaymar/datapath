@@ -50,6 +50,7 @@ namespace datapath::linux_ {
 		size_t                      _hello_got                           = 0;
 		uint64_t                    _own_limit                           = 0;
 		std::weak_ptr<uds_listener> _listener;
+		bool                        _close_when_flushed = false; // writer-slot holder only
 
 		std::shared_ptr<uds_connection> self()
 		{

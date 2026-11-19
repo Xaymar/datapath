@@ -16,6 +16,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+#include <cstdio>
 #include "check.hpp"
 #include "windows/security.hpp"
 
@@ -42,6 +43,53 @@ TEST(security_descriptor_builds_for_each_level)
 		CHECK(IsValidSecurityDescriptor(sd));
 		LocalFree(sd);
 	}
+}
+
+#include <datapath/datapath.hpp>
+#include <thread>
+#include "common/handshake.hpp"
+
+TEST(client_limits_server_to_identification)
+{
+	// A server must not be able to act with the client's token (named-pipe
+	// impersonation). Play the server with raw Win32 calls and inspect the level.
+	if (GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "wine_get_version")) {
+		std::printf("SKIP: Wine does not implement impersonation levels for pipes\n");
+		return;
+	}
+	std::wstring path = L"\\\\.\\pipe\\dp-test-sqos-" + std::to_wstring(GetCurrentProcessId());
+	HANDLE       h    = CreateNamedPipeW(path.c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_WAIT, 1, 4096, 4096, 0,
+										 nullptr);
+	CHECK(h != INVALID_HANDLE_VALUE);
+	int         level  = -1;
+	std::thread server([&] {
+		ConnectNamedPipe(h, nullptr);
+		uint8_t hello[datapath::detail::hello_size];
+		DWORD   got = 0;
+		ReadFile(h, hello, sizeof(hello), &got, nullptr);
+		if (ImpersonateNamedPipeClient(h)) {
+			HANDLE tok = nullptr;
+			if (OpenThreadToken(GetCurrentThread(), TOKEN_QUERY, TRUE, &tok)) {
+				SECURITY_IMPERSONATION_LEVEL l;
+				DWORD                        sz = 0;
+				if (GetTokenInformation(tok, TokenImpersonationLevel, &l, sizeof(l), &sz))
+					level = int(l);
+				CloseHandle(tok);
+			} else if (GetLastError() == ERROR_CANT_OPEN_ANONYMOUS) {
+				level = int(SecurityAnonymous);
+			}
+			RevertToSelf();
+		}
+		datapath::detail::encode_hello(hello, {datapath::detail::protocol_version, 1024});
+		WriteFile(h, hello, sizeof(hello), &got, nullptr);
+	});
+	std::shared_ptr<datapath::socket> c;
+	std::string                       name = "dp-test-sqos-" + std::to_string(GetCurrentProcessId());
+	CHECK_EQ(datapath::connect(c, name), datapath::error::Success);
+	server.join();
+	CloseHandle(h);
+	std::printf("impersonation level seen by server: %d\n", level);
+	CHECK(level == int(SecurityIdentification) || level == int(SecurityAnonymous));
 }
 
 TEST_MAIN()

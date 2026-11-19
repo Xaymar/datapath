@@ -31,14 +31,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "uds_connection.hpp"
 #include "uds_server.hpp"
 
+namespace {
+	// The context whose I/O thread is running on this thread, if any.
+	thread_local const datapath::linux_::epoll_context* tl_context = nullptr;
+}
+
 // event_loop -------------------------------------------------------------------
 
 datapath::linux_::event_loop::event_loop(epoll_context* ctx) : _ctx(ctx) {}
 
 datapath::linux_::event_loop::~event_loop()
 {
-	if (_thread.joinable())
-		_thread.detach();
 	if (_efd >= 0)
 		::close(_efd);
 	if (_ep >= 0)
@@ -56,8 +59,10 @@ bool datapath::linux_::event_loop::start()
 	ev.data.ptr = nullptr;
 	if (::epoll_ctl(_ep, EPOLL_CTL_ADD, _efd, &ev) != 0)
 		return false;
-	_thread = std::thread([this] {
-		_thread_id.store(std::this_thread::get_id(), std::memory_order_release);
+	// The thread keeps its context alive, so the context is never destroyed on
+	// one of its own I/O threads.
+	_thread = std::thread([this, keep = _ctx->shared_from_this()] {
+		tl_context = keep.get();
 		run();
 	});
 	return true;
@@ -112,7 +117,7 @@ bool datapath::linux_::event_loop::post(std::shared_ptr<fd_target> target, int k
 	bool wake;
 	{
 		std::lock_guard<std::mutex> l(_post_lock);
-		if (target && _ctx->stopped() && !_thread.joinable())
+		if (_dead)
 			return false;
 		_posts.push_back({std::move(target), kind});
 		wake      = !_signaled;
@@ -223,10 +228,26 @@ void datapath::linux_::epoll_context::add_member(std::weak_ptr<datapath::detail:
 	_listeners.push_back(std::move(l));
 }
 
+bool datapath::linux_::epoll_context::on_io_thread() const noexcept
+{
+	return tl_context == this;
+}
+
 void datapath::linux_::epoll_context::shutdown()
 {
 	if (_stopped.exchange(true))
 		return;
+	if (on_io_thread()) {
+		// An I/O thread cannot join itself, and its caller's stack still uses
+		// objects the teardown would free: finish on a separate thread.
+		std::thread([self = shared_from_this()] { self->shutdown_now(); }).detach();
+		return;
+	}
+	shutdown_now();
+}
+
+void datapath::linux_::epoll_context::shutdown_now()
+{
 	std::vector<std::weak_ptr<datapath::detail::connection>> conns;
 	std::vector<std::weak_ptr<datapath::detail::listener>>   lsts;
 	{
@@ -243,25 +264,25 @@ void datapath::linux_::epoll_context::shutdown()
 	// Close notifications were posted above; the quit item queues behind them.
 	for (auto& loop : _loops)
 		loop->post(nullptr, 0);
-	for (auto& loop : _loops) {
-		if (!loop->_thread.joinable())
-			continue;
-		if (loop->on_loop_thread())
-			loop->_thread.detach();
-		else
+	for (auto& loop : _loops)
+		if (loop->_thread.joinable())
 			loop->_thread.join();
-	}
-	// Break context <-> target reference cycles.
 	for (auto& loop : _loops) {
+		// Notifications that raced the quit item still run (e.g. on_close).
+		std::vector<event_loop::post_item> posts;
+		{
+			std::lock_guard<std::mutex> l(loop->_post_lock);
+			loop->_dead = true;
+			posts.swap(loop->_posts);
+		}
+		for (auto& it : posts)
+			if (it.target)
+				it.target->on_post(it.kind);
+		// Break context <-> target reference cycles.
 		std::unordered_map<fd_target*, std::shared_ptr<fd_target>> regs;
 		{
 			std::lock_guard<std::mutex> l(loop->_reg_lock);
 			regs.swap(loop->_registered);
-		}
-		std::vector<event_loop::post_item> posts;
-		{
-			std::lock_guard<std::mutex> l(loop->_post_lock);
-			posts.swap(loop->_posts);
 		}
 	}
 }
@@ -275,11 +296,23 @@ datapath::error datapath::linux_::epoll_context::connect(std::shared_ptr<datapat
 	if (!make_socket_address(path, addr))
 		return datapath::error::InvalidPath;
 
-	int fd = ::socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+	using clock   = std::chrono::steady_clock;
+	auto deadline = clock::now() + opts.connect_timeout;
+
+	int fd = ::socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
 	if (fd < 0)
 		return datapath::error::CriticalFailure;
-	if (::connect(fd, reinterpret_cast<const sockaddr*>(&addr.addr), addr.length) != 0) {
+	for (;;) {
+		if (::connect(fd, reinterpret_cast<const sockaddr*>(&addr.addr), addr.length) == 0)
+			break;
 		int err = errno;
+		if (err == EINTR)
+			continue;
+		if (err == EAGAIN && clock::now() < deadline) {
+			// Backlog full: the server is busy or stalled. Retry until the deadline.
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			continue;
+		}
 		::close(fd);
 		switch (err) {
 		case ENOENT:
@@ -295,8 +328,6 @@ datapath::error datapath::linux_::epoll_context::connect(std::shared_ptr<datapat
 		}
 	}
 
-	using clock   = std::chrono::steady_clock;
-	auto deadline = clock::now() + opts.connect_timeout;
 	auto transfer = [&](bool write, uint8_t* buf, size_t size) -> datapath::error {
 		size_t done = 0;
 		while (done < size) {
@@ -333,8 +364,6 @@ datapath::error datapath::linux_::epoll_context::connect(std::shared_ptr<datapat
 		::close(fd);
 		return ec;
 	}
-	::fcntl(fd, F_SETFL, ::fcntl(fd, F_GETFL) | O_NONBLOCK);
-
 	auto limit = std::min(opts.max_message_size, reply.max_message_size);
 	auto conn  = std::make_shared<uds_connection>(shared_from_this(), pick_loop(), fd, opts, limit);
 	if (!conn->start(false, {}, limit))

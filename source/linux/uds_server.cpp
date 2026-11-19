@@ -48,7 +48,10 @@ datapath::error datapath::linux_::uds_listener::create()
 			return errno == EACCES ? datapath::error::AccessDenied : datapath::error::InvalidPath;
 		if (_addr.abstract)
 			return datapath::error::AddressInUse;
-		// A stale socket file is reused only if nobody answers on it.
+		// A stale socket file is reused only if it is a socket nobody answers on.
+		struct stat st {};
+		if (::lstat(_addr.filesystem_path.c_str(), &st) != 0 || !S_ISSOCK(st.st_mode))
+			return datapath::error::AddressInUse;
 		int probe = ::socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
 		int rc    = ::connect(probe, reinterpret_cast<const sockaddr*>(&_addr.addr), _addr.length);
 		int err   = errno;

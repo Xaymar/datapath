@@ -101,8 +101,11 @@ void datapath::windows::pipe_connection::write_loop()
 	for (;;) {
 		if (_woff >= _wbatch.size()) {
 			_woff = 0;
-			if (!_queue.take(_wbatch))
+			if (!_queue.take(_wbatch)) {
+				if (_close_when_flushed)
+					close_with(datapath::error::VersionMismatch);
 				return;
+			}
 		}
 		DWORD bytes = 0, err = 0;
 		switch (issue(true, _wbatch.data() + _woff, _wbatch.size() - _woff, _wop, bytes, err)) {
@@ -145,7 +148,11 @@ void datapath::windows::pipe_connection::hello_done()
 {
 	datapath::detail::hello h{};
 	if (datapath::detail::decode_hello(_hello, h) != datapath::error::Success) {
-		close_with(datapath::error::VersionMismatch);
+		// Answer with our own hello so the client can report VersionMismatch,
+		// then close once it is written.
+		_graceful           = true;
+		_close_when_flushed = true;
+		complete_accept();
 		return;
 	}
 	uint64_t limit = std::min(_own_limit, h.max_message_size);
@@ -161,8 +168,9 @@ void datapath::windows::pipe_connection::hello_done()
 void datapath::windows::pipe_connection::begin_server_handshake(std::weak_ptr<pipe_listener> listener,
 																uint64_t                     own_limit)
 {
-	_listener  = std::move(listener);
-	_own_limit = own_limit;
+	_listener    = std::move(listener);
+	_own_limit   = own_limit;
+	_server_side = true;
 	_queue.try_acquire(); // replies must go out before anything the user queues
 	hello_loop();
 }
@@ -179,6 +187,11 @@ void datapath::windows::pipe_connection::platform_close()
 {
 	std::unique_lock<std::shared_mutex> lock(_handle_lock);
 	if (_h != INVALID_HANDLE_VALUE) {
+		// Disconnect the server end so the pipe name is released even while the
+		// client still holds its handle (otherwise re-hosting fails). Skipped for
+		// a graceful close that must let the client read what was written.
+		if (_server_side && !_graceful)
+			DisconnectNamedPipe(_h);
 		CancelIoEx(_h, nullptr);
 		CloseHandle(_h);
 		_h = INVALID_HANDLE_VALUE;

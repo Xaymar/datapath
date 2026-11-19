@@ -597,4 +597,70 @@ TEST(custom_context_shutdown_closes_sockets)
 	CHECK(!keep || !keep->good());
 }
 
+TEST(drop_context_inside_callback)
+{
+	struct holder {
+		std::shared_ptr<datapath::context> ctx;
+		srv_ptr                            server;
+		sock_ptr                           server_side;
+		sock_ptr                           client;
+	};
+	auto name = unique_name();
+	auto h    = std::make_shared<holder>();
+	h->ctx    = datapath::context::create({std::chrono::microseconds(0), 1});
+	latch accepted, done;
+	CHECK_EQ(datapath::host(h->server, name, {}, h->ctx), error::Success);
+	holder* hraw = h.get();
+	h->server->on_accept([hraw, &accepted](sock_ptr s) {
+		hraw->server_side = s;
+		accepted.notify();
+		return true;
+	});
+	CHECK_EQ(datapath::connect(h->client, name, {}, h->ctx), error::Success);
+	CHECK(accepted.wait(1));
+	auto* slot = new std::shared_ptr<holder>(std::move(h));
+	(*slot)->client->on_message([slot, &done](const uint8_t*, size_t) {
+		// Drop every handle, including the last context reference, on an I/O thread.
+		auto local = std::move(*slot);
+		local.reset();
+		done.notify();
+	});
+	(*slot)->server_side->send("x", 1);
+	CHECK(done.wait(1));
+	std::this_thread::sleep_for(300ms); // let the context finish tearing down
+	delete slot;
+}
+
+TEST(bad_version_gets_server_hello)
+{
+	auto        name = unique_name();
+	echo_server srv;
+	CHECK_EQ(srv.start(name), error::Success);
+	auto p = raw::connect(name);
+	CHECK(p != nullptr);
+	uint8_t hello[datapath::detail::hello_size];
+	datapath::detail::encode_hello(hello, {datapath::detail::protocol_version + 7, 1024});
+	CHECK(raw::write(*p, hello, sizeof(hello)));
+	// The server answers with its own hello so the client can report VersionMismatch.
+	uint8_t reply[datapath::detail::hello_size];
+	CHECK(raw::read(*p, reply, sizeof(reply), 5000));
+	datapath::detail::hello h{};
+	CHECK_EQ(datapath::detail::decode_hello(reply, h), error::Success);
+	CHECK(raw::wait_closed(*p, 5000));
+	CHECK_EQ(srv.accepted.value(), 0);
+}
+
+TEST(rehost_while_old_client_holds_handle)
+{
+	auto name = unique_name();
+	auto srv  = std::make_unique<echo_server>();
+	CHECK_EQ(srv->start(name), error::Success);
+	auto p = raw_handshake(name, 1 << 20); // never reads, never closes
+	CHECK(p != nullptr);
+	CHECK(srv->accepted.wait(1));
+	srv.reset();
+	echo_server again;
+	CHECK_EQ(again.start(name), error::Success);
+}
+
 TEST_MAIN()

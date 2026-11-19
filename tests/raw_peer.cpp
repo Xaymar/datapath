@@ -88,9 +88,23 @@ bool raw::read(peer& p, void* data, size_t size, int timeout_ms)
 
 bool raw::wait_closed(peer& p, int timeout_ms)
 {
-	bool closed = false;
-	wait_readable(p.h, size_t(1) << 30, timeout_ms, closed);
-	return closed;
+	// Drain whatever the server wrote until the pipe reports it is broken.
+	auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+	for (;;) {
+		DWORD avail = 0;
+		if (!PeekNamedPipe(p.h, nullptr, 0, nullptr, &avail, nullptr))
+			return true;
+		if (avail > 0) {
+			char  buf[4096];
+			DWORD got = 0;
+			if (!ReadFile(p.h, buf, sizeof(buf) < avail ? DWORD(sizeof(buf)) : avail, &got, nullptr))
+				return true;
+			continue;
+		}
+		if (std::chrono::steady_clock::now() > deadline)
+			return false;
+		Sleep(1);
+	}
 }
 
 #else

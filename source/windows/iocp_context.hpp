@@ -68,6 +68,8 @@ namespace datapath::windows {
 
 		void run();
 		void dispatch(OVERLAPPED_ENTRY& entry);
+		void shutdown_now();
+		bool on_io_thread() const noexcept;
 
 		public:
 		explicit iocp_context(const datapath::context_options& opts);
