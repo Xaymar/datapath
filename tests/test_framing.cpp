@@ -229,4 +229,64 @@ TEST(spin_work_defers_block)
 	CHECK(took < std::chrono::seconds(1));
 }
 
+// A deliver callback returning false stops parsing with Closed, for frames that
+// fit the buffer and for frames that need the dedicated large buffer.
+TEST(parser_deliver_false_stops)
+{
+	for (size_t size : {size_t(10), size_t(200000)}) {
+		bytes stream;
+		for (int i = 0; i < 3; i++) {
+			auto f = frame(pattern(size, uint8_t(i)));
+			stream.insert(stream.end(), f.begin(), f.end());
+		}
+		datapath::detail::frame_parser p(1ull << 30, 4096);
+		int                            calls = 0;
+		error                          ec    = error::Success;
+		size_t                         pos   = 0;
+		while (pos < stream.size() && ec == error::Success) {
+			auto   a = p.prepare();
+			size_t n = std::min(a.second, stream.size() - pos);
+			std::memcpy(a.first, stream.data() + pos, n);
+			pos += n;
+			ec = p.commit(n, [&](const uint8_t*, size_t s) -> bool {
+				CHECK_EQ(s, size);
+				return ++calls < 2;
+			});
+		}
+		CHECK_EQ(ec, error::Closed);
+		CHECK_EQ(calls, 2);
+	}
+}
+
+TEST(parser_set_limit_applies_to_next_frame)
+{
+	datapath::detail::frame_parser p(16, 4096);
+	auto                           f = frame(pattern(32, 1));
+	p.set_limit(64);
+	auto a = p.prepare();
+	std::memcpy(a.first, f.data(), f.size());
+	int got = 0;
+	CHECK_EQ(p.commit(f.size(), [&](const uint8_t*, size_t) { got++; }), error::Success);
+	CHECK_EQ(got, 1);
+	p.set_limit(8);
+	a = p.prepare();
+	std::memcpy(a.first, f.data(), f.size());
+	CHECK_EQ(p.commit(f.size(), [&](const uint8_t*, size_t) { got++; }), error::TooLarge);
+	CHECK_EQ(got, 1);
+}
+
+// Tiny buffers are clamped to a usable minimum.
+TEST(parser_tiny_buffer_is_clamped)
+{
+	datapath::detail::frame_parser p(1ull << 30, 1);
+	CHECK(p.prepare().second >= size_t(64));
+	std::vector<bytes> msgs = {pattern(40, 1), pattern(100, 2), pattern(3, 3)};
+	bytes              stream;
+	for (auto& m : msgs) {
+		auto f = frame(m);
+		stream.insert(stream.end(), f.begin(), f.end());
+	}
+	CHECK(feed(stream, {7}, 1) == msgs);
+}
+
 TEST_MAIN()
