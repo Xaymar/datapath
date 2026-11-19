@@ -65,6 +65,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <process.h>
 #else
 #include <spawn.h>
+#include <sys/prctl.h>
 #include <sys/wait.h>
 #include <unistd.h>
 extern char** environ;
@@ -477,6 +478,13 @@ namespace {
 	// caches. Runs at normal priority until the parent kills the process.
 	int run_stress(const config& c)
 	{
+#ifndef _WIN32
+		// The client leaves with std::exit(), skipping child cleanup: die with the
+		// parent instead of loading the machine forever (Windows uses a job object).
+		prctl(PR_SET_PDEATHSIG, SIGKILL);
+		if (getppid() == 1)
+			return 0;
+#endif
 		unsigned n = c.stress > 0 ? unsigned(c.stress) : std::max(1u, std::thread::hardware_concurrency());
 		std::vector<std::thread> ts;
 		for (unsigned t = 0; t < n; t++) {
@@ -499,8 +507,26 @@ namespace {
 	}
 
 	// A child process running this executable with `args`; killed on destruction.
+	// The client ends the process with std::exit(), so destructors may never run:
+	// on Windows every child also joins a kill-on-close job, which ends it when
+	// this process exits for any reason.
 	struct child_process {
 #ifdef _WIN32
+		static HANDLE job()
+		{
+			static HANDLE h = [] {
+				HANDLE                               j = CreateJobObjectW(nullptr, nullptr);
+				JOBOBJECT_EXTENDED_LIMIT_INFORMATION info{};
+				info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+				if (j && !SetInformationJobObject(j, JobObjectExtendedLimitInformation, &info, sizeof(info))) {
+					CloseHandle(j);
+					j = nullptr;
+				}
+				return j;
+			}();
+			return h;
+		}
+
 		PROCESS_INFORMATION pi{};
 		bool                ok = false;
 
@@ -513,7 +539,14 @@ namespace {
 				cmd += L" " + std::wstring(a.begin(), a.end());
 			STARTUPINFOW si{};
 			si.cb = sizeof(si);
-			ok    = CreateProcessW(nullptr, &cmd[0], nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi) != FALSE;
+			ok    = CreateProcessW(nullptr, &cmd[0], nullptr, nullptr, FALSE, CREATE_SUSPENDED, nullptr, nullptr, &si,
+								   &pi)
+				 != FALSE;
+			if (!ok)
+				return;
+			if (HANDLE j = job())
+				AssignProcessToJobObject(j, pi.hProcess);
+			ResumeThread(pi.hThread);
 		}
 		// Wait up to `ms` for a clean exit, then kill.
 		void finish(int ms)
