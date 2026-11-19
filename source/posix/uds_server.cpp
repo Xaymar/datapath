@@ -6,28 +6,58 @@ SPDX-License-Identifier: BSD-3-Clause
 */
 
 #include "uds_server.hpp"
-#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <algorithm>
 #include <cerrno>
+#include <chrono>
+#include <thread>
+#include "platform.hpp"
 #include "uds_connection.hpp"
 
-datapath::linux_::uds_listener::uds_listener(std::shared_ptr<epoll_context> ctx, event_loop& loop,
+namespace {
+	// True if the socket file at `addr` has no server behind it. Linux refuses
+	// connections only when nobody listens (a full backlog is EAGAIN); macOS
+	// also refuses them while a live server's backlog is full, so it asks a few
+	// times before declaring the file stale.
+	bool stale_socket(const datapath::posix::socket_address& addr)
+	{
+#ifdef __APPLE__
+		constexpr int attempts = 20;
+#else
+		constexpr int attempts = 1;
+#endif
+		for (int i = 0; i < attempts; i++) {
+			if (i)
+				std::this_thread::sleep_for(std::chrono::milliseconds(5));
+			int probe = ::socket(AF_UNIX, SOCK_STREAM, 0);
+			if (probe < 0)
+				return false;
+			int rc  = ::connect(probe, reinterpret_cast<const sockaddr*>(&addr.addr), addr.length);
+			int err = errno;
+			::close(probe);
+			if (rc == 0 || err != ECONNREFUSED)
+				return false;
+		}
+		return true;
+	}
+} // namespace
+
+datapath::posix::uds_listener::uds_listener(std::shared_ptr<event_context> ctx, event_loop& loop,
 											 socket_address addr, const datapath::options& opts)
 	: _ctx(std::move(ctx)), _loop(loop), _addr(std::move(addr)), _opts(opts)
 {}
 
-datapath::linux_::uds_listener::~uds_listener()
+datapath::posix::uds_listener::~uds_listener()
 {
 	if (_fd >= 0)
 		::close(_fd);
 }
 
-datapath::error datapath::linux_::uds_listener::create()
+datapath::error datapath::posix::uds_listener::create()
 {
-	_fd = ::socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+	_fd = open_stream_socket();
 	if (_fd < 0)
 		return datapath::error::CriticalFailure;
 
@@ -41,11 +71,7 @@ datapath::error datapath::linux_::uds_listener::create()
 		struct stat st {};
 		if (::lstat(_addr.filesystem_path.c_str(), &st) != 0 || !S_ISSOCK(st.st_mode))
 			return datapath::error::AddressInUse;
-		int probe = ::socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
-		int rc    = ::connect(probe, reinterpret_cast<const sockaddr*>(&_addr.addr), _addr.length);
-		int err   = errno;
-		::close(probe);
-		if (rc == 0 || err != ECONNREFUSED)
+		if (!stale_socket(_addr))
 			return datapath::error::AddressInUse;
 		::unlink(_addr.filesystem_path.c_str());
 		if (do_bind() != 0)
@@ -61,28 +87,33 @@ datapath::error datapath::linux_::uds_listener::create()
 		// Before listen(): nobody can connect until the mode is right.
 		if (::chmod(_addr.filesystem_path.c_str(), mode) != 0)
 			return datapath::error::AccessDenied;
+		// BSDs give a new file the group of its directory (wheel for /tmp),
+		// not the creator's: Group access means the creator's group.
+		if (_opts.permissions == datapath::permissions::Group
+			&& ::chown(_addr.filesystem_path.c_str(), uid_t(-1), ::getegid()) != 0)
+			return datapath::error::AccessDenied;
 	}
 	if (::listen(_fd, int(std::max<size_t>(_opts.backlog, 16))) != 0)
 		return datapath::error::Failure;
-	if (!_loop.add(_fd, EPOLLIN, shared_from_this()))
+	if (!_loop.add(_fd, ev::in, shared_from_this()))
 		return datapath::error::CriticalFailure;
 	return datapath::error::Success;
 }
 
-bool datapath::linux_::uds_listener::peer_allowed(int fd) const
+bool datapath::posix::uds_listener::peer_allowed(int fd) const
 {
 	if (!_addr.abstract || _opts.permissions == datapath::permissions::World)
 		return true; // filesystem sockets are guarded by their mode bits
-	ucred     cred{};
-	socklen_t len = sizeof(cred);
-	if (::getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cred, &len) != 0)
+	uid_t uid = 0;
+	gid_t gid = 0;
+	if (!peer_credentials(fd, uid, gid))
 		return false;
-	if (cred.uid == 0 || cred.uid == ::geteuid())
+	if (uid == 0 || uid == ::geteuid())
 		return true;
-	return _opts.permissions == datapath::permissions::Group && cred.gid == ::getegid();
+	return _opts.permissions == datapath::permissions::Group && gid == ::getegid();
 }
 
-void datapath::linux_::uds_listener::on_event(uint32_t)
+void datapath::posix::uds_listener::on_event(uint32_t)
 {
 	for (;;) {
 		int fd;
@@ -90,7 +121,7 @@ void datapath::linux_::uds_listener::on_event(uint32_t)
 			std::lock_guard<std::mutex> l(_lock);
 			if (_closed || _fd < 0)
 				return;
-			fd = ::accept4(_fd, nullptr, nullptr, SOCK_NONBLOCK | SOCK_CLOEXEC);
+			fd = accept_stream_socket(_fd);
 		}
 		if (fd < 0) {
 			if (errno == EINTR || errno == ECONNABORTED)
@@ -106,6 +137,7 @@ void datapath::linux_::uds_listener::on_event(uint32_t)
 				continue;
 			}
 			_connected++;
+			tune_socket_buffers(fd, _opts);
 			conn = std::make_shared<uds_connection>(_ctx, _ctx->pick_loop(), fd, _opts, _opts.max_message_size);
 			_conns.erase(std::remove_if(_conns.begin(), _conns.end(), [](auto& w) { return w.expired(); }),
 						 _conns.end());
@@ -117,7 +149,7 @@ void datapath::linux_::uds_listener::on_event(uint32_t)
 	}
 }
 
-void datapath::linux_::uds_listener::on_post(int kind)
+void datapath::posix::uds_listener::on_post(int kind)
 {
 	if (kind == 0) {
 		_loop.unregister(this);
@@ -140,7 +172,7 @@ void datapath::linux_::uds_listener::on_post(int kind)
 	}
 }
 
-void datapath::linux_::uds_listener::offer(std::shared_ptr<uds_connection> conn)
+void datapath::posix::uds_listener::offer(std::shared_ptr<uds_connection> conn)
 {
 	datapath::detail::accept_fn handler;
 	{
@@ -175,14 +207,14 @@ void datapath::linux_::uds_listener::offer(std::shared_ptr<uds_connection> conn)
 		conn->close();
 }
 
-void datapath::linux_::uds_listener::connection_finished()
+void datapath::posix::uds_listener::connection_finished()
 {
 	std::lock_guard<std::mutex> l(_lock);
 	if (_connected)
 		_connected--;
 }
 
-void datapath::linux_::uds_listener::set_accept_handler(datapath::detail::accept_fn handler)
+void datapath::posix::uds_listener::set_accept_handler(datapath::detail::accept_fn handler)
 {
 	std::lock_guard<std::mutex> l(_lock);
 	_handler = std::move(handler);
@@ -190,7 +222,7 @@ void datapath::linux_::uds_listener::set_accept_handler(datapath::detail::accept
 		_offer_posted = _loop.post(shared_from_this(), k_offer);
 }
 
-datapath::error datapath::linux_::uds_listener::close()
+datapath::error datapath::posix::uds_listener::close()
 {
 	std::vector<std::weak_ptr<uds_connection>>  conns;
 	std::deque<std::shared_ptr<uds_connection>> waiting;
@@ -220,7 +252,7 @@ datapath::error datapath::linux_::uds_listener::close()
 	return datapath::error::Success;
 }
 
-void datapath::linux_::uds_listener::release()
+void datapath::posix::uds_listener::release()
 {
 	close();
 	std::lock_guard<std::recursive_mutex> cb(_callback_lock);

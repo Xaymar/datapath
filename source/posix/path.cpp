@@ -9,7 +9,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <cstddef>
 #include <cstring>
 
-bool datapath::linux_::make_socket_address(const std::string& path, socket_address& out)
+bool datapath::posix::make_socket_address(const std::string& path, socket_address& out)
 {
 	out                  = socket_address{};
 	out.addr.sun_family  = AF_UNIX;
@@ -24,6 +24,12 @@ bool datapath::linux_::make_socket_address(const std::string& path, socket_addre
 		out.filesystem_path = path;
 		return true;
 	}
+#ifdef __APPLE__
+	// No abstract namespace: bare names become files in /tmp, which every user
+	// shares like the abstract namespace (the per-user $TMPDIR would hide a
+	// server from other users' clients).
+	return make_socket_address("/tmp/datapath." + path, out);
+#else
 	std::string name = "datapath." + path;
 	if (name.size() + 1 > max)
 		return false;
@@ -31,4 +37,5 @@ bool datapath::linux_::make_socket_address(const std::string& path, socket_addre
 	out.length   = socklen_t(offsetof(sockaddr_un, sun_path) + 1 + name.size());
 	out.abstract = true;
 	return true;
+#endif
 }

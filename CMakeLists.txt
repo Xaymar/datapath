@@ -92,17 +92,31 @@ if(WIN32)
 		source/windows/security.hpp
 		source/windows/win.hpp
 	)
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR ANDROID)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR ANDROID OR APPLE)
+	# One backend for Unix domain sockets; the poller and the OS-specific parts
+	# (sockets flags, thread priority, core count) differ.
 	list(APPEND DATAPATH_SOURCES
-		source/linux/epoll_context.cpp
-		source/linux/epoll_context.hpp
-		source/linux/path.cpp
-		source/linux/path.hpp
-		source/linux/uds_connection.cpp
-		source/linux/uds_connection.hpp
-		source/linux/uds_server.cpp
-		source/linux/uds_server.hpp
+		source/posix/event_context.cpp
+		source/posix/event_context.hpp
+		source/posix/path.cpp
+		source/posix/path.hpp
+		source/posix/platform.hpp
+		source/posix/uds_connection.cpp
+		source/posix/uds_connection.hpp
+		source/posix/uds_server.cpp
+		source/posix/uds_server.hpp
 	)
+	if(APPLE)
+		list(APPEND DATAPATH_SOURCES
+			source/posix/event_loop_kqueue.cpp
+			source/posix/platform_apple.cpp
+		)
+	else()
+		list(APPEND DATAPATH_SOURCES
+			source/posix/event_loop_epoll.cpp
+			source/posix/platform_linux.cpp
+		)
+	endif()
 else()
 	message(FATAL_ERROR "DataPath: unsupported platform ${CMAKE_SYSTEM_NAME}")
 endif()

@@ -101,6 +101,7 @@ bool raw::wait_closed(peer& p, int timeout_ms)
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <cstddef>
 #include <cstring>
 
 struct raw::peer {
@@ -115,14 +116,23 @@ void raw::peer_deleter::operator()(peer* p) const
 
 raw::peer_ptr raw::connect(const std::string& name)
 {
-	int fd = ::socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+	int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
 	if (fd < 0)
 		return nullptr;
 	sockaddr_un addr{};
-	addr.sun_family     = AF_UNIX;
-	std::string abs     = std::string("datapath.") + name;
+	addr.sun_family = AF_UNIX;
+#ifdef __APPLE__
+	// Bare names are files in /tmp (no abstract namespace).
+	int one = 1;
+	::setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(one));
+	std::string file = "/tmp/datapath." + name;
+	std::memcpy(addr.sun_path, file.c_str(), file.size() + 1);
+	socklen_t len = socklen_t(sizeof(addr));
+#else
+	std::string abs = std::string("datapath.") + name;
 	std::memcpy(addr.sun_path + 1, abs.data(), abs.size());
 	socklen_t len = socklen_t(offsetof(sockaddr_un, sun_path) + 1 + abs.size());
+#endif
 	if (::connect(fd, reinterpret_cast<sockaddr*>(&addr), len) != 0) {
 		::close(fd);
 		return nullptr;
@@ -134,7 +144,11 @@ bool raw::write(peer& p, const void* data, size_t size)
 {
 	const char* c = static_cast<const char*>(data);
 	while (size) {
+#ifdef MSG_NOSIGNAL
 		ssize_t n = ::send(p.fd, c, size, MSG_NOSIGNAL);
+#else
+		ssize_t n = ::send(p.fd, c, size, 0); // SO_NOSIGPIPE is set
+#endif
 		if (n <= 0)
 			return false;
 		c += n;

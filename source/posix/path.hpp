@@ -10,7 +10,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <sys/un.h>
 #include <string>
 
-namespace datapath::linux_ {
+namespace datapath::posix {
 	struct socket_address {
 		sockaddr_un addr{};
 		socklen_t   length   = 0;
@@ -19,6 +19,7 @@ namespace datapath::linux_ {
 	};
 
 	// Paths starting with '/' are filesystem sockets; anything else is a name
-	// in the abstract namespace ("\0datapath.<name>"). False if too long/empty.
+	// in the abstract namespace ("\0datapath.<name>"), or on macOS/iOS the
+	// filesystem socket "/tmp/datapath.<name>". False if too long/empty.
 	bool make_socket_address(const std::string& path, socket_address& out);
-} // namespace datapath::linux_
+} // namespace datapath::posix

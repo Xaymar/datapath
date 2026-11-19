@@ -1,8 +1,8 @@
 # Build and test the C++ library on every supported platform, with coverage.
 #
 # Layout: one job per language. The C++ job is a matrix; adding a platform
-# (e.g. macOS once its backend exists) is one more `include` entry. Bindings
-# (C API, Rust, Node.js, Python) get their own jobs alongside `cpp`.
+# is one more `include` entry. Bindings (C API, Rust, Node.js, Python) get
+# their own jobs alongside `cpp`.
 # Benchmarks are built (they are part of the default build) but never run here.
 
 name: CI
@@ -78,6 +78,22 @@ jobs:
             ldflags: -fsanitize=thread
             samples: "OFF"
 
+          - name: macOS / AppleClang / Release
+            os: macos-latest
+            build_type: Release
+
+          - name: macOS / AppleClang / Coverage
+            os: macos-latest
+            build_type: Debug
+            cxxflags: --coverage
+            coverage: gcovr
+
+          - name: macOS / AppleClang / ASan+UBSan
+            os: macos-latest
+            build_type: RelWithDebInfo
+            cxxflags: -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer
+            ldflags: -fsanitize=address,undefined
+
     env:
       BUILD_DIR: build
       UBSAN_OPTIONS: print_stacktrace=1
@@ -94,6 +110,11 @@ jobs:
           apt-get install -yq --no-install-recommends \
             ca-certificates git cmake ninja-build g++ clang python3 \
             ${{ matrix.coverage == 'gcovr' && 'gcovr' || '' }}
+
+      - name: Install packages (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install ninja ${{ matrix.coverage == 'gcovr' && 'gcovr' || '' }}
 
       - uses: actions/checkout@v4
 
@@ -138,12 +159,15 @@ jobs:
             -- ctest --test-dir $env:BUILD_DIR -C ${{ matrix.build_type }} --output-on-failure
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Collect coverage (Linux)
+      - name: Collect coverage (Linux, macOS)
         if: matrix.coverage == 'gcovr'
         shell: bash
         run: |
           mkdir -p coverage-html
-          gcovr --root . --filter source/ --filter include/ "$BUILD_DIR" \
+          gcov=()
+          # AppleClang writes LLVM's coverage format, which GNU gcov cannot read.
+          if [ "$RUNNER_OS" = macOS ]; then gcov=(--gcov-executable "xcrun llvm-cov gcov"); fi
+          gcovr "${gcov[@]}" --root . --filter source/ --filter include/ "$BUILD_DIR" \
             --cobertura coverage.xml --html-details coverage-html/index.html --txt
 
       - name: Coverage summary

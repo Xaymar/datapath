@@ -144,8 +144,10 @@ namespace {
 
 		static std::string pipe_path(const std::string& name)
 		{
-#ifdef _WIN32
+#if defined(_WIN32)
 			return "\\\\.\\pipe\\uv." + name;
+#elif defined(__APPLE__)
+			return "/tmp/uv." + name; // no abstract namespace
 #else
 			return std::string("\0uv.", 4) + name; // abstract namespace
 #endif

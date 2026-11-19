@@ -22,7 +22,7 @@ cmake -S . -B build-mingw -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/mingw-w64.cmak
 ```
 
 ## Testing
-Run the whole suite with `ctest` as shown above before sending a change. Linux-only and Windows-only tests (`tests/test_linux.cpp`, `tests/test_windows_security.cpp`) build only on their platform, so a change to a platform backend should be tested on that platform. On Linux, an AddressSanitizer build catches most lifetime bugs in the handler and close paths:
+Run the whole suite with `ctest` as shown above before sending a change. Unix-only and Windows-only tests (`tests/test_posix.cpp` for Linux and macOS, `tests/test_windows_security.cpp`) build only on their platforms, so a change to a platform backend should be tested on that platform. On Linux, an AddressSanitizer build catches most lifetime bugs in the handler and close paths:
 ```bash
 cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer"
 ```
