@@ -1,0 +1,347 @@
+﻿DataPath phase-0 baseline (C++ core), Irkela, quieter re-run
+commit:     4b88182 (claude/project-thread-rbf0nb; build from this commit, results file added in a later commit)
+merge-base: 2d0e2c0b6dd7a235ace6eeefc1acd25acbda1990 (origin/root)
+date:       2026-11-20T04:52:58Z
+CPU:        AMD Ryzen 9 7940HS w/ Radeon 780M Graphics
+logical cores: 16
+Windows:    10.0.19045 (Windows 10 Pro)
+compiler:   MSVC 14.51.36231 (Visual Studio 18 Community), Release
+power plan: Balanced (381b4222-f694-41f0-9685-ff5bb260df2e)
+background: top CPU over 10 s before the run, % of total CPU (16 logical):
+            powershell 0.26, claude 0.09, Discord 0.06, ProcessLasso 0.06,
+            explorer 0.02, rustdesk 0.02, steamwebhelper 0.02, steam 0.01
+            Discord, nextcloud, steamwebhelper and ProcessLasso were all running (idle).
+DataPath benchmark matrix, 5 runs per size 
+
+==== --priority 2
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      2.40      2.90      4.40      6.40    196.20        5.1      5.90      7.30
+        64   100000      2.40      2.90      4.20      6.70    500.70       40.9      6.00      7.10
+      4096   100000      4.80      5.70      7.90     13.10    140.20     1326.9     10.90     13.70
+     65536    32768     18.60     19.40     27.40     42.10    530.40     6253.7     35.80     53.50
+
+==== --ideal-core off
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=off load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      2.50      3.00      4.20      6.20    504.00        5.1      5.60      7.40
+        64   100000      2.50      3.00      4.30      6.70    535.00       40.4      6.10      7.00
+      4096   100000      4.90      5.80      7.80     11.30    359.30     1309.5     11.20     11.90
+     65536    32768     19.50     20.30     27.30     44.60    589.00     5983.6     37.40     48.10
+
+==== --ideal-core 1
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=1 load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      2.50      3.00      4.40      6.50    501.70        5.0      6.20      7.90
+        64   100000      2.50      3.00      4.30      6.40    509.70       40.0      6.00      9.00
+      4096   100000      4.80      5.40      7.40     12.10    411.80     1408.1     10.30     12.80
+     65536    32768     18.60     19.40     26.70     53.20    564.70     6176.0     39.60     78.60
+
+==== --priority 0
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=0 stress=off ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      2.50      3.00      4.40      7.10    520.70        5.0      6.30      8.10
+        64   100000      2.50      3.00      4.30      6.30    673.40       39.8      5.60      7.20
+      4096   100000      5.00      5.70      8.20     14.20    179.00     1327.7     12.70     16.30
+     65536    32768     21.60     22.40     32.50     55.10    505.80     5376.8     45.40    120.20
+
+==== --mmcss
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=on priority=2 stress=off ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      2.50      3.00      3.80      5.50    513.00        4.8      4.70      6.90
+        64   100000      2.50      3.00      3.90      5.80    121.10       38.1      5.00      8.40
+      4096   100000      4.30      5.40      6.20      9.00    132.40     1430.5      8.70     10.90
+     65536    32768     19.50     22.00     25.90     41.80    482.10     5726.2     41.60     47.60
+
+==== --yield
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=on alertable=off mmcss=off priority=2 stress=off ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      2.20      3.20      4.70      7.60    206.20        4.5      6.70      9.20
+        64   100000      2.30      3.30      4.50      7.30     76.40       35.4      7.00      8.40
+      4096   100000      4.30      5.80      7.80     13.40    172.90     1367.6     13.00     16.10
+     65536    32768     19.60     22.20     32.40     50.60    407.60     5645.1     46.60     54.40
+
+==== --alertable
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=on mmcss=off priority=2 stress=off ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      2.50      3.00      4.50      7.00    502.20        5.0      6.40      7.60
+        64   100000      2.50      3.00      4.30      6.20    679.80       40.3      5.90      6.60
+      4096   100000      4.40      4.90      6.80     11.40    385.90     1532.2      9.50     13.10
+     65536    32768     19.50     20.30     27.60     44.60    510.40     5951.9     37.90     60.90
+
+==== --spin 0
+IPC benchmark: transport=datapath platform=windows spin=0us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      2.70     13.40     17.80     28.90    680.70        1.1     23.20     69.00
+        64   100000      2.90     13.70     17.00     58.90    576.20        8.7     24.20     72.30
+      4096   100000      8.20     16.60     20.50     30.40    675.40      463.2     26.30     73.10
+     65536    32768     27.60     33.70     42.80    334.40    685.90     3581.4     81.30    504.70
+
+==== --spin 0 --ideal-core off
+IPC benchmark: transport=datapath platform=windows spin=0us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=off load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      2.60     13.50     18.00     60.00    675.80        1.1     23.40     67.30
+        64   100000      2.90     13.60     16.50     23.70    494.60        8.8     22.30     27.30
+      4096   100000      8.70     16.50     20.40     30.20    681.30      466.4     27.70     31.50
+     65536    32768     28.00     33.80     42.30    335.70    527.20     3587.4     85.00    377.50
+
+==== --spin 200
+IPC benchmark: transport=datapath platform=windows spin=200us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      2.50      3.10      4.20      6.40    517.20        4.9      5.70      6.80
+        64   100000      2.50      3.10      4.10      6.40    118.30       39.9      5.80      7.70
+      4096   100000      4.30      4.90      6.90     10.60    404.20     1541.6     10.20     12.30
+     65536    32768     19.60     20.40     26.60     40.80    526.80     5972.9     37.50     42.40
+
+==== --threads 2
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=2 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      2.60      3.40      4.60      9.30    205.30        4.3      8.60      9.70
+        64   100000      2.60      3.50      4.80      9.20    213.10       33.7      9.00     10.10
+      4096   100000      4.80      5.90      9.10     14.30    201.00     1292.9     13.10     14.50
+     65536    32768     20.90     28.10     42.30     70.00    344.80     4329.4     55.90     83.50
+
+==== --threads auto
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=auto clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      5.50     14.00     17.90     25.80    455.40        1.1     22.10     33.40
+        64   100000      5.20     14.30     18.40     26.90    476.90        8.5     25.90     34.80
+      4096   100000     10.30     17.50     22.40     47.40    363.00      424.7     45.80     56.20
+     65536    32768     26.70     35.60     43.30     97.70    475.40     3463.5     86.30    110.20
+
+==== --threads auto --ideal-core off
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=auto clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=off load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      5.50     14.00     17.80     30.20    314.90        1.1     24.20     37.10
+        64   100000      5.40     14.20     18.20     35.50    336.40        8.6     29.90     38.70
+      4096   100000      9.00     17.40     23.70     52.90    438.40      425.4     40.20     55.50
+     65536    32768     27.20     35.80     43.70    105.40    375.10     3444.6     97.90    108.20
+
+==== --clients 8
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=1 clients=8 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   800000      2.50     18.20     25.90     55.40   1855.40        6.6     38.90     76.20
+        64   800000      2.60     18.50     25.10     37.30   1754.00       52.5     36.80     72.80
+      4096   800000      6.20     35.30     49.50    131.90    746.00     1790.6     96.60    222.20
+     65536   262144     29.40    135.60    180.80    389.80    758.60     7128.7    344.30    441.80
+
+==== --clients 8 --threads 4
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=4 clients=8 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   800000      2.80      7.20     16.00     21.00    226.30       15.8     20.70     21.60
+        64   800000      2.80      7.20     16.10     21.00    256.90      125.5     20.60     21.20
+      4096   800000      7.20     21.10     44.40     54.60    244.20     2755.8     53.80     59.50
+     65536   262144     23.70     54.40    111.10    137.30    462.80    16581.9    135.10    140.50
+
+==== --clients 8 --threads auto
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=auto clients=8 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   800000      2.90      4.90     13.00     17.20    279.90       20.0     16.90     17.30
+        64   800000      2.90      5.00     12.90     17.20    208.50      157.6     17.10     17.30
+      4096   800000      7.20     23.40     48.90     62.50    362.30     2409.4     53.40     71.30
+     65536   262144     23.90     46.40     81.50    104.40    478.40    18574.4    100.20    109.30
+
+==== --clients 8 --threads auto --ideal-core off
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=auto clients=8 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=off load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   800000      2.90      5.00     12.70     17.10    230.80       20.0     17.00     17.30
+        64   800000      2.90      5.10     12.80     17.40    214.30      157.7     17.10     17.40
+      4096   800000      6.80     20.40     42.60     54.20    246.70     2867.8     51.50     72.50
+     65536   262144     24.50     46.80     81.70    104.10    467.90    18696.0     99.20    143.20
+
+==== --load --threads 2
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=2 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=auto load=1MiB stream
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      2.70      3.70      5.50     15.30    228.00        4.0     15.00     16.30
+        64   100000      2.70      3.70      5.80     15.90    252.10       31.7     15.60     17.20
+      4096   100000      4.50      5.80     10.40     20.30    216.80     1291.1     19.20     22.60
+     65536    32768     19.50     28.60     46.10     88.10    320.60     4170.9     67.10     94.90
+Bulk stream under load: 2.08 GiB/s (server-confirmed)
+
+==== --stress 0
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=all cores ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      2.50      3.30      4.50      5.60    137.20        4.0      5.30     25.80
+        64   100000      2.60      3.40      4.50      5.40    115.20       35.4      5.40     28.70
+      4096   100000      4.60      5.40      7.10     34.20    198.20     1387.2     13.70     52.50
+     65536    32768     22.00     26.00     32.80     40.20    339.30     4723.7     38.80     41.50
+
+==== --stress 0 --ideal-core off
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=all cores ideal_core=off load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      3.00     20.50     28.60     49.10    358.10        0.8     43.20     57.90
+        64   100000      3.10     21.00     29.60     54.40    323.00        6.0     53.70     60.50
+      4096   100000      5.60     43.40     68.40    108.50    489.10      196.5    104.70    113.00
+     65536    32768     27.20    350.70    461.00    502.70    798.20      392.6    499.10    512.90
+
+==== --stress 0 --priority 0
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=0 stress=all cores ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      3.00     20.70     29.20    126.10  29290.50        0.6    100.90    138.60
+        64   100000      3.10     21.50     30.50    140.60  30696.30        4.7    136.60    152.50
+      4096   100000      5.60     45.90     75.50    291.30  30733.40      145.9    269.60    324.90
+     65536    32768     23.00    207.90    429.60    480.70    974.90      595.6    432.20    512.30
+
+==== --stress 0 --mmcss
+IPC benchmark: transport=datapath platform=windows spin=50us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=on priority=2 stress=all cores ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      3.00     20.00     33.90   2088.20   3032.00        0.6   2086.50   2097.40
+        64   100000      3.00     20.80     35.80   2093.70   3101.60        4.7   2085.80   2101.90
+      4096   100000      5.60     44.90    156.70   2184.80   3207.60      138.8   2172.40   2194.90
+     65536    32768     22.70    302.40   2472.60   3029.40   3665.60      365.8   2998.70   3044.00
+
+==== --stress 0 --spin 0
+IPC benchmark: transport=datapath platform=windows spin=0us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=all cores ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      3.70     41.60     80.10    104.40    554.60        0.4    103.00    109.40
+        64   100000      3.60     43.00     80.90    103.60    403.00        3.0     98.10    108.90
+      4096   100000      9.10     71.00    122.50    146.50    635.50      116.4    141.70    155.50
+     65536    32768     28.30    331.10    462.30    500.60    924.00      411.1    499.80    519.80
+
+==== --stress 0 --spin 0 --ideal-core off
+IPC benchmark: transport=datapath platform=windows spin=0us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=all cores ideal_core=off load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      3.70     41.20     65.60     79.80    424.30        0.4     78.50     90.40
+        64   100000      3.80     43.10     67.30     82.70    483.40        3.1     81.30     84.10
+      4096   100000      9.00     70.00    102.00    124.40    508.60      118.9    118.90    131.30
+     65536    32768     29.40    326.10    450.50    482.50    718.70      419.6    479.10    484.70
+
+==== c-api --priority 2
+IPC benchmark: transport=datapath-c platform=windows spin=50us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      2.50      3.00      4.50      6.40    499.90        5.0      6.00      8.00
+        64   100000      2.50      3.00      4.30      6.50    322.50       39.2      5.80      7.50
+      4096   100000      4.30      4.90      6.80     10.20    289.30     1542.9     10.00     12.40
+     65536    32768     18.40     19.10     25.60     38.00    510.90     6371.6     33.20     39.70
+
+==== c-api --clients 8 --threads auto
+IPC benchmark: transport=datapath-c platform=windows spin=50us io_threads=auto clients=8 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   800000      2.90      5.00     12.40     17.30    285.10       20.1     16.80     22.80
+        64   800000      3.00      5.10     12.50     17.20    220.90      159.2     16.70     17.40
+      4096   800000      6.70     20.40     41.40     51.40    461.40     2767.2     50.80     55.00
+     65536   262144     24.70     46.90     81.30    103.90    473.40    18661.5     99.90    140.60
+
+==== c-api --load --threads 2
+IPC benchmark: transport=datapath-c platform=windows spin=50us io_threads=2 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=auto load=1MiB stream
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      2.60      3.60      5.50     15.60    225.60        4.0     14.80     18.00
+        64   100000      2.60      3.70      5.40     15.30    154.00       31.5     13.90     22.70
+      4096   100000      5.10      6.90     12.80     21.30    194.50     1092.1     21.10     28.00
+     65536    32768     19.40     27.80     44.60     92.60    491.60     4330.7     80.90     96.70
+Bulk stream under load: 2.27 GiB/s (server-confirmed)
+
+==== c-api --stress 0
+IPC benchmark: transport=datapath-c platform=windows spin=50us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=all cores ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      2.50      3.50      4.50      5.80     65.80        4.2      5.30     28.10
+        64   100000      2.60      3.50      5.00     28.50     77.20       30.9      5.60     31.80
+      4096   100000      5.00      5.90      7.80     59.00    240.60     1255.6     56.80     61.80
+     65536    32768     22.70     25.50     31.30     38.70    517.40     4825.3     37.30     39.60
+
+==== libuv --spin 0 --no-mmcss --priority 0
+IPC benchmark: transport=libuv 1.52.1 platform=windows spin=0us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=0 stress=off ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      8.90     21.10     39.10     57.80    694.10        0.7     54.30     86.40
+        64   100000      8.90     21.40     39.80     64.70    682.00        5.5     54.20     75.20
+      4096   100000     14.90     26.30     49.30     83.00    770.60      285.4     70.70    158.00
+     65536    32768     32.60     55.30     69.00    357.80    575.20     2224.8    122.80    549.60
+
+==== libuv --priority 2
+IPC benchmark: transport=libuv 1.52.1 platform=windows spin=50us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      5.90      6.50      8.80     13.50    130.90        2.3     13.00     14.80
+        64   100000      5.90      6.50      9.70     16.10    520.00       17.8     15.70     16.80
+      4096   100000      7.90      8.50     12.20     18.90    512.20      878.5     16.80     21.00
+     65536    32768     21.30     32.60     51.30     65.10    338.50     4106.6     63.20     84.70
+
+==== libuv --spin 0
+IPC benchmark: transport=libuv 1.52.1 platform=windows spin=0us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=off ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      9.80     20.60     25.00     37.40    517.60        0.7     31.70     64.30
+        64   100000     10.50     20.80     25.30     36.30    506.50        5.8     32.90     65.60
+      4096   100000     12.80     23.80     29.40     79.50    548.10      318.7     61.30    303.70
+     65536    32768     29.60     39.00     56.00     98.10    578.00     3121.3     93.10    536.00
+
+==== libuv --stress 0 --spin 0 --no-mmcss --priority 0
+IPC benchmark: transport=libuv 1.52.1 platform=windows spin=0us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=0 stress=all cores ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      9.90     77.30    141.20   1052.00   1571.80        0.2    979.10   1058.70
+        64   100000     10.10     78.90    139.10   1060.10   4127.30        1.6   1023.20   1065.80
+      4096   100000     13.60    107.50    182.90   1105.80  21576.00       76.5   1100.70   1113.70
+     65536    32768     38.20    322.10    674.60   1397.90   4650.40      411.1   1353.60   1450.50
+
+==== libuv --stress 0
+IPC benchmark: transport=libuv 1.52.1 platform=windows spin=50us io_threads=1 clients=1 buffer=262144 pipe_buffer=1048576 yield=off alertable=off mmcss=off priority=2 stress=all cores ideal_core=auto load=off
+Full round-trip latency in microseconds.
+Each row: median of 5 runs; p99.9 lo/hi = lowest/highest p99.9 of any run.
+      size    count       min       p50       p99     p99.9       max      MiB/s  p99.9 lo  p99.9 hi
+         8   100000      7.20     46.20     77.30    420.40   1257.50        0.3    280.40    615.10
+        64   100000      7.10     46.40     79.10    441.30   1257.20        2.7    212.80    971.10
+      4096   100000      9.60     79.60    136.50    228.90   1121.90      105.1    200.90    375.20
+     65536    32768     24.90    288.90    417.80    501.50    762.60      472.4    480.60    855.70
+
