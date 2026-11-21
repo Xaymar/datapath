@@ -144,6 +144,30 @@ TEST(parser_read_size_adapts)
 	CHECK_EQ(p.prepare().second, size_t(64 * 1024));
 }
 
+TEST(parser_64k_frames_take_one_read)
+{
+	// A 64 KiB payload plus header is just over the starting read size. After the
+	// first frame, the read size must stay large enough to take each frame in one
+	// read instead of a full read plus an 8-byte one.
+	datapath::detail::frame_parser p(1ull << 30, 256 * 1024);
+	bytes  f     = frame(pattern(65536, 3));
+	size_t reads = 0, msgs = 0;
+	for (int i = 0; i < 50; i++) {
+		size_t pos = 0;
+		while (pos < f.size()) {
+			auto   a = p.prepare();
+			size_t n = std::min(a.second, f.size() - pos); // the peer sent exactly one frame
+			std::memcpy(a.first, f.data() + pos, n);
+			pos += n;
+			if (i >= 2)
+				reads++;
+			CHECK(p.commit(n, [&](const uint8_t*, size_t s) { msgs += s == 65536; }) == error::Success);
+		}
+	}
+	CHECK_EQ(msgs, size_t(50));
+	CHECK_EQ(reads, size_t(48));
+}
+
 TEST(parser_rejects_oversize_header)
 {
 	error st = error::Unknown;
