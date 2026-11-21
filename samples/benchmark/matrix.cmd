@@ -44,6 +44,22 @@ for %%A in (
 	echo Running: %%~A
 	"%BENCH%" local --runs %RUNS% %%~A >> "%OUT%" 2>&1
 )
+rem The same core through the C API (datapath.h). The Rust core is compared
+rem against these runs, since it is measured through the same interface.
+for %%D in ("%BENCH%") do set "CAPI=%%~dpDdatapath-benchmark-c.exe"
+if exist "%CAPI%" (
+	for %%A in (
+		"--priority 2"
+		"--clients 8 --threads auto"
+		"--load --threads 2"
+		"--stress 0"
+	) do (
+		echo.>> "%OUT%"
+		echo ==== c-api %%~A>> "%OUT%"
+		echo Running: c-api %%~A
+		"%CAPI%" local --runs %RUNS% %%~A >> "%OUT%" 2>&1
+	)
+)
 rem Same measurements for libuv, if it was built (-DDATAPATH_BUILD_COMPARE=ON).
 for %%D in ("%BENCH%") do set "LIBUV=%%~dpDlibuv-benchmark.exe"
 if exist "%LIBUV%" (
