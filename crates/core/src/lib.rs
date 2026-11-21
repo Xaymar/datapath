@@ -28,7 +28,12 @@
 // The connection core is only used by a backend; until Windows has one, its
 // internals are unused there.
 #[cfg_attr(
-    not(any(target_os = "linux", target_os = "android", target_os = "macos")),
+    not(any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "macos",
+        windows
+    )),
     allow(dead_code)
 )]
 pub mod conn;
@@ -38,12 +43,27 @@ pub mod proto;
 pub mod queue;
 pub mod spin;
 
-#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
+#[cfg(any(
+    target_os = "linux",
+    target_os = "android",
+    target_os = "macos",
+    windows
+))]
 pub mod api;
-#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
+#[cfg(any(
+    target_os = "linux",
+    target_os = "android",
+    target_os = "macos",
+    windows
+))]
 mod sys;
 
-#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
+#[cfg(any(
+    target_os = "linux",
+    target_os = "android",
+    target_os = "macos",
+    windows
+))]
 pub use api::{
     ConnectBuilder, Context, ContextBuilder, HostBuilder, Incoming, PendingAccept, Sender, Server,
     Socket,

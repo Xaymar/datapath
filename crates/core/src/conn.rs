@@ -336,9 +336,12 @@ impl ConnCore {
     /// Close, wait for running callbacks, and drop the handlers without firing
     /// `on_close`. May be called from the connection's own callbacks.
     pub fn release<H: Hooks + ?Sized>(&self, hooks: &H) {
-        self.close_with(CloseReason::Local, hooks);
+        // Mark the close as fired before closing: an I/O thread that sees the
+        // closed connection first must not run `on_close`.
         let _cb = self.callback_lock.lock();
-        if self.close_fired.swap(true, Ordering::AcqRel) {
+        let fired = self.close_fired.swap(true, Ordering::AcqRel);
+        self.close_with(CloseReason::Local, hooks);
+        if fired {
             return;
         }
         let (on_message, on_close) = {
