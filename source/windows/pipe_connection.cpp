@@ -16,8 +16,9 @@ namespace {
 	// NtQueryInformationFile (FilePipeLocalInformation): the free outbound buffer
 	// space, capped at the buffer's size. WriteQuotaAvailable also counts reads
 	// the peer has pending, and a write larger than the buffer itself was seen
-	// to wait (1 MiB frames on a 1 MiB pipe). 0 when it can't be read.
-	uint64_t write_quota_available(HANDLE h) noexcept
+	// to wait (1 MiB frames on a 1 MiB pipe). 0 when it can't be read; the
+	// buffer's size goes to `outbound`.
+	uint64_t write_quota_available(HANDLE h, uint64_t& outbound) noexcept
 	{
 		struct io_status_block {
 			union {
@@ -39,6 +40,7 @@ namespace {
 		pipe_local_information info{};
 		if (fn(h, &iosb, &info, sizeof(info), 24 /*FilePipeLocalInformation*/) < 0)
 			return 0;
+		outbound = info.OutboundQuota;
 		return info.WriteQuotaAvailable < info.OutboundQuota ? info.WriteQuotaAvailable : info.OutboundQuota;
 	}
 }
@@ -242,7 +244,11 @@ bool datapath::windows::pipe_connection::direct_write_wanted(uint64_t frame_size
 	// Pipes have no gather write, so a direct send writes the header on its own
 	// and the reader may wake for it alone. On Irkela that cost more than the
 	// saved copy at 64 KiB (p50 12.7 -> 16 us) and less at 256 KiB (71 -> 53 us).
-	return frame_size > 2 * datapath::detail::send_queue::coalesce_limit;
+	// A frame larger than the pipe buffer is never sent directly (see
+	// platform_write_direct), so skip the attempt: it still cost ~10 us p50 and
+	// ~100 us p99 at 1 MiB on Irkela.
+	uint64_t outbound = _outbound_quota.load(std::memory_order_relaxed);
+	return frame_size > 2 * datapath::detail::send_queue::coalesce_limit && (!outbound || frame_size <= outbound);
 }
 
 size_t datapath::windows::pipe_connection::platform_write_direct(const uint8_t* header, size_t header_size,
@@ -257,7 +263,11 @@ size_t datapath::windows::pipe_connection::platform_write_direct(const uint8_t* 
 	// Only when the pipe buffer takes the whole frame now: then every write
 	// completes at once and the OS keeps no pointer into the caller's buffers.
 	// Otherwise the frame is copied into the queue as before.
-	if (write_quota_available(_h) < total)
+	uint64_t outbound = 0;
+	uint64_t quota    = write_quota_available(_h, outbound);
+	if (outbound)
+		_outbound_quota.store(outbound, std::memory_order_relaxed);
+	if (quota < total)
 		return 0;
 	if (!_direct_event) {
 		_direct_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
