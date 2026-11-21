@@ -236,7 +236,10 @@ void datapath::windows::pipe_connection::platform_write()
 
 bool datapath::windows::pipe_connection::direct_write_wanted(uint64_t frame_size) const noexcept
 {
-	return frame_size > datapath::detail::send_queue::coalesce_limit;
+	// Pipes have no gather write, so a direct send writes the header on its own
+	// and the reader may wake for it alone. On Irkela that cost more than the
+	// saved copy at 64 KiB (p50 12.7 -> 16 us) and less at 256 KiB (71 -> 53 us).
+	return frame_size > 2 * datapath::detail::send_queue::coalesce_limit;
 }
 
 size_t datapath::windows::pipe_connection::platform_write_direct(const uint8_t* header, size_t header_size,
