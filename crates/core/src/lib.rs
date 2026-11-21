@@ -25,6 +25,12 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
 
+// The connection core is only used by a backend; until Windows has one, its
+// internals are unused there.
+#[cfg_attr(
+    not(any(target_os = "linux", target_os = "android", target_os = "macos")),
+    allow(dead_code)
+)]
 pub mod conn;
 pub mod error;
 pub mod options;

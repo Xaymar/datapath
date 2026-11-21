@@ -10,7 +10,7 @@
 //!
 //! * Messages are delivered only by the backend's read chain, which runs on I/O
 //!   threads and is never concurrent with itself for one connection.
-//! * [`ConnCore::finish_close`] is called either by the read chain (once it
+//! * `ConnCore::finish_close` is called either by the read chain (once it
 //!   observes the connection closed) or, when reads were never armed, by a
 //!   posted close event. `on_close` therefore never races with `on_message`.
 //! * A handler that panics is caught here: the connection closes with
