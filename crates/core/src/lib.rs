@@ -15,7 +15,7 @@
 //! * [`queue`]: the bounded, coalescing, multi-producer send queue.
 //! * [`spin`]: busy-poll for a short budget, then block.
 //! * [`options`], [`conn`]: settings and the platform-neutral connection state machine.
-//! * [`api`]: contexts, sockets and servers, on Linux, Android and macOS so far.
+//! * `api`: contexts, sockets and servers, on Linux, Android and macOS so far.
 //!
 //! The platform-free modules do no I/O and need no `unsafe`. The backend under
 //! `sys` is built on `rustix` and is safe code too, except for three small

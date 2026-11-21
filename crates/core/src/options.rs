@@ -63,7 +63,7 @@ pub enum IdealCore {
     Core(u32),
 }
 
-/// Settings of a [`Context`](crate::Context): its I/O threads.
+/// Settings of a `Context`: its I/O threads.
 #[derive(Clone, Debug)]
 pub struct ContextOptions {
     /// Priority of the I/O threads. Default [`Priority::High`].
