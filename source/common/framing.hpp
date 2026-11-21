@@ -57,6 +57,12 @@ namespace datapath::detail {
 		static constexpr size_t min_read = 64 * 1024;
 		size_t                  _read_hint;
 		size_t                  _last_request = 0;
+		// Bytes still missing from a partly received frame that fits _buf (0 when
+		// none or unknown). The next read asks for at least this much, and a read
+		// that only finishes such a frame's tail does not shrink the hint: else a
+		// frame just over the hint (64 KiB payload + header) is always split into
+		// a full read and a tiny one, and the tiny one halves the hint again.
+		size_t                  _need = 0;
 
 		void compact() noexcept
 		{
@@ -102,7 +108,8 @@ namespace datapath::detail {
 				compact();
 			}
 			size_t room   = _buf.size() - _wpos;
-			_last_request = room < _read_hint ? room : _read_hint;
+			size_t want   = _need > _read_hint ? _need : _read_hint;
+			_last_request = room < want ? room : want;
 			return {_buf.data() + _wpos, _last_request};
 		}
 
@@ -124,9 +131,11 @@ namespace datapath::detail {
 			}
 
 			_wpos += n;
+			bool tail = _need != 0 && n <= _need;
+			_need     = 0;
 			if (n == _last_request && _read_hint < _buf.size()) {
 				_read_hint = (_read_hint * 2 < _buf.size()) ? _read_hint * 2 : _buf.size();
-			} else if (n < _read_hint / 8 && _read_hint > min_read) {
+			} else if (!tail && n < _read_hint / 8 && _read_hint > min_read) {
 				_read_hint /= 2;
 			}
 			for (;;) {
@@ -152,6 +161,7 @@ namespace datapath::detail {
 					// Fits the buffer; make room for the rest and wait for more data.
 					if (_rpos + frame_header_size + len > _buf.size())
 						compact();
+					_need = frame_header_size + size_t(len) - avail;
 					break;
 				}
 				// Larger than the receive buffer: move to a dedicated buffer.
