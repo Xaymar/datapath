@@ -210,11 +210,11 @@ impl Listener {
         drop(old);
     }
 
-    pub fn close(&self) {
+    pub fn close(&self) -> bool {
         let (conns, waiting, handler) = {
             let mut st = lock(&self.state);
             if st.closed {
-                return;
+                return false;
             }
             st.closed = true;
             if let Some(fd) = st.fd.take() {
@@ -243,6 +243,7 @@ impl Listener {
         if let Some(me) = self.me.upgrade() {
             self.loop_.post(Some(me), 0);
         }
+        true
     }
 
     /// Close, and wait for a running accept handler.

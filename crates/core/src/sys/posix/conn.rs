@@ -313,8 +313,8 @@ impl UdsConn {
         self.core.set_close_handler(handler);
     }
 
-    pub fn close(&self) {
-        self.core.close_with(CloseReason::Local, self);
+    pub fn close(&self) -> bool {
+        self.core.close_with(CloseReason::Local, self)
     }
 
     pub fn is_open(&self) -> bool {

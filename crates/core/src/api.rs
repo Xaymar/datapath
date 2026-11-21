@@ -180,9 +180,20 @@ impl Socket {
         self.conn.set_close_handler(Some(Box::new(handler)));
     }
 
-    /// Close the connection; the close handler fires.
-    pub fn close(&self) {
-        self.conn.close();
+    /// Close the connection; the close handler fires. Returns false if it was
+    /// closed already.
+    pub fn close(&self) -> bool {
+        self.conn.close()
+    }
+
+    /// Remove the message handler. Reading, once started, continues.
+    pub fn clear_on_message(&self) {
+        self.conn.set_message_handler(None);
+    }
+
+    /// Remove the close handler.
+    pub fn clear_on_close(&self) {
+        self.conn.set_close_handler(None);
     }
 
     /// True while the connection is open.
@@ -325,10 +336,26 @@ impl Server {
         }
     }
 
-    /// Stop accepting and close every connection of this server.
-    pub fn close(&self) {
-        self.listener.close();
+    /// Stop accepting and close every connection of this server. Returns false
+    /// if it was closed already.
+    pub fn close(&self) -> bool {
+        self.listener.close()
     }
+
+    /// Replace the accept handler. Clients that passed the handshake before
+    /// any handler was set are offered to it now.
+    pub fn set_on_accept(&self, handler: impl FnMut(Incoming) + Send + 'static) {
+        set_accept(&self.listener, Box::new(handler));
+    }
+
+    /// Remove the accept handler: later clients wait until one is set.
+    pub fn clear_on_accept(&self) {
+        self.listener.set_accept_handler(None);
+    }
+}
+
+fn set_accept(listener: &sys::Listener, mut f: Box<dyn FnMut(Incoming) + Send + 'static>) {
+    listener.set_accept_handler(Some(Box::new(move |conn| f(Incoming { conn: Some(conn) }))));
 }
 
 impl Drop for Server {
@@ -428,6 +455,27 @@ impl Incoming {
         let conn = self.conn.take().expect("accept consumes the Incoming");
         conn.complete_accept();
         Socket { conn }
+    }
+
+    /// Take the socket now and decide later. Handlers can be set and messages
+    /// queued on the socket right away, but the client's connect only completes
+    /// once [`PendingAccept::finish`] is called. Dropping the socket without
+    /// finishing rejects the client.
+    pub fn detach(mut self) -> (Socket, PendingAccept) {
+        let conn = self.conn.take().expect("detach consumes the Incoming");
+        (Socket { conn: conn.clone() }, PendingAccept { conn })
+    }
+}
+
+/// The decision still owed for a [`detach`](Incoming::detach)ed client.
+pub struct PendingAccept {
+    conn: Arc<sys::Conn>,
+}
+
+impl PendingAccept {
+    /// Complete the handshake: the client's connect returns.
+    pub fn finish(self) {
+        self.conn.complete_accept();
     }
 }
 

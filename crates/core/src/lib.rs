@@ -37,7 +37,8 @@ mod sys;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub use api::{
-    ConnectBuilder, Context, ContextBuilder, HostBuilder, Incoming, Sender, Server, Socket,
+    ConnectBuilder, Context, ContextBuilder, HostBuilder, Incoming, PendingAccept, Sender, Server,
+    Socket,
 };
 pub use conn::{CloseReason, SendError};
 pub use error::Error;
