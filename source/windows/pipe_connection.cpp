@@ -12,8 +12,11 @@ SPDX-License-Identifier: BSD-3-Clause
 namespace {
 	constexpr size_t max_io = size_t(1) << 30;
 
-	// Free space in the pipe's outbound buffer, from NtQueryInformationFile
-	// (FilePipeLocalInformation). 0 when it can't be read.
+	// Bytes a write can hand to the pipe without waiting, from
+	// NtQueryInformationFile (FilePipeLocalInformation): the free outbound buffer
+	// space, capped at the buffer's size. WriteQuotaAvailable also counts reads
+	// the peer has pending, and a write larger than the buffer itself was seen
+	// to wait (1 MiB frames on a 1 MiB pipe). 0 when it can't be read.
 	uint64_t write_quota_available(HANDLE h) noexcept
 	{
 		struct io_status_block {
@@ -36,7 +39,7 @@ namespace {
 		pipe_local_information info{};
 		if (fn(h, &iosb, &info, sizeof(info), 24 /*FilePipeLocalInformation*/) < 0)
 			return 0;
-		return info.WriteQuotaAvailable;
+		return info.WriteQuotaAvailable < info.OutboundQuota ? info.WriteQuotaAvailable : info.OutboundQuota;
 	}
 }
 
