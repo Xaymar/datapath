@@ -11,6 +11,33 @@ SPDX-License-Identifier: BSD-3-Clause
 
 namespace {
 	constexpr size_t max_io = size_t(1) << 30;
+
+	// Free space in the pipe's outbound buffer, from NtQueryInformationFile
+	// (FilePipeLocalInformation). 0 when it can't be read.
+	uint64_t write_quota_available(HANDLE h) noexcept
+	{
+		struct io_status_block {
+			union {
+				LONG  Status;
+				PVOID Pointer;
+			};
+			ULONG_PTR Information;
+		};
+		struct pipe_local_information {
+			ULONG NamedPipeType, NamedPipeConfiguration, MaximumInstances, CurrentInstances, InboundQuota,
+				ReadDataAvailable, OutboundQuota, WriteQuotaAvailable, NamedPipeState, NamedPipeEnd;
+		};
+		using query_t  = LONG(NTAPI*)(HANDLE, io_status_block*, PVOID, ULONG, int);
+		static auto fn = reinterpret_cast<query_t>(
+			reinterpret_cast<void*>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationFile")));
+		if (!fn)
+			return 0;
+		io_status_block        iosb{};
+		pipe_local_information info{};
+		if (fn(h, &iosb, &info, sizeof(info), 24 /*FilePipeLocalInformation*/) < 0)
+			return 0;
+		return info.WriteQuotaAvailable;
+	}
 }
 
 datapath::windows::pipe_connection::pipe_connection(std::shared_ptr<iocp_context> ctx, HANDLE h,
@@ -29,6 +56,8 @@ datapath::windows::pipe_connection::~pipe_connection()
 {
 	if (_h != INVALID_HANDLE_VALUE)
 		CloseHandle(_h);
+	if (_direct_event)
+		CloseHandle(_direct_event);
 }
 
 datapath::windows::pipe_connection::io_result datapath::windows::pipe_connection::issue(bool write, const uint8_t* buf,
@@ -203,6 +232,63 @@ void datapath::windows::pipe_connection::platform_post_close()
 void datapath::windows::pipe_connection::platform_write()
 {
 	write_loop();
+}
+
+bool datapath::windows::pipe_connection::direct_write_wanted(uint64_t frame_size) const noexcept
+{
+	return frame_size > datapath::detail::send_queue::coalesce_limit;
+}
+
+size_t datapath::windows::pipe_connection::platform_write_direct(const uint8_t* header, size_t header_size,
+																const buffer_view* parts, size_t count)
+{
+	std::shared_lock<std::shared_mutex> lock(_handle_lock);
+	if (_h == INVALID_HANDLE_VALUE)
+		return 0;
+	uint64_t total = header_size;
+	for (size_t i = 0; i < count; i++)
+		total += parts[i].size;
+	// Only when the pipe buffer takes the whole frame now: then every write
+	// completes at once and the OS keeps no pointer into the caller's buffers.
+	// Otherwise the frame is copied into the queue as before.
+	if (write_quota_available(_h) < total)
+		return 0;
+	if (!_direct_event) {
+		_direct_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+		if (!_direct_event)
+			return 0;
+	}
+	size_t sent  = 0;
+	auto   write = [&](const uint8_t* p, size_t n) -> bool {
+		while (n) {
+			OVERLAPPED ov{};
+			// Low bit set: the completion is not queued to the port.
+			ov.hEvent = reinterpret_cast<HANDLE>(reinterpret_cast<uintptr_t>(_direct_event) | 1);
+			DWORD got = 0;
+			if (!WriteFile(_h, p, DWORD(std::min(n, max_io)), &got, &ov)) {
+				DWORD err = GetLastError();
+				// Not expected after the quota check; wait so nothing still points
+				// into the caller's buffer when send() returns.
+				if (err != ERROR_IO_PENDING || !GetOverlappedResult(_h, &ov, &got, TRUE)) {
+					if (err == ERROR_IO_PENDING)
+						err = GetLastError();
+					lock.unlock();
+					close_with(map_error(err));
+					return false;
+				}
+			}
+			sent += got;
+			p += got;
+			n -= got;
+		}
+		return true;
+	};
+	if (!write(header, header_size))
+		return 0;
+	for (size_t i = 0; i < count; i++)
+		if (!write(static_cast<const uint8_t*>(parts[i].data), parts[i].size))
+			return 0;
+	return sent;
 }
 
 void datapath::windows::pipe_connection::after_inline_write()

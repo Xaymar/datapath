@@ -7,6 +7,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 #include "uds_connection.hpp"
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <sched.h>
 #include <unistd.h>
 #include <algorithm>
@@ -230,6 +231,49 @@ void datapath::posix::uds_connection::platform_post_close()
 void datapath::posix::uds_connection::platform_write()
 {
 	write_loop();
+}
+
+bool datapath::posix::uds_connection::direct_write_wanted(uint64_t frame_size) const noexcept
+{
+	return frame_size > datapath::detail::send_queue::coalesce_limit;
+}
+
+size_t datapath::posix::uds_connection::platform_write_direct(const uint8_t* header, size_t header_size,
+															 const buffer_view* parts, size_t count)
+{
+	// One sendmsg() for header and payload: no copy, and the peer never sees
+	// the header without the data that follows it.
+	constexpr size_t     max_iov = 64;
+	struct iovec         iov[max_iov];
+	size_t               n       = 0;
+	iov[n++]                     = {const_cast<uint8_t*>(header), header_size};
+	for (size_t i = 0; i < count && n < max_iov; i++)
+		if (parts[i].size)
+			iov[n++] = {const_cast<void*>(parts[i].data), parts[i].size};
+	// More parts than iovecs: send what fits, the rest is queued by the caller.
+	size_t sent = 0;
+	for (;;) {
+		msghdr msg{};
+		msg.msg_iov    = iov;
+		msg.msg_iovlen = decltype(msg.msg_iovlen)(n);
+		ssize_t r;
+		int     err = 0;
+		{
+			std::shared_lock<std::shared_mutex> fl(_fd_lock);
+			if (_fd < 0)
+				return sent;
+			r   = ::sendmsg(_fd, &msg, send_flags);
+			err = errno;
+		}
+		if (r >= 0)
+			return sent + size_t(r);
+		if (err == EINTR)
+			continue;
+		if (err == EAGAIN || err == EWOULDBLOCK)
+			return sent;
+		close_with(map_errno(err));
+		return 0;
+	}
 }
 
 void datapath::posix::uds_connection::after_inline_write()

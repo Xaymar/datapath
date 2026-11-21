@@ -264,4 +264,47 @@ TEST(recycled_blocks_are_reused)
 	q.recycle(std::vector<uint8_t>(16));
 }
 
+TEST(direct_send_takes_slot_only_when_idle)
+{
+	send_queue q(1 << 20, 1 << 20);
+	bool       d = false;
+	CHECK(q.try_begin_direct((1 << 20) + 1, d) == error::TooLarge);
+	CHECK(!d);
+	CHECK(q.try_begin_direct(100000, d) == error::Success);
+	CHECK(d);
+	// Writer slot is held: a second direct send and a push both see that.
+	bool d2 = true, w = true;
+	CHECK(q.try_begin_direct(100000, d2) == error::Success);
+	CHECK(!d2);
+	CHECK(push(q, 10, w, 9) == error::Success);
+	CHECK(!w);
+
+	// The OS took 3 bytes of header+payload; the rest goes ahead of the queued frame.
+	uint8_t     header[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+	uint8_t     a[4] = {10, 11, 12, 13}, b[3] = {20, 21, 22};
+	buffer_view parts[] = {{a, 4}, {b, 3}};
+	q.push_front_rest(header, 8, parts, 2, 3);
+	std::vector<uint8_t> batch;
+	CHECK(q.take(batch));
+	std::vector<uint8_t> want = {4, 5, 6, 7, 8, 10, 11, 12, 13, 20, 21, 22};
+	CHECK(batch == want);
+	CHECK(q.take(batch));
+	CHECK_EQ(batch.size(), size_t(18)); // the small frame pushed meanwhile
+	CHECK(!q.take(batch));
+
+	// All of it sent: nothing is queued. Rest past a part boundary works too.
+	CHECK(q.try_begin_direct(7, d) == error::Success);
+	CHECK(d);
+	q.push_front_rest(header, 8, parts, 2, 15);
+	CHECK(!q.take(batch));
+	CHECK(q.try_begin_direct(7, d) == error::Success);
+	q.push_front_rest(header, 8, parts, 2, 13);
+	CHECK(q.take(batch));
+	CHECK(batch == (std::vector<uint8_t>{21, 22}));
+	CHECK(!q.take(batch));
+
+	q.close();
+	CHECK(q.try_begin_direct(7, d) == error::Closed);
+}
+
 TEST_MAIN()

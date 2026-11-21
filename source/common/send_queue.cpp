@@ -122,6 +122,57 @@ bool datapath::detail::send_queue::try_acquire()
 	return true;
 }
 
+datapath::error datapath::detail::send_queue::try_begin_direct(uint64_t total, bool& acquired)
+{
+	acquired = false;
+	std::unique_lock<std::mutex> ul(_lock);
+	if (_closed)
+		return datapath::error::Closed;
+	if (total > _limit)
+		return datapath::error::TooLarge;
+	if (_writing || !_blocks.empty())
+		return datapath::error::Success;
+	_writing = true;
+	acquired = true;
+	return datapath::error::Success;
+}
+
+void datapath::detail::send_queue::push_front_rest(const uint8_t* header, size_t header_size,
+												  const buffer_view* parts, size_t count, size_t sent)
+{
+	size_t total = header_size;
+	for (size_t i = 0; i < count; i++)
+		total += parts[i].size;
+	if (sent >= total)
+		return;
+	std::vector<uint8_t> block;
+	{
+		std::unique_lock<std::mutex> ul(_lock);
+		if (_closed)
+			return;
+		if (_spare_large.capacity() >= total - sent)
+			block = std::move(_spare_large);
+	}
+	block.clear();
+	block.reserve(total - sent);
+	auto append = [&](const uint8_t* p, size_t n) {
+		if (sent >= n) {
+			sent -= n;
+			return;
+		}
+		block.insert(block.end(), p + sent, p + n);
+		sent = 0;
+	};
+	append(header, header_size);
+	for (size_t i = 0; i < count; i++)
+		append(static_cast<const uint8_t*>(parts[i].data), parts[i].size);
+	std::unique_lock<std::mutex> ul(_lock);
+	if (_closed)
+		return;
+	_queued += block.size();
+	_blocks.push_front(std::move(block));
+}
+
 void datapath::detail::send_queue::recycle(std::vector<uint8_t>&& buffer)
 {
 	std::unique_lock<std::mutex> ul(_lock);

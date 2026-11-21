@@ -270,6 +270,69 @@ TEST(concurrent_senders)
 	CHECK_EQ(bad.load(), 0);
 }
 
+TEST(concurrent_large_and_small_senders)
+{
+	// Large messages may be written straight from the caller's buffer while other
+	// threads queue small ones; every message must still arrive whole and in
+	// per-thread order.
+	constexpr int threads = 6, per = 150;
+	auto          name    = unique_name();
+	srv_ptr       server;
+	CHECK_EQ(datapath::host(server, name), error::Success);
+
+	auto size_of = [](int t, int i) -> size_t {
+		return (i % 3 == 0) ? 65536 + size_t((i * 977 + t * 31) % 200000) : 5 + size_t((i * 131 + t * 7) % 3000);
+	};
+	std::mutex       lock;
+	std::vector<int> next(threads, 0);
+	std::atomic<int> bad{0};
+	latch            got;
+	sock_ptr         keep;
+	server->on_accept([&](sock_ptr s) {
+		keep = s;
+		s->on_message([&](const uint8_t* d, size_t n) {
+			int t = d[0], i;
+			std::memcpy(&i, d + 1, 4);
+			bool ok = t < threads && n == size_of(t, i);
+			for (size_t k = 5; ok && k < n; k++)
+				ok = d[k] == uint8_t(t + i + k);
+			{
+				std::lock_guard<std::mutex> l(lock);
+				if (!ok || next[t] != i)
+					bad++;
+				next[t] = i + 1;
+			}
+			got.notify();
+		});
+		return true;
+	});
+
+	sock_ptr c;
+	CHECK_EQ(datapath::connect(c, name), error::Success);
+	std::vector<std::thread> ts;
+	for (int t = 0; t < threads; t++) {
+		ts.emplace_back([&, t] {
+			for (int i = 0; i < per; i++) {
+				bytes p(size_of(t, i));
+				for (size_t k = 5; k < p.size(); k++)
+					p[k] = uint8_t(t + i + k);
+				p[0] = uint8_t(t);
+				std::memcpy(&p[1], &i, 4);
+				// Split in two parts to exercise gathered direct writes.
+				datapath::buffer_view parts[] = {{p.data(), 5}, {p.data() + 5, p.size() - 5}};
+				while (c->sendv(parts, 2) == error::WouldBlock)
+					std::this_thread::yield();
+				// The caller's buffer is reused right away: nothing may still point into it.
+				std::fill(p.begin(), p.end(), uint8_t(0xEE));
+			}
+		});
+	}
+	for (auto& t : ts)
+		t.join();
+	CHECK(got.wait(threads * per, 60s));
+	CHECK_EQ(bad.load(), 0);
+}
+
 TEST(many_clients)
 {
 	constexpr int clients = 16, per = 100;

@@ -54,6 +54,23 @@ namespace datapath::detail {
 		virtual void platform_write() = 0;
 		// Called after send() wrote data from the caller's thread.
 		virtual void after_inline_write() {}
+		// Direct send, caller holds the writer slot and nothing is queued: write
+		// `header` then `parts` straight from these buffers without blocking, and
+		// return how many bytes the OS took right away (the rest gets queued).
+		// Must not leave the OS holding a pointer into the buffers on return. On a
+		// hard error, close the connection and return 0. The default writes nothing.
+		virtual size_t platform_write_direct(const uint8_t* header, size_t header_size, const buffer_view* parts,
+											 size_t count)
+		{
+			(void)header, (void)header_size, (void)parts, (void)count;
+			return 0;
+		}
+		// Whether platform_write_direct() is worth trying for a frame of this size.
+		virtual bool direct_write_wanted(uint64_t frame_size) const noexcept
+		{
+			(void)frame_size;
+			return false;
+		}
 		// Called after on_close has fired (listener bookkeeping).
 		virtual void on_finished() {}
 
@@ -144,6 +161,27 @@ namespace datapath::detail {
 		{
 			if (_closed.load(std::memory_order_acquire))
 				return datapath::error::Closed;
+			uint64_t total = 0;
+			for (size_t i = 0; i < count; i++)
+				total += parts[i].size;
+			if (direct_write_wanted(total + frame_header_size)) {
+				// Large message and nothing queued: write it from the caller's buffers
+				// instead of copying it into the queue first. Only what the OS does
+				// not take right away gets copied.
+				bool direct = false;
+				auto ec     = _queue.try_begin_direct(total, direct);
+				if (ec != datapath::error::Success)
+					return ec;
+				if (direct) {
+					uint8_t header[frame_header_size];
+					encode_frame_header(header, total);
+					size_t sent = platform_write_direct(header, frame_header_size, parts, count);
+					_queue.push_front_rest(header, frame_header_size, parts, count, sent);
+					platform_write(); // drains what others queued meanwhile, then releases the slot
+					after_inline_write();
+					return datapath::error::Success;
+				}
+			}
 			bool writer = false;
 			auto ec     = _queue.push(parts, count, writer);
 			if (ec == datapath::error::Success && writer) {
