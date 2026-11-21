@@ -21,9 +21,8 @@ use crate::proto::FrameParser;
 use crate::queue::SendQueue;
 use std::fmt;
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
-use std::thread::{self, ThreadId};
 
 /// Why a connection ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -113,8 +112,18 @@ pub(crate) trait Hooks {
 /// A mutex the same thread may take again. `release` takes it to wait for
 /// running callbacks, and may be called from inside one.
 pub(crate) struct ReentrantLock {
-    state: Mutex<(Option<ThreadId>, usize)>,
+    /// (owner thread id, 0 = none; depth)
+    state: Mutex<(u64, usize)>,
     cv: Condvar,
+}
+
+/// A cheap per-thread id (`thread::current().id()` clones an `Arc` each call).
+fn thread_token() -> u64 {
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+    thread_local! {
+        static TOKEN: u64 = NEXT.fetch_add(1, Ordering::Relaxed);
+    }
+    TOKEN.with(|t| *t)
 }
 
 pub(crate) struct ReentrantGuard<'a>(&'a ReentrantLock);
@@ -122,26 +131,24 @@ pub(crate) struct ReentrantGuard<'a>(&'a ReentrantLock);
 impl ReentrantLock {
     pub(crate) fn new() -> Self {
         ReentrantLock {
-            state: Mutex::new((None, 0)),
+            state: Mutex::new((0, 0)),
             cv: Condvar::new(),
         }
     }
 
     pub(crate) fn lock(&self) -> ReentrantGuard<'_> {
-        let me = thread::current().id();
+        let me = thread_token();
         let mut s = lock(&self.state);
         loop {
-            match s.0 {
-                None => {
-                    *s = (Some(me), 1);
-                    break;
-                }
-                Some(owner) if owner == me => {
-                    s.1 += 1;
-                    break;
-                }
-                _ => s = self.cv.wait(s).unwrap_or_else(|e| e.into_inner()),
+            if s.0 == 0 {
+                *s = (me, 1);
+                break;
             }
+            if s.0 == me {
+                s.1 += 1;
+                break;
+            }
+            s = self.cv.wait(s).unwrap_or_else(|e| e.into_inner());
         }
         ReentrantGuard(self)
     }
@@ -152,7 +159,7 @@ impl Drop for ReentrantGuard<'_> {
         let mut s = lock(&self.0.state);
         s.1 -= 1;
         if s.1 == 0 {
-            s.0 = None;
+            s.0 = 0;
             self.0.cv.notify_one();
         }
     }

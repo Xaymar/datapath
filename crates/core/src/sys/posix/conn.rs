@@ -64,6 +64,8 @@ pub(crate) struct UdsConn {
     /// The writer slot is parked with the loop: it resumes on `OUT`.
     write_parked: AtomicBool,
     wstate: Mutex<WriteState>,
+    /// True while a server-side connection still reads the client's hello.
+    handshaking: AtomicBool,
     hs: Mutex<Handshake>,
 }
 
@@ -88,6 +90,7 @@ impl UdsConn {
                 off: 0,
                 close_when_flushed: false,
             }),
+            handshaking: AtomicBool::new(false),
             hs: Mutex::new(Handshake {
                 active: false,
                 hello: [0; HELLO_SIZE],
@@ -115,6 +118,7 @@ impl UdsConn {
         if handshake {
             let mut hs = lock(&self.hs);
             hs.active = true;
+            self.handshaking.store(true, Ordering::Release);
             hs.listener = listener;
             hs.own_limit = own_limit;
             // The reply goes out before anything the user queues.
@@ -247,6 +251,7 @@ impl UdsConn {
                         continue;
                     }
                     hs.active = false;
+                    self.handshaking.store(false, Ordering::Release);
                     // Data waits in the kernel until reads are armed.
                     self.update_mask(0, ev::IN);
                     let hello = Hello::decode(&hs.hello);
@@ -396,8 +401,7 @@ impl Target for UdsConn {
             self.write_loop();
         }
         if events & (ev::IN | ev::RDHUP | ev::HUP | ev::ERR) != 0 {
-            let handshaking = lock(&self.hs).active;
-            if handshaking {
+            if self.handshaking.load(Ordering::Acquire) {
                 self.hello_read();
             } else if self.core.armed() {
                 self.read_loop();
