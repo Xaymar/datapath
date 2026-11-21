@@ -3,9 +3,9 @@
 //
 // SPDX-License-Identifier: BSD-3-Clause
 
-//! Readiness poller: epoll on Linux and Android, woken by an eventfd.
+//! epoll, woken by an eventfd (Linux, Android).
 
-use super::ev;
+use crate::sys::posix::ev;
 use rustix::event::epoll::{self, CreateFlags, EventData, EventFlags, EventVec};
 use rustix::event::{eventfd, EventfdFlags};
 use std::os::fd::{AsFd, OwnedFd};
@@ -78,7 +78,7 @@ impl Poller {
 
     /// Change the registration; this re-checks readiness, so enabling `OUT` on
     /// a socket that is already writable reports it.
-    pub fn modify(&self, fd: impl AsFd, events: u32, key: u64) -> bool {
+    pub fn modify(&self, fd: impl AsFd, _old_events: u32, events: u32, key: u64) -> bool {
         epoll::modify(&self.epoll, fd, EventData::new_u64(key), to_flags(events)).is_ok()
     }
 

@@ -147,7 +147,7 @@ impl UdsConn {
         if new == *mask {
             return;
         }
-        self.loop_.modify(fd, new, key_of_self(self));
+        self.loop_.modify(fd, *mask, new, key_of_self(self));
         *mask = new;
     }
 

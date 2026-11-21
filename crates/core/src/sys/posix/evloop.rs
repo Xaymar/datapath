@@ -86,8 +86,8 @@ impl Loop {
         }
     }
 
-    pub fn modify(&self, fd: impl AsFd, events: u32, key: u64) -> bool {
-        self.poller.modify(fd, events, key)
+    pub fn modify(&self, fd: impl AsFd, old_events: u32, events: u32, key: u64) -> bool {
+        self.poller.modify(fd, old_events, events, key)
     }
 
     pub fn remove_fd(&self, fd: impl AsFd) {

@@ -7,7 +7,7 @@
 //! it with this crate's static library: the header stays the contract, and this
 //! proves the Rust library fulfils it.
 
-#![cfg(any(target_os = "linux", target_os = "android"))]
+#![cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 
 use std::path::PathBuf;
 use std::process::Command;

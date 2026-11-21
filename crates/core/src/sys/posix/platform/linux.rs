@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: BSD-3-Clause
 
-//! The parts of the POSIX backend that differ between operating systems.
+//! Linux and Android.
 
 use crate::options::Options;
 use rustix::io::Errno;

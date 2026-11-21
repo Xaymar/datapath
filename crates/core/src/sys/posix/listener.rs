@@ -53,15 +53,26 @@ pub(crate) struct Listener {
 }
 
 /// True if the socket file at `addr` has no server behind it. Linux refuses
-/// connections only when nobody listens (a full backlog is EAGAIN).
+/// connections only when nobody listens (a full backlog is EAGAIN); macOS also
+/// refuses them while a live server's backlog is full, so it asks a few times
+/// before declaring the file stale.
 fn stale_socket(addr: &SocketAddress) -> bool {
-    let Ok(probe) = open_stream_socket() else {
-        return false;
-    };
-    matches!(
-        rustix::net::connect_unix(&probe, &addr.addr),
-        Err(Errno::CONNREFUSED)
-    )
+    let attempts = if cfg!(target_os = "macos") { 20 } else { 1 };
+    for i in 0..attempts {
+        if i > 0 {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let Ok(probe) = open_stream_socket() else {
+            return false;
+        };
+        if !matches!(
+            rustix::net::connect_unix(&probe, &addr.addr),
+            Err(Errno::CONNREFUSED)
+        ) {
+            return false;
+        }
+    }
+    true
 }
 
 impl Listener {

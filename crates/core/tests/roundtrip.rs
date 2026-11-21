@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: BSD-3-Clause
 
-#![cfg(any(target_os = "linux", target_os = "android"))]
+#![cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 
 use datapath_core::{CloseReason, Context, Error, Options, SendError, Server, Socket};
 use std::io::IoSlice;

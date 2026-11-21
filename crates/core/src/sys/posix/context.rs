@@ -186,21 +186,49 @@ impl ContextShared {
         let addr = make_socket_address(path).ok_or(Error::InvalidPath)?;
         let deadline = Instant::now() + opts.connect_timeout;
 
-        let fd = open_stream_socket().map_err(|_| Error::CriticalFailure)?;
+        #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
+        let mut fd = open_stream_socket().map_err(|_| Error::CriticalFailure)?;
         tune(&fd, opts);
         loop {
-            match rustix::net::connect_unix(&fd, &addr.addr) {
+            #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
+            let mut err = match rustix::net::connect_unix(&fd, &addr.addr) {
                 Ok(()) => break,
-                Err(Errno::INTR) => continue,
-                // Backlog full: the server is busy or stalled. Retry until the deadline.
-                Err(Errno::AGAIN) if Instant::now() < deadline => {
-                    std::thread::sleep(Duration::from_millis(1));
-                }
-                Err(Errno::NOENT) | Err(Errno::CONNREFUSED) => return Err(Error::NotFound),
-                Err(Errno::ACCESS) | Err(Errno::PERM) => return Err(Error::AccessDenied),
-                Err(Errno::AGAIN) => return Err(Error::TimedOut),
-                Err(_) => return Err(Error::Failure),
+                Err(e) => e,
+            };
+            if err == Errno::INTR {
+                continue;
             }
+            // macOS refuses connections while a live server's backlog is full,
+            // the same way it does for a socket file without a server. Keep
+            // trying while the file exists; the deadline reports TimedOut like
+            // a full backlog.
+            #[cfg(target_os = "macos")]
+            if err == Errno::CONNREFUSED {
+                if let Some(path) = &addr.filesystem_path {
+                    if matches!(rustix::fs::stat(path.as_str()),
+                        Ok(st) if rustix::fs::FileType::from_raw_mode(st.st_mode) == rustix::fs::FileType::Socket)
+                    {
+                        err = Errno::AGAIN;
+                    }
+                }
+            }
+            if err == Errno::AGAIN && Instant::now() < deadline {
+                // Backlog full: the server is busy or stalled. Retry until the deadline.
+                std::thread::sleep(Duration::from_millis(1));
+                // BSD sockets are unusable after a failed connect(): start over.
+                #[cfg(target_os = "macos")]
+                {
+                    fd = open_stream_socket().map_err(|_| Error::CriticalFailure)?;
+                    tune(&fd, opts);
+                }
+                continue;
+            }
+            return Err(match err {
+                Errno::NOENT | Errno::CONNREFUSED => Error::NotFound,
+                Errno::ACCESS | Errno::PERM => Error::AccessDenied,
+                Errno::AGAIN => Error::TimedOut,
+                _ => Error::Failure,
+            });
         }
 
         let mut hello = Hello::new(opts.max_message_size).encode();

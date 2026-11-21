@@ -15,10 +15,12 @@
 //! * [`queue`]: the bounded, coalescing, multi-producer send queue.
 //! * [`spin`]: busy-poll for a short budget, then block.
 //! * [`options`], [`conn`]: settings and the platform-neutral connection state machine.
-//! * [`api`]: contexts, sockets and servers, on Linux and Android so far.
+//! * [`api`]: contexts, sockets and servers, on Linux, Android and macOS so far.
 //!
-//! The platform-free modules do no I/O and need no `unsafe`; the backend under
-//! `sys` is built on `rustix` and is safe code as well.
+//! The platform-free modules do no I/O and need no `unsafe`. The backend under
+//! `sys` is built on `rustix` and is safe code too, except for three small
+//! spots on macOS where `rustix` has no wrapper (kqueue's `kevent`, the
+//! quality-of-service call, and `sysctlbyname`), each a single FFI call.
 
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
@@ -30,12 +32,12 @@ pub mod proto;
 pub mod queue;
 pub mod spin;
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 pub mod api;
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 mod sys;
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 pub use api::{
     ConnectBuilder, Context, ContextBuilder, HostBuilder, Incoming, PendingAccept, Sender, Server,
     Socket,
