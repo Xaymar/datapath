@@ -10,4 +10,5 @@ repository.workspace = true
 homepage.workspace = true
 publish = false
 
-[dependencies]
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "0.38", features = ["net", "event", "process", "thread", "fs"] }

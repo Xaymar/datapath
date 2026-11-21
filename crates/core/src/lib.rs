@@ -14,15 +14,31 @@
 //! * [`proto`]: the wire format (frame header, handshake, incremental frame parser).
 //! * [`queue`]: the bounded, coalescing, multi-producer send queue.
 //! * [`spin`]: busy-poll for a short budget, then block.
+//! * [`options`], [`conn`]: settings and the platform-neutral connection state machine.
+//! * [`api`]: contexts, sockets and servers, on Linux and Android so far.
 //!
-//! None of these modules does I/O or needs `unsafe`.
+//! The platform-free modules do no I/O and need no `unsafe`; the backend under
+//! `sys` is built on `rustix` and is safe code as well.
 
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod conn;
 pub mod error;
+pub mod options;
 pub mod proto;
 pub mod queue;
 pub mod spin;
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub mod api;
+#[cfg(any(target_os = "linux", target_os = "android"))]
+mod sys;
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub use api::{
+    ConnectBuilder, Context, ContextBuilder, HostBuilder, Incoming, Sender, Server, Socket,
+};
+pub use conn::{CloseReason, SendError};
 pub use error::Error;
+pub use options::{ContextOptions, IdealCore, Options, Permissions, Priority};
