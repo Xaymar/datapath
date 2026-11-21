@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["FRAME_HEADER_SIZE","HELLO_SIZE","PROTOCOL_VERSION"],"fn":["encode_frame_header"],"struct":["FrameParser","Hello"]};

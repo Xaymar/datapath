@@ -1,0 +1,1 @@
+{"rustc":18169182855791486453,"features":"[]","declared_features":"[]","target":15167064442193507038,"profile":4625255726265738819,"path":587156000829610627,"deps":[[18004438656992273299,"datapath_core",false,4697883079731254915]],"local":[{"Precalculated":"1795231848.261394887s (tests/abi.rs)"}],"rustflags":["-D","warnings"],"config":9396254390672932401,"compile_kind":0}
