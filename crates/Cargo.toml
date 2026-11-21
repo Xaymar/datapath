@@ -14,9 +14,3 @@ homepage = "https://github.com/Xaymar/datapath"
 [profile.release]
 lto = "fat"
 codegen-units = 1
-
-# For the C ABI library (C/C++ callers cannot unwind into Rust handlers).
-# Use: cargo build --profile capi -p datapath-capi
-[profile.capi]
-inherits = "release"
-panic = "abort"
