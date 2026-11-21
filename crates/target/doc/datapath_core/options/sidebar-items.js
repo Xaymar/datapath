@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["IdealCore","Permissions","Priority"],"struct":["ContextOptions","Options"]};

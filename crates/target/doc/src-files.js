@@ -1,2 +1,0 @@
-createSrcSidebar('[["datapath_capi",["",[],["imp.rs","lib.rs"]]],["datapath_core",["",[["sys",[["posix",[["platform",[],["linux.rs","mod.rs"]],["poller",[],["epoll.rs","mod.rs"]]],["conn.rs","context.rs","evloop.rs","listener.rs","mod.rs","path.rs"]]],["mod.rs"]]],["api.rs","conn.rs","error.rs","lib.rs","options.rs","proto.rs","queue.rs","spin.rs"]]],["datapath_core",["",[],["error.rs","lib.rs","proto.rs","queue.rs","spin.rs"]]]]');
-//{"start":19,"fragment_lengths":[45,288,80]}

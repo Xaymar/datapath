@@ -1,9 +1,0 @@
-(function() {
-    const implementors = Object.fromEntries([["datapath_core",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.97.0/core/default/trait.Default.html\" title=\"trait core::default::Default\">Default</a> for <a class=\"enum\" href=\"datapath_core/options/enum.IdealCore.html\" title=\"enum datapath_core::options::IdealCore\">IdealCore</a>",0],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.97.0/core/default/trait.Default.html\" title=\"trait core::default::Default\">Default</a> for <a class=\"enum\" href=\"datapath_core/options/enum.Permissions.html\" title=\"enum datapath_core::options::Permissions\">Permissions</a>",0],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.97.0/core/default/trait.Default.html\" title=\"trait core::default::Default\">Default</a> for <a class=\"enum\" href=\"datapath_core/options/enum.Priority.html\" title=\"enum datapath_core::options::Priority\">Priority</a>",0],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.97.0/core/default/trait.Default.html\" title=\"trait core::default::Default\">Default</a> for <a class=\"struct\" href=\"datapath_core/options/struct.ContextOptions.html\" title=\"struct datapath_core::options::ContextOptions\">ContextOptions</a>",0],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.97.0/core/default/trait.Default.html\" title=\"trait core::default::Default\">Default</a> for <a class=\"struct\" href=\"datapath_core/options/struct.Options.html\" title=\"struct datapath_core::options::Options\">Options</a>",0]]]]);
-    if (window.register_implementors) {
-        window.register_implementors(implementors);
-    } else {
-        window.pending_implementors = implementors;
-    }
-})()
-//{"start":59,"fragment_lengths":[1498]}
