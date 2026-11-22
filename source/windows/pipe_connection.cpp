@@ -11,6 +11,38 @@ SPDX-License-Identifier: BSD-3-Clause
 
 namespace {
 	constexpr size_t max_io = size_t(1) << 30;
+
+	// Bytes a write can hand to the pipe without waiting, from
+	// NtQueryInformationFile (FilePipeLocalInformation): the free outbound buffer
+	// space, capped at the buffer's size. WriteQuotaAvailable also counts reads
+	// the peer has pending, and a write larger than the buffer itself was seen
+	// to wait (1 MiB frames on a 1 MiB pipe). 0 when it can't be read; the
+	// buffer's size goes to `outbound`.
+	uint64_t write_quota_available(HANDLE h, uint64_t& outbound) noexcept
+	{
+		struct io_status_block {
+			union {
+				LONG  Status;
+				PVOID Pointer;
+			};
+			ULONG_PTR Information;
+		};
+		struct pipe_local_information {
+			ULONG NamedPipeType, NamedPipeConfiguration, MaximumInstances, CurrentInstances, InboundQuota,
+				ReadDataAvailable, OutboundQuota, WriteQuotaAvailable, NamedPipeState, NamedPipeEnd;
+		};
+		using query_t  = LONG(NTAPI*)(HANDLE, io_status_block*, PVOID, ULONG, int);
+		static auto fn = reinterpret_cast<query_t>(
+			reinterpret_cast<void*>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationFile")));
+		if (!fn)
+			return 0;
+		io_status_block        iosb{};
+		pipe_local_information info{};
+		if (fn(h, &iosb, &info, sizeof(info), 24 /*FilePipeLocalInformation*/) < 0)
+			return 0;
+		outbound = info.OutboundQuota;
+		return info.WriteQuotaAvailable < info.OutboundQuota ? info.WriteQuotaAvailable : info.OutboundQuota;
+	}
 }
 
 datapath::windows::pipe_connection::pipe_connection(std::shared_ptr<iocp_context> ctx, HANDLE h,
@@ -29,6 +61,8 @@ datapath::windows::pipe_connection::~pipe_connection()
 {
 	if (_h != INVALID_HANDLE_VALUE)
 		CloseHandle(_h);
+	if (_direct_event)
+		CloseHandle(_direct_event);
 }
 
 datapath::windows::pipe_connection::io_result datapath::windows::pipe_connection::issue(bool write, const uint8_t* buf,
@@ -203,6 +237,74 @@ void datapath::windows::pipe_connection::platform_post_close()
 void datapath::windows::pipe_connection::platform_write()
 {
 	write_loop();
+}
+
+bool datapath::windows::pipe_connection::direct_write_wanted(uint64_t frame_size) const noexcept
+{
+	// Pipes have no gather write, so a direct send writes the header on its own
+	// and the reader may wake for it alone. On Irkela that cost more than the
+	// saved copy at 64 KiB (p50 12.7 -> 16 us) and less at 256 KiB (71 -> 53 us).
+	// A frame larger than the pipe buffer is never sent directly (see
+	// platform_write_direct), so skip the attempt: it still cost ~10 us p50 and
+	// ~100 us p99 at 1 MiB on Irkela.
+	uint64_t outbound = _outbound_quota.load(std::memory_order_relaxed);
+	return frame_size > 2 * datapath::detail::send_queue::coalesce_limit && (!outbound || frame_size <= outbound);
+}
+
+size_t datapath::windows::pipe_connection::platform_write_direct(const uint8_t* header, size_t header_size,
+																const buffer_view* parts, size_t count)
+{
+	std::shared_lock<std::shared_mutex> lock(_handle_lock);
+	if (_h == INVALID_HANDLE_VALUE)
+		return 0;
+	uint64_t total = header_size;
+	for (size_t i = 0; i < count; i++)
+		total += parts[i].size;
+	// Only when the pipe buffer takes the whole frame now: then every write
+	// completes at once and the OS keeps no pointer into the caller's buffers.
+	// Otherwise the frame is copied into the queue as before.
+	uint64_t outbound = 0;
+	uint64_t quota    = write_quota_available(_h, outbound);
+	if (outbound)
+		_outbound_quota.store(outbound, std::memory_order_relaxed);
+	if (quota < total)
+		return 0;
+	if (!_direct_event) {
+		_direct_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+		if (!_direct_event)
+			return 0;
+	}
+	size_t sent  = 0;
+	auto   write = [&](const uint8_t* p, size_t n) -> bool {
+		while (n) {
+			OVERLAPPED ov{};
+			// Low bit set: the completion is not queued to the port.
+			ov.hEvent = reinterpret_cast<HANDLE>(reinterpret_cast<uintptr_t>(_direct_event) | 1);
+			DWORD got = 0;
+			if (!WriteFile(_h, p, DWORD(std::min(n, max_io)), &got, &ov)) {
+				DWORD err = GetLastError();
+				// Not expected after the quota check; wait so nothing still points
+				// into the caller's buffer when send() returns.
+				if (err != ERROR_IO_PENDING || !GetOverlappedResult(_h, &ov, &got, TRUE)) {
+					if (err == ERROR_IO_PENDING)
+						err = GetLastError();
+					lock.unlock();
+					close_with(map_error(err));
+					return false;
+				}
+			}
+			sent += got;
+			p += got;
+			n -= got;
+		}
+		return true;
+	};
+	if (!write(header, header_size))
+		return 0;
+	for (size_t i = 0; i < count; i++)
+		if (!write(static_cast<const uint8_t*>(parts[i].data), parts[i].size))
+			return 0;
+	return sent;
 }
 
 void datapath::windows::pipe_connection::after_inline_write()

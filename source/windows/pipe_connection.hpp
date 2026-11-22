@@ -6,6 +6,7 @@ SPDX-License-Identifier: BSD-3-Clause
 */
 
 #pragma once
+#include <atomic>
 #include <memory>
 #include <shared_mutex>
 #include <vector>
@@ -30,6 +31,11 @@ namespace datapath::windows {
 		// Writer-slot state.
 		std::vector<uint8_t> _wbatch;
 		size_t               _woff = 0;
+		// Event for direct writes (created on first use, writer-slot holder only).
+		// Used with its low bit set so those writes never post to the port.
+		HANDLE               _direct_event = nullptr;
+		// Outbound pipe buffer size, learned on the first direct send; 0 = unknown.
+		std::atomic<uint64_t> _outbound_quota{0};
 
 		// Server-side handshake state.
 		uint8_t                      _hello[datapath::detail::hello_size] = {};
@@ -58,6 +64,9 @@ namespace datapath::windows {
 		void platform_write() override;
 		void after_inline_write() override;
 		void on_finished() override;
+		size_t platform_write_direct(const uint8_t* header, size_t header_size, const buffer_view* parts,
+									 size_t count) override;
+		bool   direct_write_wanted(uint64_t frame_size) const noexcept override;
 
 		public:
 		pipe_connection(std::shared_ptr<iocp_context> ctx, HANDLE h, bool skip_on_success,

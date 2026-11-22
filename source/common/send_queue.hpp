@@ -52,6 +52,18 @@ namespace datapath::detail {
 		// Writer only: try to acquire the writer slot without pushing (used to resume).
 		bool try_acquire();
 
+		// Direct send: if nothing is queued and nobody writes, take the writer slot
+		// so the caller can write a message of `total` payload bytes straight from
+		// its own buffers (`acquired` = true). Otherwise `acquired` stays false and
+		// the caller uses push(). Returns the same errors push() would.
+		datapath::error try_begin_direct(uint64_t total, bool& acquired);
+
+		// Writer only, after a direct send the OS only partly took: queue the bytes
+		// of `header` followed by `parts` that come after the first `sent`, ahead of
+		// anything other threads queued meanwhile. Does nothing once closed.
+		void push_front_rest(const uint8_t* header, size_t header_size, const buffer_view* parts, size_t count,
+							 size_t sent);
+
 		void recycle(std::vector<uint8_t>&& buffer);
 		void set_limit(uint64_t max_message_size);
 		uint64_t limit() const;

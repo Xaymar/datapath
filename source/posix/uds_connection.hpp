@@ -58,6 +58,9 @@ namespace datapath::posix {
 		void platform_write() override;
 		void after_inline_write() override;
 		void on_finished() override;
+		size_t platform_write_direct(const uint8_t* header, size_t header_size, const buffer_view* parts,
+									 size_t count) override;
+		bool   direct_write_wanted(uint64_t frame_size) const noexcept override;
 
 		public:
 		uds_connection(std::shared_ptr<event_context> ctx, event_loop& loop, int fd, const datapath::options& opts,
