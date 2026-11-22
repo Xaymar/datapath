@@ -79,6 +79,13 @@ namespace {
 	// on its own (twice, for the mirrored layout).
 	constexpr size_t   data_offset = 64 * 1024;
 	constexpr uint32_t hdr_mirror  = 1;
+	// Records of 4 KiB and more start on a page boundary. Without it, a
+	// mirrored ring drifts each record by 8 bytes per lap, and every 512
+	// messages (4096 / 8 phases) two hit a bad alignment and take ~5x as long:
+	// Irkela idle p99.9 256 KiB 117 vs 44 us, 1 MiB 385 vs 115 us. The padded
+	// layout restarts at offset 0 each lap, so it never drifts.
+	constexpr uint32_t hdr_page_align = 2;
+	constexpr uint32_t hdr_known      = hdr_mirror | hdr_page_align;
 	static_assert(sizeof(section_header) <= data_offset, "header must fit before the rings");
 
 	// "Magic ring buffer": map one ring twice, back to back, so that a record
@@ -153,6 +160,12 @@ namespace {
 
 	// DATAPATH_SHM_LOCK=1: fault in and VirtualLock every ring mapping, so the
 	// working-set manager can't trim pages that then soft-fault on next touch.
+	// Mirrored rings only; DATAPATH_SHM_PAGE_ALIGN=0 restores 8-byte steps.
+	bool page_align_wanted()
+	{
+		return env_flag("DATAPATH_SHM_PAGE_ALIGN", true);
+	}
+
 	bool lock_wanted()
 	{
 		return env_flag("DATAPATH_SHM_LOCK", false);
@@ -236,6 +249,7 @@ namespace {
 		bool   copy       = true; // peer is another user: copy messages out before delivery
 		uint64_t    cap   = 0;     // validated at setup; never re-read from the header
 		bool        mirrored = false;
+		bool        page_align = false;
 		mirror_view mirror[2];
 
 		// Mirror both rings of the mapped section.
@@ -275,6 +289,7 @@ namespace {
 		uint8_t*                     _data[2];
 		uint64_t                     _cap;
 		bool                         _mirror;
+		bool                         _page_align;
 		int                          _tx, _rx; // ring indices
 		HANDLE                       _stop;    // process-local: wakes our own threads on close
 
@@ -292,7 +307,8 @@ namespace {
 		// record plus the padding before it always fits once the ring is empty.
 		uint64_t max_fragment() const
 		{
-			return _mirror ? _cap - 8 : _cap / 2 - 8;
+			// Page-aligned records may need up to a page of padding in front.
+			return _mirror ? _cap - (_page_align ? 8192 : 8) : _cap / 2 - 8;
 		}
 
 		ring_ctl& tx() const
@@ -337,12 +353,31 @@ namespace {
 			return true;
 		}
 
+		// Ring bytes one record of `len` payload bytes takes (both sides agree).
+		uint64_t step_for(uint64_t len) const
+		{
+			uint64_t step = 8 + align8(len);
+			if (_page_align && len >= 4096)
+				step = (step + 4095) & ~uint64_t(4095);
+			return step;
+		}
+
+		// Mirrored + page-aligned: padding needed before a large record so that it
+		// starts on a page boundary.
+		uint64_t align_gap(uint64_t len) const
+		{
+			if (!_page_align || len < 4096)
+				return 0;
+			uint64_t in_page = _head & 4095;
+			return in_page ? 4096 - in_page : 0;
+		}
+
 		// Bytes needed at the current position for a record of `len` payload bytes.
 		uint64_t needed(uint64_t len) const
 		{
-			uint64_t need   = 8 + align8(len);
+			uint64_t need   = step_for(len);
 			if (_mirror)
-				return need;
+				return need + align_gap(len);
 			uint64_t to_end = _cap - (_head & (_cap - 1));
 			return to_end < need ? to_end + need : need;
 		}
@@ -356,9 +391,16 @@ namespace {
 
 		void put(const uint8_t* p, uint64_t len, uint64_t flags)
 		{
-			uint64_t need = 8 + align8(len);
+			uint64_t need = step_for(len);
 			uint64_t pos  = _head & (_cap - 1);
 			uint8_t* d    = _data[_tx];
+			if (uint64_t gap = _mirror ? align_gap(len) : 0) {
+				// Mirrored: a padding record skips to the next page boundary.
+				uint64_t pad = rec_pad;
+				std::memcpy(d + pos, &pad, 8);
+				_head += gap;
+				pos = _head & (_cap - 1);
+			}
 			if (!_mirror && _cap - pos < need) {
 				uint64_t pad = rec_pad;
 				std::memcpy(d + pos, &pad, 8);
@@ -441,14 +483,16 @@ namespace {
 				std::memcpy(&rec, d + pos, 8); // read once: the peer may change it
 				uint64_t step;
 				if (rec & rec_pad) {
-					step = _cap - pos;
-					if (_mirror || pos == 0 || step > h - _tail) {
+					// Padded rings skip to the ring start, mirrored ones to the next page.
+					uint64_t in_page = pos & 4095;
+					step             = _mirror ? (in_page ? 4096 - in_page : 0) : _cap - pos;
+					if (step == 0 || (_mirror && !_page_align) || (!_mirror && pos == 0) || step > h - _tail) {
 						fail("peer wrote an invalid padding record");
 						return false;
 					}
 				} else {
 					uint64_t len = rec & 0xffffffffu;
-					step         = 8 + align8(len);
+					step         = step_for(len);
 					// Mirrored: the record may run into the second view (pos + step
 					// <= 2 * cap). Padded: it must end at the end of the ring.
 					if (step > h - _tail || len > max_fragment() || (!_mirror && step > _cap - pos)) {
@@ -514,7 +558,8 @@ namespace {
 		{
 			_hdr     = static_cast<section_header*>(_o->view);
 			_cap     = _o->cap; // the peer can change the header later; use what was checked
-			_mirror  = _o->mirrored;
+			_mirror     = _o->mirrored;
+			_page_align = _o->page_align;
 			if (_mirror) {
 				_data[0] = _o->mirror[0].base;
 				_data[1] = _o->mirror[1].base;
@@ -671,8 +716,12 @@ namespace {
 			hdr->magic    = 0x4d535044; // "DPSM"
 			hdr->version  = shm_version;
 			hdr->capacity = cap;
-			if (mirror_wanted() && o->map_mirrors())
+			if (mirror_wanted() && o->map_mirrors()) {
 				hdr->flags = hdr_mirror;
+				if (page_align_wanted())
+					hdr->flags |= hdr_page_align;
+			}
+			o->page_align = (hdr->flags & hdr_page_align) != 0;
 			return o;
 		}
 
@@ -773,8 +822,10 @@ namespace {
 		const char* name() const override
 		{
 			// The config line shows the ring layout and whether pages are locked.
-			bool m = mirror_wanted(), l = lock_wanted();
-			return m ? (l ? "shm-mirrored-locked" : "shm-mirrored") : (l ? "shm-padded-locked" : "shm-padded");
+			bool m = mirror_wanted(), l = lock_wanted(), a = m && page_align_wanted();
+			static const std::string n = std::string(m ? "shm-mirrored" : "shm-padded") + (a ? "-paged" : "")
+										 + (l ? "-locked" : "");
+			return n.c_str();
 		}
 
 		bench::status host(const std::string& path, std::function<void(bench::conn_ptr)> on_accept) override
@@ -841,13 +892,15 @@ namespace {
 				// The server sized the section; check it really holds both rings
 				// before touching anything past the header.
 				MEMORY_BASIC_INFORMATION mbi{};
-				auto*                    hdr = static_cast<section_header*>(o->view);
+				auto*                    hdr   = static_cast<section_header*>(o->view);
+				uint32_t                 flags = hdr->flags; // read once: the peer may change it
 				ok = VirtualQuery(o->view, &mbi, sizeof(mbi)) && mbi.RegionSize >= data_offset + 2 * cap
 					 && hdr->magic == 0x4d535044 && hdr->version == shm_version && hdr->capacity == cap
-					 && (hdr->flags & ~hdr_mirror) == 0;
+					 && (flags & ~hdr_known) == 0;
 				// The server picked the layout; we must be able to mirror too.
-				o->cap = cap;
-				if (ok && (hdr->flags & hdr_mirror))
+				o->cap        = cap;
+				o->page_align = (flags & hdr_page_align) != 0;
+				if (ok && (flags & hdr_mirror))
 					ok = o->map_mirrors();
 			}
 			if (!ok) {
