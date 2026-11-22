@@ -28,6 +28,9 @@ SPDX-License-Identifier: BSD-3-Clause
 //   --stress N                                  local mode: load all cores with N busy threads in a
 //                                               separate process (0 = one per logical core)
 //   --stress-nice N                             Linux: run the stress process at nice N (default 0)
+//   --pin C,S                                   local mode: pin the client process to logical CPU C and
+//                                               the server process to S (the stress process stays free)
+//   --affinity N                                server/client mode: pin this process to logical CPU N
 //   --mmcss / --no-mmcss                        Windows: register I/O threads with MMCSS (default on)
 //   --priority 0..3                             I/O thread priority (normal .. time critical, default 2);
 //                                               Linux: nice -0/-4/-12/-19 where RLIMIT_NICE allows
@@ -212,6 +215,17 @@ namespace {
 				c.ideal_core  = v == "off" ? -2 : v == "auto" ? -1 : int(std::strtol(v.c_str(), nullptr, 10));
 			} else if (a == "--stress") {
 				c.stress = int(std::strtol(next(), nullptr, 10));
+			} else if (a == "--pin") {
+				std::string v     = next();
+				size_t      comma = v.find(',');
+				if (comma == std::string::npos) {
+					std::fprintf(stderr, "--pin needs client,server\n");
+					return false;
+				}
+				c.affinity   = int(std::strtol(v.substr(0, comma).c_str(), nullptr, 10));
+				c.pin_server = int(std::strtol(v.substr(comma + 1).c_str(), nullptr, 10));
+			} else if (a == "--affinity") {
+				c.affinity = int(std::strtol(next(), nullptr, 10));
 			} else if (a == "--stress-nice") {
 				c.stress_nice = int(std::strtol(next(), nullptr, 10));
 			} else if (a == "--runs") {
@@ -234,10 +248,39 @@ namespace {
 		return true;
 	}
 
+	// Pin the whole process (every thread, also ones created later) to one
+	// logical CPU. Called before the transport starts its threads.
+	bool pin_process(int cpu)
+	{
+		if (cpu < 0)
+			return true;
+#ifdef _WIN32
+		if (cpu >= 64 || !SetProcessAffinityMask(GetCurrentProcess(), DWORD_PTR(1) << cpu)) {
+			std::fprintf(stderr, "could not pin the process to cpu%d\n", cpu);
+			return false;
+		}
+		return true;
+#elif defined(__linux__)
+		cpu_set_t set;
+		CPU_ZERO(&set);
+		CPU_SET(cpu, &set);
+		if (sched_setaffinity(0, sizeof(set), &set) != 0) {
+			std::fprintf(stderr, "could not pin the process to cpu%d: %s\n", cpu, std::strerror(errno));
+			return false;
+		}
+		return true;
+#else
+		std::fprintf(stderr, "--affinity is not supported on this platform\n");
+		return false;
+#endif
+	}
+
 	// ---------------------------------------------------------------- server
 
 	int run_server(const config& c)
 	{
+		if (!pin_process(c.affinity))
+			return 1;
 		auto                    tp = bench::make_transport(c);
 		std::mutex              lock;
 		std::condition_variable cv;
@@ -436,6 +479,8 @@ namespace {
 
 	int run_client(const config& c)
 	{
+		if (!pin_process(c.affinity))
+			return 1;
 		auto tp = bench::make_transport(c);
 
 		std::vector<std::unique_ptr<pinger>> pingers;
@@ -458,13 +503,14 @@ namespace {
 			bulk->start();
 		}
 
-		std::printf("IPC benchmark: transport=%s platform=%s spin=%ldus io_threads=%s clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s mmcss=%s priority=%d stress=%s ideal_core=%s load=%s\n",
+		std::printf("IPC benchmark: transport=%s platform=%s spin=%ldus io_threads=%s clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s mmcss=%s priority=%d stress=%s ideal_core=%s load=%s pin=%s\n",
 					tp->name(), platform_name(), c.spin, c.threads ? std::to_string(c.threads).c_str() : "auto", c.clients, c.buffer, c.pipe_buffer, c.yield ? "on" : "off", c.alertable ? "on" : "off", c.mmcss ? "on" : "off", c.priority,
 					c.stress < 0 ? "off"
 								 : ((c.stress == 0 ? std::string("all cores") : std::to_string(c.stress)) +
 									(c.stress_nice ? " nice " + std::to_string(c.stress_nice) : std::string()))
 									   .c_str(),
-					c.ideal_core == -2 ? "off" : c.ideal_core == -1 ? "auto" : std::to_string(c.ideal_core).c_str(), c.load ? "1MiB stream" : "off");
+					c.ideal_core == -2 ? "off" : c.ideal_core == -1 ? "auto" : std::to_string(c.ideal_core).c_str(), c.load ? "1MiB stream" : "off",
+					c.affinity < 0 && c.pin_server < 0 ? "off" : (std::to_string(c.affinity) + "," + std::to_string(c.pin_server)).c_str());
 		std::printf("Full round-trip latency in microseconds.\n");
 		if (c.runs > 1)
 			std::printf("Each row: median of %zu runs; p99.9 lo/hi = lowest/highest p99.9 of any run.\n", c.runs);
@@ -792,6 +838,10 @@ namespace {
 										 "--priority", std::to_string(c.priority)};
 		if (c.alertable)
 			args.push_back("--alertable");
+		if (c.pin_server >= 0) {
+			args.push_back("--affinity");
+			args.push_back(std::to_string(c.pin_server));
+		}
 		// The server's I/O threads take the physical cores after the client's. With
 		// --threads auto each process covers every core, so both start at N.
 		args.push_back("--ideal-core");

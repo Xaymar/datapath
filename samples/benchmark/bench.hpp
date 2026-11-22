@@ -38,6 +38,8 @@ namespace bench {
 		int                 stress      = -1; // -1 off, 0 = one thread per logical core
 		int                 stress_nice = 0;  // Linux: nice value of the stress process
 		int                 ideal_core  = datapath::context_options{}.ideal_core;
+		int                 affinity    = -1; // pin this process to one logical CPU (-1 = no)
+		int                 pin_server  = -1; // local mode: logical CPU for the server process
 	};
 
 	enum class status { ok, would_block, closed, not_found, failed };
