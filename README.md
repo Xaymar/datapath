@@ -34,23 +34,24 @@ Small messages are where DataPath is strongest. On Windows, its 16 B round trip 
 | iOS | Unix domain sockets, kqueue | Planned (backend should apply) |
 
 ## Benchmarks
-Full round trip (send, echo, receive), ping-pong between two processes, release builds, median of 5 runs. Both machines were measured on 2026-11-22 at commit `fef98d8`. The benchmark ships a second transport over libuv 1.52.1 named pipes / Unix sockets with the same framing, clock, sizes and harness, so both libraries are measured the same way. How to reproduce these runs is in [CONTRIBUTING.md](CONTRIBUTING.md#benchmarking). The graph above shows each median with a whisker from the lowest to the highest p99.9 of the five runs; `docs/images/latency_chart.py` redraws it.
+Full round trip (send, echo, receive), ping-pong between two processes, release builds, median of 5 runs. Both machines were measured on 2026-11-22: Windows at commit `cf179fe` (stress rows at `b5fcd45`, which only lacks the core-0 affinity change and is identical when pinned), Linux at `fef98d8`. The benchmark ships a second transport over libuv 1.52.1 named pipes / Unix sockets with the same framing, clock, sizes and harness, so both libraries are measured the same way. How to reproduce these runs is in [CONTRIBUTING.md](CONTRIBUTING.md#benchmarking). The graph above shows each median with a whisker from the lowest to the highest p99.9 of the five runs; `docs/images/latency_chart.py` redraws it.
 
 * **DataPath**: defaults (`spin` 50 µs, `priority` 2, one I/O thread).
 * **libuv as shipped**: `--spin 0 --no-mmcss --priority 0`, libuv's own loop.
 * **libuv + policy**: libuv's loop thread given DataPath's spin and priority settings.
+* **Placement (Windows)**: `--pin 8,12`, the client process on logical CPU 8 and the server on 12: two different physical cores, neither of them core 0. Without pinning, under stress each invocation's result depended on where the scheduler put the two I/O threads, for both libraries: on Irkela, 16 KiB p99.9 was about 15 µs with both on the two hyper-threads of one core, about 200 µs on separate cores, and about 1.1 ms when one of them was on core 0. Two separate cores is the case a typical client and server get.
 * **Stress**: `--stress 0`, one busy thread per logical core in a separate process. On Linux the stress process runs at nice 12 (`--stress-nice 12`), which is the gap `priority` 2 gives when the system lets the process raise its priority. The test container had `RLIMIT_NICE` 0, so the gap was created from the other side; at equal nice every variant measured 4–8 ms, one scheduler timeslice.
 
 **Windows: Irkela**, AMD Ryzen 9 7940HS (8 cores / 16 threads), Windows 10 22H2, Balanced power plan. p99.9 in µs:
 
 | | 16 B | 64 B | 256 B | 1 KiB | 4 KiB | 16 KiB | 64 KiB | 256 KiB | 1 MiB |
 |---|---|---|---|---|---|---|---|---|---|
-| DataPath, idle | **7.2** | **7.9** | **7.7** | **11.5** | **14.3** | **25.3** | **32.6** | **528** | **1595** |
-| libuv as shipped, idle | 74.0 | 75.9 | 72.3 | 75.4 | 89.3 | 123 | 506 | 627 | 1904 |
-| libuv + policy, idle | 15.9 | 16.1 | 17.0 | 17.3 | 22.3 | 31.9 | 56.3 | 582 | 1662 |
-| DataPath, stress | **51.6** | **43.3** | **58.8** | **41.5** | 115 | 174 | 306 | **902** | **10379** |
-| libuv as shipped, stress | 504 | 544 | 539 | 541 | 640 | 598 | 1145 | 8906 | 47758 |
-| libuv + policy, stress | 69.1 | 86.5 | 74.9 | 83.6 | **105** | **30.7** | **39.1** | 1564 | 26002 |
+| DataPath, idle | **10.9** | **7.1** | **7.3** | **7.5** | **12.5** | **24.3** | **29.6** | **78.6** | **794** |
+| libuv as shipped, idle | 29.5 | 29.6 | 29.0 | 30.4 | 33.8 | 43.7 | 56.8 | 250 | 1178 |
+| libuv + policy, idle | 15.2 | 16.2 | 14.8 | 17.0 | 19.8 | 31.3 | 51.6 | 221 | 1198 |
+| DataPath, stress | **39.0** | **39.2** | **42.2** | **41.8** | **102** | **229** | **457** | **2178** | **28188** |
+| libuv as shipped, stress | 257 | 289 | 256 | 265 | 334 | 692 | 2982 | 36566 | 73953 |
+| libuv + policy, stress | 108 | 122 | 112 | 117 | 198 | 313 | 640 | 7465 | 31856 |
 
 **Linux: merenka-gpu0**, AMD EPYC 7313P container limited to 8 cores / 16 threads, Linux 6.12, GCC 15.2. p99.9 in µs:
 
@@ -64,24 +65,24 @@ Full round trip (send, echo, receive), ping-pong between two processes, release 
 | libuv + policy, stress | 42.7 | 150 | 185 | 187 | 25.0 | 219 | 560 | **359** | 12392 |
 
 What the numbers say:
-* On Windows, DataPath has the lowest tail at every size when idle: 1.3–2.2× lower than libuv with the same policy up to 64 KiB, and at 64 KiB it moves 9.2 GiB/s against libuv's 6.3. From 256 KiB up all three variants share a floor of about 0.5 ms (each run's slowest round trip on Irkela sits near 500 µs, whatever the library), and at 1 MiB DataPath's p99.9 is 1.6 ms against 1.7–1.9 ms. Under stress DataPath is lowest up to 1 KiB and from 256 KiB, while libuv with DataPath's policy is lower at 4–64 KiB (31–39 vs 174–306 µs at 16–64 KiB). libuv as shipped stays above 0.5 ms at every size under stress.
+* On Windows, DataPath has the lowest tail at every size, idle and under stress. Idle it is 1.3–2.8× lower than libuv with the same policy (7.1 vs 16.2 µs at 64 B, 29.6 vs 51.6 µs at 64 KiB, 79 vs 221 µs at 256 KiB) and moves 8.9 GiB/s at 64 KiB against libuv's 4.2. Under stress it is 2.6–3.1× lower up to 1 KiB, 1.4–1.9× at 4–64 KiB, 3.4× at 256 KiB and 1.1× at 1 MiB; libuv as shipped is 2.6–17× above DataPath. A repeat of the stress runs agreed within a few percent, except DataPath at 64 KiB (457 and 609 µs). With both processes on the two hyper-threads of one core (`--pin 8,9`), no stress thread shares that core's L1/L2 and DataPath stays under 21 µs p99.9 up to 64 KiB under full load (libuv + policy: 13–20 µs up to 16 KiB, 226 µs at 64 KiB).
 * On Linux both libraries sit on the same epoll and Unix-socket stack. Idle, DataPath and libuv with the same policy tie up to 1 KiB, both ahead of libuv as shipped. From 16 KiB up libuv as shipped has the lowest tail (55 vs 79 µs at 64 KiB), although DataPath moves more data at large sizes (9.3 vs 7.8 GiB/s and p50 203 vs 245 µs at 1 MiB). Under stress DataPath is lowest at every size up to 64 KiB; from 64 KiB every variant swings by up to 10× between runs, so read those cells through the whiskers in the graph.
-* Each size runs at most 2 GiB per run, so 256 KiB gets 8,192 round trips and 1 MiB only 2,048. There p99.9 is roughly the second or third slowest round trip, and a single hiccup moves it: DataPath's idle 1 MiB p99.9 on Irkela ranged from 1.1 to 3.8 ms between runs.
+* Each size runs at most 2 GiB per run, so 256 KiB gets 8,192 round trips and 1 MiB only 2,048. There p99.9 is roughly the second or third slowest round trip, and a single hiccup moves it. Unpinned, DataPath's idle 1 MiB p99.9 on Irkela ranged from 1.1 to 3.8 ms between runs, and every run's slowest round trip sat near 500 µs; pinned off core 0 it stays at 0.79–0.82 ms.
 * Single runs are noisy at microsecond resolution; compare medians of several runs (`--runs 5`).
 
-DataPath-only percentiles on the same machines, idle, in µs:
+DataPath-only percentiles on the same machines, idle, in µs (Irkela pinned to 8,12 as above):
 
 | | Irkela p50 | p99 | p99.9 | merenka-gpu0 p50 | p99 | p99.9 |
 |---|---|---|---|---|---|---|
-| 16 B | 3.0 | 4.5 | 7.2 | 8.9 | 10.4 | 13.7 |
-| 64 B | 3.0 | 4.6 | 7.9 | 9.0 | 9.7 | 13.1 |
-| 256 B | 3.1 | 4.4 | 7.7 | 9.4 | 10.3 | 13.8 |
-| 1 KiB | 3.0 | 4.8 | 11.5 | 10.0 | 11.5 | 15.1 |
-| 4 KiB | 6.1 | 8.6 | 14.3 | 14.5 | 15.6 | 21.8 |
-| 16 KiB | 8.5 | 13.7 | 25.3 | 23.5 | 27.1 | 35.8 |
-| 64 KiB | 12.7 | 16.5 | 32.6 | 38.3 | 54.2 | 79.3 |
-| 256 KiB | 53.8 | 66.2 | 528 | 53.2 | 65.6 | 133 |
-| 1 MiB | 559 | 1080 | 1595 | 203 | 268 | 567 |
+| 16 B | 3.5 | 9.1 | 10.9 | 8.9 | 10.4 | 13.7 |
+| 64 B | 3.1 | 3.8 | 7.1 | 9.0 | 9.7 | 13.1 |
+| 256 B | 3.1 | 4.2 | 7.3 | 9.4 | 10.3 | 13.8 |
+| 1 KiB | 3.0 | 3.9 | 7.5 | 10.0 | 11.5 | 15.1 |
+| 4 KiB | 5.1 | 6.7 | 12.5 | 14.5 | 15.6 | 21.8 |
+| 16 KiB | 11.3 | 13.3 | 24.3 | 23.5 | 27.1 | 35.8 |
+| 64 KiB | 13.4 | 17.3 | 29.6 | 38.3 | 54.2 | 79.3 |
+| 256 KiB | 53.1 | 60.1 | 78.6 | 53.2 | 65.6 | 133 |
+| 1 MiB | 604 | 784 | 794 | 203 | 268 | 567 |
 
 ## Usage
 ```cpp
@@ -117,7 +118,7 @@ See `samples/echo/main.cpp` for a complete program.
 * **Windows scheduling.** I/O threads run at `THREAD_PRIORITY_HIGHEST` (`context_options::priority`, 0–3). Under full CPU load, normal priority let single round trips stall for up to 12 ms; highest kept p99.9 under 100 µs. `context_options::mmcss` (registering with the Multimedia Class Scheduler) is off: on a busy system MMCSS throttles threads that use their CPU share, which measured as a fixed ~2 ms p99.9 stall, and on an idle system it made no difference. `yield` and `alertable` showed no consistent gain and are off.
 * **Linux scheduling.** The same `context_options::priority` (default 2) lowers each I/O thread's nice value by 0, 4, 12 or 19 from the one it inherited. Unprivileged processes only get as far as `RLIMIT_NICE` allows, which is often not at all; `CAP_SYS_NICE` lifts the limit. Under full CPU load, a 12-step gap took 64 B p99.9 from about 8 ms to about 200 µs. No real-time scheduling policy is used.
 * **macOS scheduling.** macOS picks threads, performance or efficiency cores and timer coalescing by quality-of-service class, so `priority` 1 sets `QOS_CLASS_USER_INITIATED` and 2 and 3 set `QOS_CLASS_USER_INTERACTIVE` (the class of a UI's main thread). No privileges are needed. Real-time (time constraint) threads are not used: the kernel demotes one that spins past its computation budget. `io_threads = 0` starts one I/O thread per physical core (`hw.physicalcpu`, which counts both core types on Apple silicon).
-* **Core placement (Windows).** By default (`context_options::ideal_core = -1`) each I/O thread gets its own physical core as a soft hint (ideal processor, not hard affinity), never two on the hyper-threads of one core, and core 0, which handles most interrupts, is skipped when there are more than two cores. A busy hyper-thread sibling roughly halves the speed of the other one; on the test machine this cut 64 KiB p99.9 from 72 to 52 µs and 8 B from 12 to 7 µs. `-2` leaves placement to the OS, `N` starts at physical core N. `io_threads = 0` starts exactly one I/O thread per physical core (on Windows, the cores this placement uses), so no two I/O threads ever share a core's hyper-threads.
+* **Core placement (Windows).** By default (`context_options::ideal_core = -1`) each I/O thread gets its own physical core as a soft hint (ideal processor, not hard affinity), never two on the hyper-threads of one core, and core 0, which handles most interrupts, is skipped when there are more than two cores. Core 0 is avoided with real thread affinity (within the process's own affinity), because under full CPU load Windows ignored the hint and ran I/O threads there, at about 1.1 ms instead of 0.2 ms p99.9 for 16 KiB. A busy hyper-thread sibling roughly halves the speed of the other one; on the test machine this cut 64 KiB p99.9 from 72 to 52 µs and 8 B from 12 to 7 µs. `-2` leaves placement to the OS, `N` starts at physical core N. `io_threads = 0` starts exactly one I/O thread per physical core (on Windows, the cores this placement uses), so no two I/O threads ever share a core's hyper-threads.
 * **Buffers.** `options::receive_buffer` (256 KiB) holds incoming frames; reads adapt their size to the traffic, so a large buffer doesn't slow down small messages. `options::pipe_buffer` (1 MiB) is the Windows kernel pipe buffer, and on macOS the kernel socket buffer of each connection (the macOS default is 8 KiB). Linux keeps its default socket buffers.
 * **Tuning.** `context_options::spin` (default 50 µs) is how long an I/O thread busy-polls after the last event before sleeping in the kernel. Higher values cut tail latency for bursty traffic and cost CPU only while traffic flows. `0` disables spinning. Spinning only helps while spare CPUs exist: when spinning I/O threads cover every CPU (for example client and server on one machine, both with `io_threads = 0`), a woken thread waits for a spinner's budget to run out, and on Linux 64 B p99.9 measured about 116 µs with the default spin versus 23 µs with `0`. `context_options::yield` also fixes that case (24 µs) but gives a timeslice away on every yield under full CPU load. On Windows the I/O threads also opt out of EcoQoS power throttling.
 * **Paths.** A bare name maps to `\\.\pipe\<name>` on Windows, to the abstract socket `datapath.<name>` on Linux, and to the socket file `/tmp/datapath.<name>` on macOS, which has no abstract namespace (`/tmp` rather than the per-user `$TMPDIR`, so other users can still reach a `Group` or `World` server). On Linux and macOS, a path starting with `/` is a filesystem socket, created with mode `0600`/`0660`/`0666` for `User`/`Group`/`World` (`Group` is the server's group) and removed on close. On macOS a server whose backlog is full refuses connections like a missing server does, so `connect()` keeps retrying while the socket file exists and returns `TimedOut` at `connect_timeout`.
