@@ -200,8 +200,9 @@ TEST(falls_back_to_version_1_server)
 			return;
 		}
 	});
+	auto     ctx = pairing_context(true);
 	sock_ptr c;
-	CHECK_EQ(datapath::connect(c, name, {}, pairing_context(true)), error::Success);
+	CHECK_EQ(datapath::connect(c, name, {}, ctx), error::Success);
 	server.join();
 	for (HANDLE h : pipes)
 		CloseHandle(h);
@@ -215,8 +216,9 @@ TEST(falls_back_to_version_1_server)
 TEST(server_answers_version_2_with_trailer)
 {
 	auto    name = unique_name();
+	auto    ctx  = pairing_context(true); // destroying a context closes its servers
 	srv_ptr server;
-	CHECK_EQ(datapath::host(server, name, {}, pairing_context(true)), error::Success);
+	CHECK_EQ(datapath::host(server, name, {}, ctx), error::Success);
 	sock_ptr accepted;
 	server->on_accept([&](sock_ptr s) {
 		accepted = s;
