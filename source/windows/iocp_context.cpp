@@ -87,6 +87,26 @@ namespace {
 		}
 	}
 
+	// Logical processors of physical core 0 in processor group 0 (0 if unknown).
+	// Called on the creating thread, like physical_cores().
+	KAFFINITY core0_mask()
+	{
+		DWORD len = 0;
+		GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &len);
+		std::vector<uint8_t> buf(len);
+		auto* info = reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buf.data());
+		if (!len || !GetLogicalProcessorInformationEx(RelationProcessorCore, info, &len))
+			return 0;
+		for (DWORD off = 0; off < len;) {
+			auto* e = reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buf.data() + off);
+			if (e->Relationship == RelationProcessorCore && e->Processor.GroupCount > 0
+				&& e->Processor.GroupMask[0].Group == 0 && (e->Processor.GroupMask[0].Mask & 1))
+				return e->Processor.GroupMask[0].Mask;
+			off += e->Size;
+		}
+		return 0;
+	}
+
 	// Physical cores that I/O threads are spread over: all of them, minus core 0
 	// (interrupt/DPC heavy) when there are more than two.
 	size_t first_io_core(size_t cores)
@@ -95,7 +115,7 @@ namespace {
 	}
 
 	void apply_ideal_core(const datapath::context_options& opts, const std::vector<PROCESSOR_NUMBER>& cores,
-						  size_t index)
+						  KAFFINITY avoid, size_t index)
 	{
 		if (opts.ideal_core < -1)
 			return;
@@ -110,6 +130,18 @@ namespace {
 			size_t span  = cores.size() - first;
 			size_t start = size_t(GetCurrentProcessId() * 2654435761u) % span;
 			pn           = cores[first + (start + index) % span];
+			// The ideal processor is only a hint, and under full load Windows still
+			// ran I/O threads on core 0, where interrupts and DPCs land: 16 KiB
+			// p99.9 1.1 ms there vs ~0.2 ms on other cores (Irkela, --stress 0).
+			// Keep them off it for real, within the process's own affinity. Single
+			// processor group only; a process confined to core 0 stays as it is.
+			DWORD_PTR process = 0, system = 0;
+			if (first > 0 && avoid && pn.Group == 0 && GetActiveProcessorGroupCount() == 1
+				&& GetProcessAffinityMask(GetCurrentProcess(), &process, &system)) {
+				DWORD_PTR allowed = process & ~DWORD_PTR(avoid);
+				if (allowed)
+					SetThreadAffinityMask(GetCurrentThread(), allowed);
+			}
 		}
 		SetThreadIdealProcessorEx(GetCurrentThread(), &pn, nullptr);
 	}
@@ -190,12 +222,15 @@ bool datapath::windows::iocp_context::start()
 	// Each thread keeps its context alive, so the context is never destroyed on
 	// one of its own I/O threads (dispatch and run keep using `this`).
 	std::vector<PROCESSOR_NUMBER> cores;
+	KAFFINITY                     avoid = 0;
 	if (_opts.ideal_core >= -1)
 		cores = physical_cores();
+	if (_opts.ideal_core == -1)
+		avoid = core0_mask();
 	for (size_t i = 0; i < _opts.io_threads; i++)
-		_threads.emplace_back([this, i, cores, keep = shared_from_this()] {
+		_threads.emplace_back([this, i, cores, avoid, keep = shared_from_this()] {
 			tl_context = keep.get();
-			apply_ideal_core(_opts, cores, i);
+			apply_ideal_core(_opts, cores, avoid, i);
 			run();
 		});
 	return true;
