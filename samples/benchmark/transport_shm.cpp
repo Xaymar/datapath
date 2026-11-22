@@ -69,11 +69,81 @@ namespace {
 		uint32_t magic;
 		uint32_t version;
 		uint64_t capacity;
+		uint32_t flags; // hdr_mirror: records may run past the end of a ring
 		ring_ctl ring[2]; // [0] server -> client, [1] client -> server
 	};
 	static_assert(std::atomic<uint64_t>::is_always_lock_free, "shared atomics must be lock-free");
 
-	constexpr size_t data_offset = (sizeof(section_header) + 4095) & ~size_t(4095);
+	// Rings start on the 64 KiB allocation granularity, so each one can be mapped
+	// on its own (twice, for the mirrored layout).
+	constexpr size_t   data_offset = 64 * 1024;
+	constexpr uint32_t hdr_mirror  = 1;
+	static_assert(sizeof(section_header) <= data_offset, "header must fit before the rings");
+
+	// "Magic ring buffer": map one ring twice, back to back, so that a record
+	// running past the end lands at its start (the second view is the same
+	// pages). Records are then always contiguous: no padding, no split copies,
+	// and any message up to the ring size can be delivered in place. Needs
+	// VirtualAlloc2/MapViewOfFile3 (Windows 10 1803+); placeholders make it
+	// race-free. Each process builds its own mirror; only the section is shared.
+	struct mirror_view {
+		uint8_t* base = nullptr;
+		void*    view[2] = {};
+
+		bool map(HANDLE section, uint64_t offset, uint64_t cap)
+		{
+			using valloc2_t = PVOID(WINAPI*)(HANDLE, PVOID, SIZE_T, ULONG, ULONG, void*, ULONG);
+			using map3_t    = PVOID(WINAPI*)(HANDLE, HANDLE, PVOID, ULONG64, SIZE_T, ULONG, ULONG, void*, ULONG);
+			static HMODULE kb      = LoadLibraryW(L"kernelbase.dll");
+			static auto    valloc2 = kb ? reinterpret_cast<valloc2_t>(reinterpret_cast<void*>(GetProcAddress(kb, "VirtualAlloc2")))
+										: nullptr;
+			static auto    map3 = kb ? reinterpret_cast<map3_t>(reinterpret_cast<void*>(GetProcAddress(kb, "MapViewOfFile3")))
+									 : nullptr;
+			constexpr ULONG reserve_placeholder = 0x00040000, replace_placeholder = 0x00004000,
+							preserve_placeholder = 0x00000002;
+			if (!valloc2 || !map3)
+				return false;
+			base = static_cast<uint8_t*>(
+				valloc2(nullptr, nullptr, SIZE_T(2 * cap), MEM_RESERVE | reserve_placeholder, PAGE_NOACCESS, nullptr, 0));
+			if (!base)
+				return false;
+			// Split the reservation into two placeholders of `cap` each.
+			if (!VirtualFree(base, SIZE_T(cap), MEM_RELEASE | preserve_placeholder)) {
+				VirtualFree(base, 0, MEM_RELEASE);
+				base = nullptr;
+				return false;
+			}
+			for (int i = 0; i < 2; i++) {
+				view[i] = map3(section, GetCurrentProcess(), base + i * cap, offset, SIZE_T(cap), replace_placeholder,
+							   PAGE_READWRITE, nullptr, 0);
+				if (!view[i]) {
+					release(cap);
+					return false;
+				}
+			}
+			return true;
+		}
+
+		void release(uint64_t cap)
+		{
+			for (int i = 0; i < 2; i++) {
+				if (view[i])
+					UnmapViewOfFile(view[i]);
+				else if (base)
+					VirtualFree(base + i * cap, 0, MEM_RELEASE); // still a placeholder
+				view[i] = nullptr;
+			}
+			base = nullptr;
+		}
+	};
+
+	// Mirrored rings by default; DATAPATH_SHM_MIRROR=0 selects the padded layout.
+	bool mirror_wanted()
+	{
+		char   v[8] = {};
+		DWORD  n    = GetEnvironmentVariableA("DATAPATH_SHM_MIRROR", v, sizeof(v));
+		return !(n > 0 && v[0] == '0');
+	}
 
 	uint64_t align8(uint64_t v)
 	{
@@ -139,9 +209,24 @@ namespace {
 		HANDLE events[4]  = {}; // data[0], space[0], data[1], space[1]
 		void*  view       = nullptr;
 		bool   copy       = true; // peer is another user: copy messages out before delivery
+		uint64_t    cap   = 0;     // validated at setup; never re-read from the header
+		bool        mirrored = false;
+		mirror_view mirror[2];
+
+		// Mirror both rings of the mapped section.
+		bool map_mirrors()
+		{
+			for (int r = 0; r < 2; r++)
+				if (!mirror[r].map(section, data_offset + r * cap, cap))
+					return false;
+			mirrored = true;
+			return true;
+		}
 
 		~shm_objects()
 		{
+			for (auto& m : mirror)
+				m.release(cap);
 			if (view)
 				UnmapViewOfFile(view);
 			if (section)
@@ -161,6 +246,7 @@ namespace {
 		section_header*              _hdr;
 		uint8_t*                     _data[2];
 		uint64_t                     _cap;
+		bool                         _mirror;
 		int                          _tx, _rx; // ring indices
 		HANDLE                       _stop;    // process-local: wakes our own threads on close
 
@@ -173,6 +259,13 @@ namespace {
 		bench::message_fn _fn;
 		std::function<void()> _close_fn;
 		std::vector<uint8_t> _assembly, _scratch;
+
+		// Largest record payload. Padded rings keep it to half the ring, so a
+		// record plus the padding before it always fits once the ring is empty.
+		uint64_t max_fragment() const
+		{
+			return _mirror ? _cap - 8 : _cap / 2 - 8;
+		}
 
 		ring_ctl& tx() const
 		{
@@ -220,6 +313,8 @@ namespace {
 		uint64_t needed(uint64_t len) const
 		{
 			uint64_t need   = 8 + align8(len);
+			if (_mirror)
+				return need;
 			uint64_t to_end = _cap - (_head & (_cap - 1));
 			return to_end < need ? to_end + need : need;
 		}
@@ -236,7 +331,7 @@ namespace {
 			uint64_t need = 8 + align8(len);
 			uint64_t pos  = _head & (_cap - 1);
 			uint8_t* d    = _data[_tx];
-			if (_cap - pos < need) {
+			if (!_mirror && _cap - pos < need) {
 				uint64_t pad = rec_pad;
 				std::memcpy(d + pos, &pad, 8);
 				_head += _cap - pos;
@@ -319,14 +414,16 @@ namespace {
 				uint64_t step;
 				if (rec & rec_pad) {
 					step = _cap - pos;
-					if (pos == 0 || step > h - _tail) {
+					if (_mirror || pos == 0 || step > h - _tail) {
 						fail("peer wrote an invalid padding record");
 						return false;
 					}
 				} else {
 					uint64_t len = rec & 0xffffffffu;
 					step         = 8 + align8(len);
-					if (step > _cap - pos || step > h - _tail || len > _cap / 2) {
+					// Mirrored: the record may run into the second view (pos + step
+					// <= 2 * cap). Padded: it must end at the end of the ring.
+					if (step > h - _tail || len > max_fragment() || (!_mirror && step > _cap - pos)) {
 						fail("peer wrote an invalid record");
 						return false;
 					}
@@ -388,9 +485,15 @@ namespace {
 			: _cfg(cfg), _pipe(pipe), _o(std::move(o))
 		{
 			_hdr     = static_cast<section_header*>(_o->view);
-			_cap     = _hdr->capacity;
-			_data[0] = static_cast<uint8_t*>(_o->view) + data_offset;
-			_data[1] = _data[0] + _cap;
+			_cap     = _o->cap; // the peer can change the header later; use what was checked
+			_mirror  = _o->mirrored;
+			if (_mirror) {
+				_data[0] = _o->mirror[0].base;
+				_data[1] = _o->mirror[1].base;
+			} else {
+				_data[0] = static_cast<uint8_t*>(_o->view) + data_offset;
+				_data[1] = _data[0] + _cap;
+			}
 			_tx      = server ? 0 : 1;
 			_rx      = server ? 1 : 0;
 			_stop    = CreateEventW(nullptr, TRUE, FALSE, nullptr);
@@ -419,7 +522,7 @@ namespace {
 			if (size > max_message)
 				return bench::status::failed;
 			auto*    p        = static_cast<const uint8_t*>(data);
-			uint64_t frag_max = _cap / 2 - 8;
+			uint64_t frag_max = max_fragment();
 			uint64_t f;
 			if (size <= frag_max) {
 				// Never blocks: like a full send queue, a full ring is WouldBlock.
@@ -504,6 +607,7 @@ namespace {
 		{
 			auto o  = std::make_unique<shm_objects>();
 			o->copy = peer_sid != _own_sid;
+			o->cap  = cap;
 			// Owner: everything. Peer: map read/write + query + read control
 			// (0x20007) for the section, modify state + synchronize (0x100002) for
 			// the events. Nothing for anyone else.
@@ -537,6 +641,8 @@ namespace {
 			hdr->magic    = 0x4d535044; // "DPSM"
 			hdr->version  = shm_version;
 			hdr->capacity = cap;
+			if (mirror_wanted() && o->map_mirrors())
+				hdr->flags = hdr_mirror;
 			return o;
 		}
 
@@ -695,7 +801,12 @@ namespace {
 				MEMORY_BASIC_INFORMATION mbi{};
 				auto*                    hdr = static_cast<section_header*>(o->view);
 				ok = VirtualQuery(o->view, &mbi, sizeof(mbi)) && mbi.RegionSize >= data_offset + 2 * cap
-					 && hdr->magic == 0x4d535044 && hdr->version == shm_version && hdr->capacity == cap;
+					 && hdr->magic == 0x4d535044 && hdr->version == shm_version && hdr->capacity == cap
+					 && (hdr->flags & ~hdr_mirror) == 0;
+				// The server picked the layout; we must be able to mirror too.
+				o->cap = cap;
+				if (ok && (hdr->flags & hdr_mirror))
+					ok = o->map_mirrors();
 			}
 			if (!ok) {
 				CloseHandle(pipe);
