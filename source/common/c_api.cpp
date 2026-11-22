@@ -136,6 +136,7 @@ namespace {
 		out.mmcss      = o.mmcss != 0;
 		out.alertable  = o.alertable != 0;
 		out.yield      = o.yield != 0;
+		out.pair_peer  = o.pair_peer != 0;
 		return true;
 	}
 
@@ -206,6 +207,7 @@ void datapath_context_options_init(datapath_context_options* o)
 	o->mmcss       = d.mmcss ? 1 : 0;
 	o->alertable   = d.alertable ? 1 : 0;
 	o->yield       = d.yield ? 1 : 0;
+	o->pair_peer   = d.pair_peer ? 1 : 0;
 }
 
 void datapath_options_init(datapath_options* o)

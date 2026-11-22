@@ -45,6 +45,9 @@ namespace datapath::windows {
 		bool                         _server_side       = false;
 		bool                         _close_when_flushed = false; // writer-slot holder only
 		std::atomic<bool>            _graceful{false};
+		bool                         _pair_requested = false; // client sent a version 2 hello
+		// This connection holds the context's core pairing (undone in on_finished).
+		std::atomic<bool>            _paired{false};
 
 		std::shared_ptr<pipe_connection> self()
 		{
@@ -79,6 +82,11 @@ namespace datapath::windows {
 		// Server side, after on_accept returned true: send the reply, then release
 		// anything queued meanwhile.
 		void complete_accept();
+		// Client side: this connection's context paired its I/O thread for it.
+		void set_paired() noexcept
+		{
+			_paired.store(true, std::memory_order_release);
+		}
 
 		void on_io(io_op* op, DWORD bytes, DWORD err) override;
 	};

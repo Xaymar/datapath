@@ -70,7 +70,7 @@ pub struct datapath_context_options {
     pub mmcss: u8,
     pub alertable: u8,
     pub yield_: u8,
-    pub reserved0: u8,
+    pub pair_peer: u8,
 }
 
 #[repr(C)]

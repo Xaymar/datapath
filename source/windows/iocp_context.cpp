@@ -107,11 +107,55 @@ namespace {
 		return 0;
 	}
 
+	// Logical processors (group 0) of the physical core that holds `pn`; 0 if
+	// unknown or not in group 0. Called on the creating thread.
+	KAFFINITY core_mask_of(const PROCESSOR_NUMBER& pn)
+	{
+		if (pn.Group != 0)
+			return 0;
+		DWORD len = 0;
+		GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &len);
+		std::vector<uint8_t> buf(len);
+		auto* info = reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buf.data());
+		if (!len || !GetLogicalProcessorInformationEx(RelationProcessorCore, info, &len))
+			return 0;
+		for (DWORD off = 0; off < len;) {
+			auto* e = reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buf.data() + off);
+			if (e->Relationship == RelationProcessorCore && e->Processor.GroupCount > 0
+				&& e->Processor.GroupMask[0].Group == 0
+				&& (e->Processor.GroupMask[0].Mask & (KAFFINITY(1) << pn.Number)))
+				return e->Processor.GroupMask[0].Mask;
+			off += e->Size;
+		}
+		return 0;
+	}
+
+	int lowest_bit(DWORD_PTR m)
+	{
+		for (int i = 0; i < int(sizeof(m) * 8); i++)
+			if (m & (DWORD_PTR(1) << i))
+				return i;
+		return -1;
+	}
+
 	// Physical cores that I/O threads are spread over: all of them, minus core 0
 	// (interrupt/DPC heavy) when there are more than two.
 	size_t first_io_core(size_t cores)
 	{
 		return cores > 2 ? 1 : 0;
+	}
+
+	// The physical core (its first logical processor) that I/O thread `index`
+	// prefers. Automatic (ideal_core -1, also used for pairing when placement is
+	// off) skips core 0 (interrupt/DPC heavy) when there is room.
+	PROCESSOR_NUMBER pick_core(int ideal_core, const std::vector<PROCESSOR_NUMBER>& cores, size_t index)
+	{
+		if (ideal_core >= 0)
+			return cores[(size_t(ideal_core) + index) % cores.size()];
+		size_t first = first_io_core(cores.size());
+		size_t span  = cores.size() - first;
+		size_t start = size_t(GetCurrentProcessId() * 2654435761u) % span;
+		return cores[first + (start + index) % span];
 	}
 
 	void apply_ideal_core(const datapath::context_options& opts, const std::vector<PROCESSOR_NUMBER>& cores,
@@ -121,15 +165,9 @@ namespace {
 			return;
 		if (cores.empty())
 			return;
-		PROCESSOR_NUMBER pn;
-		if (opts.ideal_core >= 0) {
-			pn = cores[(size_t(opts.ideal_core) + index) % cores.size()];
-		} else {
-			// Automatic: skip core 0 (interrupt/DPC heavy) when there is room.
+		PROCESSOR_NUMBER pn = pick_core(opts.ideal_core, cores, index);
+		if (opts.ideal_core < 0) {
 			size_t first = first_io_core(cores.size());
-			size_t span  = cores.size() - first;
-			size_t start = size_t(GetCurrentProcessId() * 2654435761u) % span;
-			pn           = cores[first + (start + index) % span];
 			// The ideal processor is only a hint, and under full load Windows still
 			// ran I/O threads on core 0, where interrupts and DPCs land: 16 KiB
 			// p99.9 1.1 ms there vs ~0.2 ms on other cores (Irkela, --stress 0).
@@ -223,10 +261,21 @@ bool datapath::windows::iocp_context::start()
 	// one of its own I/O threads (dispatch and run keep using `this`).
 	std::vector<PROCESSOR_NUMBER> cores;
 	KAFFINITY                     avoid = 0;
-	if (_opts.ideal_core >= -1)
+	if (_opts.ideal_core >= -1 || _opts.pair_peer)
 		cores = physical_cores();
 	if (_opts.ideal_core == -1)
 		avoid = core0_mask();
+	if (_opts.pair_peer && _opts.io_threads == 1 && !cores.empty() && GetActiveProcessorGroupCount() == 1) {
+		// Pair on the core the I/O thread prefers anyway; with placement off, on
+		// the core automatic placement would pick.
+		_pair_core = core_mask_of(pick_core(_opts.ideal_core >= 0 ? _opts.ideal_core : -1, cores, 0));
+		DWORD_PTR process = 0, system = 0;
+		if (GetProcessAffinityMask(GetCurrentProcess(), &process, &system)) {
+			_restore_mask = process;
+			if (avoid && cores.size() > 2 && (process & ~DWORD_PTR(avoid)))
+				_restore_mask = process & ~DWORD_PTR(avoid);
+		}
+	}
 	for (size_t i = 0; i < _opts.io_threads; i++)
 		_threads.emplace_back([this, i, cores, avoid, keep = shared_from_this()] {
 			tl_context = keep.get();
@@ -234,6 +283,66 @@ bool datapath::windows::iocp_context::start()
 			run();
 		});
 	return true;
+}
+
+bool datapath::windows::iocp_context::pin_io_thread(DWORD_PTR mask)
+{
+	if (!mask || _threads.size() != 1)
+		return false;
+	return SetThreadAffinityMask(_threads[0].native_handle(), mask) != 0;
+}
+
+int32_t datapath::windows::iocp_context::pair_server()
+{
+	if (!pair_wanted() || !_pair_core)
+		return -1;
+	DWORD_PTR process = 0, system = 0;
+	if (!GetProcessAffinityMask(GetCurrentProcess(), &process, &system))
+		return -1;
+	// Two hyper-threads of the core: the lower one for us, the next for the client.
+	DWORD_PTR both = DWORD_PTR(_pair_core) & process;
+	int       own  = lowest_bit(both);
+	int       peer = own < 0 ? -1 : lowest_bit(both & ~(DWORD_PTR(1) << own));
+	if (peer < 0)
+		return -1; // no SMT, or the process may only use one of them
+	if (_paired.exchange(true, std::memory_order_acq_rel))
+		return -1; // an earlier connection is paired already
+	if (!pin_io_thread(DWORD_PTR(1) << own)) {
+		_paired.store(false, std::memory_order_release);
+		return -1;
+	}
+	return peer;
+}
+
+bool datapath::windows::iocp_context::pair_client(int32_t cpu)
+{
+	if (cpu < 0 || cpu >= int32_t(sizeof(DWORD_PTR) * 8) || !pair_wanted() || GetActiveProcessorGroupCount() != 1)
+		return false;
+	DWORD_PTR process = 0, system = 0;
+	DWORD_PTR mask    = DWORD_PTR(1) << cpu;
+	if (!GetProcessAffinityMask(GetCurrentProcess(), &process, &system) || !(process & mask))
+		return false;
+	if (_paired.exchange(true, std::memory_order_acq_rel))
+		return false;
+	if (!_restore_mask)
+		_restore_mask = process;
+	if (!pin_io_thread(mask)) {
+		_paired.store(false, std::memory_order_release);
+		return false;
+	}
+	return true;
+}
+
+void datapath::windows::iocp_context::unpair()
+{
+	if (!_paired.exchange(false, std::memory_order_acq_rel))
+		return;
+	DWORD_PTR mask = _restore_mask;
+	if (!mask) {
+		DWORD_PTR system = 0;
+		GetProcessAffinityMask(GetCurrentProcess(), &mask, &system);
+	}
+	pin_io_thread(mask);
 }
 
 bool datapath::windows::iocp_context::associate(HANDLE h)
@@ -396,70 +505,95 @@ datapath::error datapath::windows::iocp_context::connect(std::shared_ptr<datapat
 		return left > 0 ? DWORD(left) : 0;
 	};
 
-	HANDLE h;
-	for (;;) {
-		// SECURITY_IDENTIFICATION: the server may identify the client but never act
-		// with its token (blocks named-pipe impersonation attacks).
-		h = CreateFileW(wpath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING,
-						FILE_FLAG_OVERLAPPED | SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION, nullptr);
-		if (h != INVALID_HANDLE_VALUE)
-			break;
-		DWORD err = GetLastError();
-		if (err != ERROR_PIPE_BUSY)
-			return map_error(err);
-		DWORD left = remaining_ms();
-		if (left == 0)
-			return datapath::error::TimedOut;
-		WaitNamedPipeW(wpath.c_str(), left);
-	}
-
-	// Handshake with event-based overlapped I/O before the handle joins the port.
-	HANDLE ev       = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-	auto   transfer = [&](bool write, uint8_t* buf, DWORD size) -> datapath::error {
-        DWORD total = 0;
-        while (total < size) {
-            OVERLAPPED ov{};
-            ov.hEvent = ev;
-            ResetEvent(ev);
-            DWORD got = 0;
-            BOOL  ok  = write ? WriteFile(h, buf + total, size - total, &got, &ov)
-                              : ReadFile(h, buf + total, size - total, &got, &ov);
-            if (!ok) {
-                DWORD err = GetLastError();
-                if (err != ERROR_IO_PENDING)
-                    return map_error(err);
-                if (WaitForSingleObject(ev, remaining_ms()) != WAIT_OBJECT_0) {
-                    CancelIoEx(h, &ov);
-                    GetOverlappedResult(h, &ov, &got, TRUE);
-                    return datapath::error::TimedOut;
-                }
-                if (!GetOverlappedResult(h, &ov, &got, FALSE))
-                    return map_error(GetLastError());
-            }
-            if (got == 0)
-                return datapath::error::Closed;
-            total += got;
-        }
-        return datapath::error::Success;
-	};
-
-	uint8_t hello[datapath::detail::hello_size];
-	datapath::detail::encode_hello(hello, {datapath::detail::protocol_version, opts.max_message_size});
-	datapath::error ec = transfer(true, hello, sizeof(hello));
-	if (ec == datapath::error::Success)
-		ec = transfer(false, hello, sizeof(hello));
-	CloseHandle(ev);
+	HANDLE                  h        = INVALID_HANDLE_VALUE;
 	datapath::detail::hello reply{};
-	if (ec == datapath::error::Success)
-		ec = datapath::detail::decode_hello(hello, reply);
-	if (ec != datapath::error::Success) {
-		CloseHandle(h);
-		return ec;
+	int32_t                 pair_cpu = -1;
+	for (bool want_pair = pair_wanted();; want_pair = false) {
+		for (;;) {
+			// SECURITY_IDENTIFICATION: the server may identify the client but never act
+			// with its token (blocks named-pipe impersonation attacks).
+			h = CreateFileW(wpath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING,
+							FILE_FLAG_OVERLAPPED | SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION, nullptr);
+			if (h != INVALID_HANDLE_VALUE)
+				break;
+			DWORD err = GetLastError();
+			if (err != ERROR_PIPE_BUSY)
+				return map_error(err);
+			DWORD left = remaining_ms();
+			if (left == 0)
+				return datapath::error::TimedOut;
+			WaitNamedPipeW(wpath.c_str(), left);
+		}
+
+		// Handshake with event-based overlapped I/O before the handle joins the port.
+		HANDLE ev       = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+		auto   transfer = [&](bool write, uint8_t* buf, DWORD size) -> datapath::error {
+	        DWORD total = 0;
+	        while (total < size) {
+	            OVERLAPPED ov{};
+	            ov.hEvent = ev;
+	            ResetEvent(ev);
+	            DWORD got = 0;
+	            BOOL  ok  = write ? WriteFile(h, buf + total, size - total, &got, &ov)
+	                              : ReadFile(h, buf + total, size - total, &got, &ov);
+	            if (!ok) {
+	                DWORD err = GetLastError();
+	                if (err != ERROR_IO_PENDING)
+	                    return map_error(err);
+	                if (WaitForSingleObject(ev, remaining_ms()) != WAIT_OBJECT_0) {
+	                    CancelIoEx(h, &ov);
+	                    GetOverlappedResult(h, &ov, &got, TRUE);
+	                    return datapath::error::TimedOut;
+	                }
+	                if (!GetOverlappedResult(h, &ov, &got, FALSE))
+	                    return map_error(GetLastError());
+	            }
+	            if (got == 0)
+	                return datapath::error::Closed;
+	            total += got;
+	        }
+	        return datapath::error::Success;
+		};
+
+		// With pair_peer, ask for version 2 (core pairing). A server that answers
+		// version 1 doesn't know it and closes this connection: connect again.
+		uint8_t hello[datapath::detail::hello_size];
+		datapath::detail::encode_hello(hello, {want_pair ? datapath::detail::protocol_version_pair
+														 : datapath::detail::protocol_version,
+											   opts.max_message_size});
+		datapath::error ec = transfer(true, hello, sizeof(hello));
+		if (ec == datapath::error::Success)
+			ec = transfer(false, hello, sizeof(hello));
+		if (ec == datapath::error::Success)
+			ec = want_pair ? datapath::detail::decode_hello_v2(hello, reply) : datapath::detail::decode_hello(hello, reply);
+		bool fallback = false;
+		if (ec == datapath::error::Success && want_pair) {
+			if (reply.version == datapath::detail::protocol_version_pair) {
+				uint8_t trailer[datapath::detail::pair_trailer_size];
+				ec = transfer(false, trailer, sizeof(trailer));
+				if (ec == datapath::error::Success)
+					pair_cpu = datapath::detail::decode_pair_trailer(trailer);
+			} else {
+				fallback = true;
+			}
+		}
+		CloseHandle(ev);
+		if (fallback) {
+			CloseHandle(h);
+			continue;
+		}
+		if (ec != datapath::error::Success) {
+			CloseHandle(h);
+			return ec;
+		}
+		break;
 	}
 
 	bool skip  = associate(h);
 	auto limit = std::min(opts.max_message_size, reply.max_message_size);
 	auto conn  = std::make_shared<pipe_connection>(shared_from_this(), h, skip, opts, limit);
+	if (pair_cpu >= 0 && pair_client(pair_cpu))
+		conn->set_paired();
 	add_member(std::weak_ptr<datapath::detail::connection>(conn));
 	out = std::move(conn);
 	return datapath::error::Success;

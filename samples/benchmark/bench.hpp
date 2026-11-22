@@ -32,6 +32,7 @@ namespace bench {
 		size_t              pipe_buffer = datapath::options{}.pipe_buffer;
 		bool                yield       = datapath::context_options{}.yield;
 		bool                alertable   = false;
+		bool                pair        = false; // context_options::pair_peer
 		bool                mmcss       = datapath::context_options{}.mmcss;
 		int                 priority    = datapath::context_options{}.priority;
 		size_t              runs        = 1;

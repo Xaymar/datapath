@@ -63,6 +63,16 @@ namespace datapath {
 		// it fixes the oversubscribed-spin tail above (116 -> 24 us), but under
 		// full CPU load every yield gives a timeslice away (64 B p50 7 us -> 4 ms).
 		bool yield = false;
+		// Windows only, opt-in: put a client and a server that both set this on the
+		// two hyper-threads of one physical core (pinned with thread affinity), so
+		// they share its L1/L2 cache and no other thread runs on that core. Under
+		// full CPU load on a Ryzen 9 7940HS this measured 16 KiB p99.9 14 us vs
+		// 229 us on separate cores; idle it made little difference. Applies only
+		// to contexts with io_threads = 1, to the first connection between two such
+		// contexts, and only while that connection is open; other connections on
+		// the same context then share the pinned core. Needs SMT. A peer without
+		// this option, or an older library, connects as usual without pairing.
+		bool pair_peer = false;
 	};
 
 	// Per-connection / per-server settings.
