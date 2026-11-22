@@ -1,11 +1,11 @@
 # DataPath
 **Fast, predictable message passing between processes on the same machine.**
 
-DataPath is a C++17 IPC library for programs that talk to each other locally and care about the worst case, not just the average. It moves whole, length-framed messages, from a few bytes to many megabytes, between one server and any number of clients, with any number of threads sending at once. It uses each OS's native transport (named pipes with I/O completion ports on Windows, Unix domain sockets with epoll on Linux and kqueue on macOS) behind one small API, and keeps small-message round trips at 7–13 µs p99.9 on an idle machine.
+DataPath is a C++17 IPC library for programs that talk to each other locally and care about the worst case, not just the average. It moves whole, length-framed messages, from a few bytes to many megabytes, between one server and any number of clients, with any number of threads sending at once. It uses each OS's native transport (named pipes with I/O completion ports on Windows, Unix domain sockets with epoll on Linux and kqueue on macOS) behind one small API, and keeps small-message round trips at 7–14 µs p99.9 on an idle machine.
 
 ![Round-trip p99.9 latency: DataPath vs libuv](docs/images/latency-p999.svg)
 
-Small messages are where DataPath is strongest. On Windows, its 8 B round trip has a p99.9 of 7.6 µs idle and 58 µs with every core busy, against 89 µs and 114 µs for libuv as shipped. Much of that comes from DataPath's defaults (a short busy-poll and a raised I/O thread priority): give libuv the same policy and it gets close on Linux, and at 64 KiB on Linux it is ahead. The [benchmarks](#benchmarks) section has the full tables and what each configuration means.
+Small messages are where DataPath is strongest. On Windows, its 16 B round trip has a p99.9 of 7.2 µs idle and 52 µs with every core busy, against 74 µs and 504 µs for libuv as shipped. Much of that comes from DataPath's defaults (a short busy-poll and a raised I/O thread priority): give libuv the same policy and it ties on Linux, and from 16 KiB up on an idle Linux machine libuv has the lower tail. The [benchmarks](#benchmarks) section has the full tables and what each configuration means.
 
 ## Features
 **Latency**
@@ -17,7 +17,7 @@ Small messages are where DataPath is strongest. On Windows, its 8 B round trip h
 * Whole messages, never byte streams: each `send()` arrives as one `on_message` call, and messages from different threads never interleave.
 * One server, many clients; `send()` is thread-safe and non-blocking from any thread, including from inside handlers.
 * Bounded queues with explicit backpressure: `send()` returns `TooLarge` or `WouldBlock` instead of blocking or growing without limit.
-* Large messages at about 9 GiB/s per direction on Windows and 4 GiB/s on Linux.
+* Large messages at about 9 GiB/s per direction on Windows and Linux.
 
 **Safety and setup**
 * Per-server access control (`User`, `Group`, `World`), a version handshake, and peer validation before `on_accept` runs.
@@ -34,7 +34,7 @@ Small messages are where DataPath is strongest. On Windows, its 8 B round trip h
 | iOS | Unix domain sockets, kqueue | Planned (backend should apply) |
 
 ## Benchmarks
-Full round trip (send, echo, receive), ping-pong between two processes, release builds, median of 5 runs. Windows was measured on 2026-11-21 at commit `8a06c1a`, Linux on 2026-11-19 at commit `1e4be58`. The benchmark ships a second transport over libuv 1.52.1 named pipes / Unix sockets with the same framing, clock, sizes and harness, so both libraries are measured the same way. How to reproduce these runs is in [CONTRIBUTING.md](CONTRIBUTING.md#benchmarking).
+Full round trip (send, echo, receive), ping-pong between two processes, release builds, median of 5 runs. Both machines were measured on 2026-11-22 at commit `fef98d8`. The benchmark ships a second transport over libuv 1.52.1 named pipes / Unix sockets with the same framing, clock, sizes and harness, so both libraries are measured the same way. How to reproduce these runs is in [CONTRIBUTING.md](CONTRIBUTING.md#benchmarking). The graph above shows each median with a whisker from the lowest to the highest p99.9 of the five runs; `docs/images/latency_chart.py` redraws it.
 
 * **DataPath**: defaults (`spin` 50 µs, `priority` 2, one I/O thread).
 * **libuv as shipped**: `--spin 0 --no-mmcss --priority 0`, libuv's own loop.
@@ -43,40 +43,45 @@ Full round trip (send, echo, receive), ping-pong between two processes, release 
 
 **Windows: Irkela**, AMD Ryzen 9 7940HS (8 cores / 16 threads), Windows 10 22H2, Balanced power plan. p99.9 in µs:
 
-| | 8 B | 64 B | 4 KiB | 64 KiB |
-|---|---|---|---|---|
-| DataPath, idle | **7.6** | **7.8** | **12.4** | **30.4** |
-| libuv as shipped, idle | 89 | 80 | 103 | 124 |
-| libuv + policy, idle | 16.0 | 19.6 | 23.0 | 78 |
-| DataPath, stress | **58** | **39** | **127** | 442 |
-| libuv as shipped, stress | 114 | 118 | 159 | **374** |
-| libuv + policy, stress | 567 | 787 | 1106 | 1397 |
+| | 16 B | 64 B | 256 B | 1 KiB | 4 KiB | 16 KiB | 64 KiB | 256 KiB | 1 MiB |
+|---|---|---|---|---|---|---|---|---|---|
+| DataPath, idle | **7.2** | **7.9** | **7.7** | **11.5** | **14.3** | **25.3** | **32.6** | **528** | **1595** |
+| libuv as shipped, idle | 74.0 | 75.9 | 72.3 | 75.4 | 89.3 | 123 | 506 | 627 | 1904 |
+| libuv + policy, idle | 15.9 | 16.1 | 17.0 | 17.3 | 22.3 | 31.9 | 56.3 | 582 | 1662 |
+| DataPath, stress | **51.6** | **43.3** | **58.8** | **41.5** | 115 | 174 | 306 | **902** | **10379** |
+| libuv as shipped, stress | 504 | 544 | 539 | 541 | 640 | 598 | 1145 | 8906 | 47758 |
+| libuv + policy, stress | 69.1 | 86.5 | 74.9 | 83.6 | **105** | **30.7** | **39.1** | 1564 | 26002 |
 
 **Linux: merenka-gpu0**, AMD EPYC 7313P container limited to 8 cores / 16 threads, Linux 6.12, GCC 15.2. p99.9 in µs:
 
-| | 8 B | 64 B | 4 KiB | 64 KiB |
-|---|---|---|---|---|
-| DataPath, idle | **13.1** | **13.0** | 20.0 | 85 |
-| libuv as shipped, idle | 18.5 | 16.7 | 22.7 | **56** |
-| libuv + policy, idle | 13.7 | 13.8 | **19.8** | 69 |
-| DataPath, stress | 128 | **35** | 86 | **458** |
-| libuv as shipped, stress | 152 | 115 | 203 | 4172 |
-| libuv + policy, stress | **55** | 53 | **20** | 596 |
+| | 16 B | 64 B | 256 B | 1 KiB | 4 KiB | 16 KiB | 64 KiB | 256 KiB | 1 MiB |
+|---|---|---|---|---|---|---|---|---|---|
+| DataPath, idle | **13.7** | **13.1** | **13.8** | **15.1** | 21.8 | 35.8 | 79.3 | 133 | 567 |
+| libuv as shipped, idle | 17.1 | 17.4 | 17.8 | 17.8 | 23.1 | **30.5** | **55.3** | **107** | **501** |
+| libuv + policy, idle | 14.0 | 13.8 | 14.2 | 15.1 | **20.2** | 31.6 | 65.9 | 193 | 766 |
+| DataPath, stress | **11.9** | **12.3** | **20.2** | **13.4** | **19.8** | **45.6** | **483** | 4836 | **8144** |
+| libuv as shipped, stress | 164 | 78.9 | 58.5 | 61.6 | 238 | 360 | 4151 | 6847 | 10959 |
+| libuv + policy, stress | 42.7 | 150 | 185 | 187 | 25.0 | 219 | 560 | **359** | 12392 |
 
 What the numbers say:
-* On Windows, DataPath has the lowest tail at every size when idle: 1.9–2.6× lower than libuv with the same policy, and at 64 KiB it moves 9.1 GiB/s against libuv's 4.8. Under stress it is lowest up to 4 KiB, 1.3–3× below libuv as shipped; at 64 KiB libuv as shipped is ahead (374 vs 442 µs). libuv with DataPath's policy did worst under stress on this run (0.6–1.4 ms), where the previous run had it near libuv as shipped, so treat stress numbers as rough.
-* On Linux both libraries sit on the same epoll and Unix-socket stack. Idle, DataPath's lead over libuv as shipped comes from its spin policy, and libuv with the same policy ties it. Under stress the results are mixed and vary a lot between runs (single-run p99.9 ranged from 12 to 190 µs for DataPath at 64 B).
-* At 64 KiB on Linux, libuv is ahead when idle (56 vs 85 µs). On Windows this gap was closed by reading each 64 KiB frame in one read instead of two (#20); the Linux numbers predate that change.
+* On Windows, DataPath has the lowest tail at every size when idle: 1.3–2.2× lower than libuv with the same policy up to 64 KiB, and at 64 KiB it moves 9.2 GiB/s against libuv's 6.3. From 256 KiB up all three variants share a floor of about 0.5 ms (each run's slowest round trip on Irkela sits near 500 µs, whatever the library), and at 1 MiB DataPath's p99.9 is 1.6 ms against 1.7–1.9 ms. Under stress DataPath is lowest up to 1 KiB and from 256 KiB, while libuv with DataPath's policy is lower at 4–64 KiB (31–39 vs 174–306 µs at 16–64 KiB). libuv as shipped stays above 0.5 ms at every size under stress.
+* On Linux both libraries sit on the same epoll and Unix-socket stack. Idle, DataPath and libuv with the same policy tie up to 1 KiB, both ahead of libuv as shipped. From 16 KiB up libuv as shipped has the lowest tail (55 vs 79 µs at 64 KiB), although DataPath moves more data at large sizes (9.3 vs 7.8 GiB/s and p50 203 vs 245 µs at 1 MiB). Under stress DataPath is lowest at every size up to 64 KiB; from 64 KiB every variant swings by up to 10× between runs, so read those cells through the whiskers in the graph.
+* Each size runs at most 2 GiB per run, so 256 KiB gets 8,192 round trips and 1 MiB only 2,048. There p99.9 is roughly the second or third slowest round trip, and a single hiccup moves it: DataPath's idle 1 MiB p99.9 on Irkela ranged from 1.1 to 3.8 ms between runs.
 * Single runs are noisy at microsecond resolution; compare medians of several runs (`--runs 5`).
 
 DataPath-only percentiles on the same machines, idle, in µs:
 
 | | Irkela p50 | p99 | p99.9 | merenka-gpu0 p50 | p99 | p99.9 |
 |---|---|---|---|---|---|---|
-| 8 B | 3.0 | 4.4 | 7.6 | 9.0 | 9.8 | 13.1 |
-| 64 B | 3.1 | 4.4 | 7.8 | 9.0 | 9.7 | 13.0 |
-| 4 KiB | 5.3 | 7.4 | 12.4 | 14.5 | 15.5 | 20.0 |
-| 64 KiB | 12.7 | 18.4 | 30.4 | 42.5 | 61.8 | 85 |
+| 16 B | 3.0 | 4.5 | 7.2 | 8.9 | 10.4 | 13.7 |
+| 64 B | 3.0 | 4.6 | 7.9 | 9.0 | 9.7 | 13.1 |
+| 256 B | 3.1 | 4.4 | 7.7 | 9.4 | 10.3 | 13.8 |
+| 1 KiB | 3.0 | 4.8 | 11.5 | 10.0 | 11.5 | 15.1 |
+| 4 KiB | 6.1 | 8.6 | 14.3 | 14.5 | 15.6 | 21.8 |
+| 16 KiB | 8.5 | 13.7 | 25.3 | 23.5 | 27.1 | 35.8 |
+| 64 KiB | 12.7 | 16.5 | 32.6 | 38.3 | 54.2 | 79.3 |
+| 256 KiB | 53.8 | 66.2 | 528 | 53.2 | 65.6 | 133 |
+| 1 MiB | 559 | 1080 | 1595 | 203 | 268 | 567 |
 
 ## Usage
 ```cpp
