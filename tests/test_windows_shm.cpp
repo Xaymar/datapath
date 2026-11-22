@@ -74,11 +74,13 @@ namespace {
 
 	// Echo server whose accepted sockets stay alive until it is destroyed.
 	struct echo_server {
-		srv_ptr               server;
-		std::mutex            lock;
-		std::vector<sock_ptr> clients;
+		// Declared first, destroyed last: callbacks may still use them while the
+		// sockets below are released.
 		waiter                closed;
 		std::atomic<int>      close_reason{-1};
+		std::mutex            lock;
+		srv_ptr               server;
+		std::vector<sock_ptr> clients;
 
 		error start(const std::string& name, const datapath::options& o = shm_options())
 		{

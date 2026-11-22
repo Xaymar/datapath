@@ -159,7 +159,7 @@ typedef struct datapath_options {
 	uint64_t receive_buffer;
 	/* Windows kernel pipe buffer, 0 = receive_buffer; host only. Default 1 MiB. */
 	uint64_t pipe_buffer;
-	/* Windows only: use shared memory when both ends set this (see
+	/* Windows, Linux, Android: use shared memory when both ends set this (see
 	 * options::shared_memory). Default 0. */
 	uint8_t  shared_memory;
 	uint8_t  reserved[7];

@@ -13,18 +13,79 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <unistd.h>
 #include <algorithm>
 #include <cerrno>
+#include <cstring>
 #include <thread>
 #include "common/handshake.hpp"
 #include "common/spin.hpp"
 #include "path.hpp"
 #include "platform.hpp"
+#include "shm.hpp"
 #include "uds_connection.hpp"
 #include "uds_server.hpp"
 
 namespace {
 	// The context whose I/O thread is running on this thread, if any.
 	thread_local const datapath::posix::event_context* tl_context = nullptr;
-}
+
+	// A connected stream socket to `addr`, retrying a full backlog until
+	// `deadline`.
+	datapath::error open_connected(const datapath::posix::socket_address& addr,
+								   std::chrono::steady_clock::time_point deadline, const datapath::options& opts,
+								   int& out)
+	{
+		using namespace datapath::posix;
+		using clock = std::chrono::steady_clock;
+		int fd      = open_stream_socket();
+		if (fd < 0)
+			return datapath::error::CriticalFailure;
+		tune_socket_buffers(fd, opts);
+		for (;;) {
+			if (::connect(fd, reinterpret_cast<const sockaddr*>(&addr.addr), addr.length) == 0)
+				break;
+			int err = errno;
+			if (err == EINTR)
+				continue;
+#ifdef __APPLE__
+			// A full backlog refuses the connection instead of failing with EAGAIN,
+			// the same way a socket file without a server does. Keep trying while
+			// the file exists; the deadline reports TimedOut like a full backlog.
+			if (err == ECONNREFUSED) {
+				struct stat st {};
+				if (::stat(addr.filesystem_path.c_str(), &st) == 0 && S_ISSOCK(st.st_mode))
+					err = EAGAIN;
+			}
+#endif
+			if (err == EAGAIN && clock::now() < deadline) {
+				// Backlog full: the server is busy or stalled. Retry until the deadline.
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+#ifdef __APPLE__
+				// BSD sockets are unusable after a failed connect(): start over.
+				::close(fd);
+				fd = open_stream_socket();
+				if (fd < 0)
+					return datapath::error::CriticalFailure;
+				tune_socket_buffers(fd, opts);
+#endif
+				continue;
+			}
+			::close(fd);
+			switch (err) {
+			case ENOENT:
+			case ECONNREFUSED:
+				return datapath::error::NotFound;
+			case EACCES:
+			case EPERM:
+				return datapath::error::AccessDenied;
+			case EAGAIN:
+				return datapath::error::TimedOut;
+			default:
+				return datapath::error::Failure;
+			}
+		}
+		out = fd;
+		return datapath::error::Success;
+	}
+} // namespace
 
 // event_loop -------------------------------------------------------------------
 
@@ -98,20 +159,74 @@ bool datapath::posix::event_loop::drain_posts(bool& quit)
 	return !items.empty();
 }
 
+void datapath::posix::event_loop::add_poller(std::shared_ptr<poll_target> t)
+{
+	std::lock_guard<std::mutex> l(_poll_lock);
+	_pollers.push_back(std::move(t));
+	_poll_version.fetch_add(1, std::memory_order_release);
+}
+
+void datapath::posix::event_loop::remove_poller(poll_target* t)
+{
+	std::shared_ptr<poll_target> dying;
+	{
+		std::lock_guard<std::mutex> l(_poll_lock);
+		for (auto it = _pollers.begin(); it != _pollers.end(); ++it)
+			if (it->get() == t) {
+				dying = std::move(*it);
+				_pollers.erase(it);
+				break;
+			}
+		_poll_version.fetch_add(1, std::memory_order_release);
+	}
+}
+
 void datapath::posix::event_loop::run()
 {
 	bool quit = false;
+	// Shared-memory rings this loop busy-polls along with its descriptors. The
+	// list is copied whenever it changes (never while idle).
+	std::vector<std::shared_ptr<poll_target>> polled;
+	uint64_t                                  polled_version = ~uint64_t(0);
+	auto                                      refresh        = [&] {
+        uint64_t v = _poll_version.load(std::memory_order_acquire);
+        if (v == polled_version)
+            return;
+        std::lock_guard<std::mutex> l(_poll_lock);
+        polled         = _pollers;
+        polled_version = _poll_version.load(std::memory_order_relaxed);
+	};
+	auto poll = [&] {
+		bool work = pump(0, quit);
+		refresh();
+		for (auto& t : polled)
+			work |= t->poll();
+		return work;
+	};
 	while (!quit) {
 		auto block = [&] {
-			if (!quit)
-				pump(-1, quit);
+			if (quit)
+				return;
+			refresh();
+			bool work = false;
+			for (auto& t : polled)
+				if (!t->prepare_block())
+					work = true;
+			if (work) {
+				// Work arrived meanwhile: handle it here (with no spin budget this is
+				// the only place rings get polled), then spin again.
+				poll();
+				return;
+			}
+			pump(-1, quit);
 		};
 		if (_ctx->yield_enabled())
-			datapath::detail::spin_then_block(_ctx->spin(), [&] { return !quit && pump(0, quit); }, block,
+			datapath::detail::spin_then_block(_ctx->spin(), [&] { return !quit && poll(); }, block,
 											  [] { sched_yield(); });
 		else
-			datapath::detail::spin_then_block(_ctx->spin(), [&] { return !quit && pump(0, quit); }, block);
+			datapath::detail::spin_then_block(_ctx->spin(), [&] { return !quit && poll(); }, block);
 	}
+	polled.clear();
 }
 
 // event_context ----------------------------------------------------------------
@@ -217,9 +332,14 @@ void datapath::posix::event_context::shutdown_now()
 				it.target->on_post(it.kind);
 		// Break context <-> target reference cycles.
 		std::unordered_map<fd_target*, std::shared_ptr<fd_target>> regs;
+		std::vector<std::shared_ptr<poll_target>>                  pollers;
 		{
 			std::lock_guard<std::mutex> l(loop->_reg_lock);
 			regs.swap(loop->_registered);
+		}
+		{
+			std::lock_guard<std::mutex> l(loop->_poll_lock);
+			pollers.swap(loop->_pollers);
 		}
 	}
 }
@@ -236,97 +356,145 @@ datapath::error datapath::posix::event_context::connect(std::shared_ptr<datapath
 	using clock   = std::chrono::steady_clock;
 	auto deadline = clock::now() + opts.connect_timeout;
 
-	int fd = open_stream_socket();
-	if (fd < 0)
-		return datapath::error::CriticalFailure;
-	tune_socket_buffers(fd, opts);
+	// Version 3 when asking for shared memory, else version 1. A server that
+	// doesn't know version 3 answers with version 1 and closes: connect again.
+	bool want_ext = shm_link::wanted(opts);
 	for (;;) {
-		if (::connect(fd, reinterpret_cast<const sockaddr*>(&addr.addr), addr.length) == 0)
-			break;
-		int err = errno;
-		if (err == EINTR)
-			continue;
-#ifdef __APPLE__
-		// A full backlog refuses the connection instead of failing with EAGAIN,
-		// the same way a socket file without a server does. Keep trying while
-		// the file exists; the deadline reports TimedOut like a full backlog.
-		if (err == ECONNREFUSED) {
-			struct stat st {};
-			if (::stat(addr.filesystem_path.c_str(), &st) == 0 && S_ISSOCK(st.st_mode))
-				err = EAGAIN;
-		}
-#endif
-		if (err == EAGAIN && clock::now() < deadline) {
-			// Backlog full: the server is busy or stalled. Retry until the deadline.
-			std::this_thread::sleep_for(std::chrono::milliseconds(1));
-#ifdef __APPLE__
-			// BSD sockets are unusable after a failed connect(): start over.
-			::close(fd);
-			fd = open_stream_socket();
-			if (fd < 0)
-				return datapath::error::CriticalFailure;
-			tune_socket_buffers(fd, opts);
-#endif
-			continue;
-		}
-		::close(fd);
-		switch (err) {
-		case ENOENT:
-		case ECONNREFUSED:
-			return datapath::error::NotFound;
-		case EACCES:
-		case EPERM:
-			return datapath::error::AccessDenied;
-		case EAGAIN:
-			return datapath::error::TimedOut;
-		default:
-			return datapath::error::Failure;
-		}
-	}
+		int fd = -1;
+		auto ec = open_connected(addr, deadline, opts, fd);
+		if (ec != datapath::error::Success)
+			return ec;
 
-	auto transfer = [&](bool write, uint8_t* buf, size_t size) -> datapath::error {
-		size_t done = 0;
-		while (done < size) {
-			int    left = int(std::max<int64_t>(
-                0, std::chrono::duration_cast<std::chrono::milliseconds>(deadline - clock::now()).count()));
-			pollfd pfd{fd, short(write ? POLLOUT : POLLIN), 0};
-			int    pr = ::poll(&pfd, 1, left);
-			if (pr < 0 && errno == EINTR)
-				continue;
-			if (pr == 0)
-				return datapath::error::TimedOut;
-			ssize_t n = write ? ::send(fd, buf + done, size - done, send_flags)
-							  : ::recv(fd, buf + done, size - done, MSG_DONTWAIT);
-			if (n > 0) {
-				done += size_t(n);
+		int  fds[shm_fd_count] = {-1, -1, -1, -1, -1};
+		auto drop_fds          = [&] {
+            for (int& f : fds)
+                if (f >= 0)
+                    ::close(f), f = -1;
+		};
+		// Reads and writes with the connect deadline. Reads also collect the
+		// descriptors the server sends with its version 3 reply.
+		auto transfer = [&](bool write, uint8_t* buf, size_t size) -> datapath::error {
+			size_t done = 0;
+			while (done < size) {
+				int    left = int(std::max<int64_t>(
+                    0, std::chrono::duration_cast<std::chrono::milliseconds>(deadline - clock::now()).count()));
+				pollfd pfd{fd, short(write ? POLLOUT : POLLIN), 0};
+				int    pr = ::poll(&pfd, 1, left);
+				if (pr < 0 && errno == EINTR)
+					continue;
+				if (pr == 0)
+					return datapath::error::TimedOut;
+				ssize_t n;
+				if (write) {
+					n = ::send(fd, buf + done, size - done, send_flags);
+				} else {
+					alignas(cmsghdr) char ctl[CMSG_SPACE(sizeof(int) * shm_fd_count)] = {};
+					iovec                 iov{buf + done, size - done};
+					msghdr                msg{};
+					msg.msg_iov        = &iov;
+					msg.msg_iovlen     = 1;
+					msg.msg_control    = ctl;
+					msg.msg_controllen = sizeof(ctl);
+					int flags          = MSG_DONTWAIT;
+#ifdef MSG_CMSG_CLOEXEC
+					flags |= MSG_CMSG_CLOEXEC;
+#endif
+					n = ::recvmsg(fd, &msg, flags);
+					for (cmsghdr* cm = n >= 0 ? CMSG_FIRSTHDR(&msg) : nullptr; cm; cm = CMSG_NXTHDR(&msg, cm)) {
+						if (cm->cmsg_level != SOL_SOCKET || cm->cmsg_type != SCM_RIGHTS)
+							continue;
+						size_t count = (cm->cmsg_len - CMSG_LEN(0)) / sizeof(int);
+						for (size_t i = 0; i < count; i++) {
+							int got;
+							std::memcpy(&got, CMSG_DATA(cm) + i * sizeof(int), sizeof(int));
+							bool kept = false;
+							for (int& f : fds)
+								if (f < 0 && !kept)
+									f = got, kept = true;
+							if (!kept)
+								::close(got); // more than a link has: dropped
+						}
+					}
+					if (msg.msg_flags & MSG_CTRUNC) {
+						drop_fds();
+						return datapath::error::VersionMismatch;
+					}
+				}
+				if (n > 0) {
+					done += size_t(n);
+					continue;
+				}
+				if (n < 0 && (errno == EINTR || errno == EAGAIN))
+					continue;
+				return datapath::error::Closed;
+			}
+			return datapath::error::Success;
+		};
+
+		uint8_t hello[datapath::detail::hello_size + datapath::detail::ext_trailer_size];
+		datapath::detail::encode_hello(hello, {want_ext ? datapath::detail::protocol_version_ext
+														: datapath::detail::protocol_version,
+											   opts.max_message_size});
+		size_t hello_out = datapath::detail::hello_size;
+		if (want_ext) {
+			datapath::detail::encode_ext_trailer(hello + datapath::detail::hello_size,
+												 datapath::detail::ext_shared_memory, 0);
+			hello_out += datapath::detail::ext_trailer_size;
+		}
+		ec = transfer(true, hello, hello_out);
+		if (ec == datapath::error::Success)
+			ec = transfer(false, hello, datapath::detail::hello_size);
+		datapath::detail::hello reply{};
+		if (ec == datapath::error::Success)
+			ec = want_ext ? datapath::detail::decode_hello_any(hello, reply) : datapath::detail::decode_hello(hello, reply);
+		bool    fallback = false, got_shm = false;
+		uint8_t offer[shm_offer_size] = {};
+		if (ec == datapath::error::Success && want_ext) {
+			if (reply.version == datapath::detail::protocol_version_ext) {
+				uint8_t trailer[datapath::detail::ext_trailer_size];
+				ec = transfer(false, trailer, sizeof(trailer));
+				uint32_t cpu = 0, accepted = 0;
+				if (ec == datapath::error::Success) {
+					datapath::detail::decode_ext_trailer(trailer, cpu, accepted);
+					got_shm = (accepted & datapath::detail::ext_shared_memory) != 0;
+				}
+				if (ec == datapath::error::Success && got_shm)
+					ec = transfer(false, offer, sizeof(offer));
+			} else if (reply.version == datapath::detail::protocol_version) {
+				fallback = true;
+			} else {
+				ec = datapath::error::VersionMismatch;
+			}
+		}
+		if (ec != datapath::error::Success || fallback) {
+			drop_fds();
+			::close(fd);
+			if (fallback) {
+				want_ext = false;
 				continue;
 			}
-			if (n < 0 && (errno == EINTR || errno == EAGAIN))
-				continue;
-			return datapath::error::Closed;
+			return ec;
 		}
-		return datapath::error::Success;
-	};
 
-	uint8_t hello[datapath::detail::hello_size];
-	datapath::detail::encode_hello(hello, {datapath::detail::protocol_version, opts.max_message_size});
-	datapath::error ec = transfer(true, hello, sizeof(hello));
-	if (ec == datapath::error::Success)
-		ec = transfer(false, hello, sizeof(hello));
-	datapath::detail::hello reply{};
-	if (ec == datapath::error::Success)
-		ec = datapath::detail::decode_hello(hello, reply);
-	if (ec != datapath::error::Success) {
-		::close(fd);
-		return ec;
+		auto                      limit = std::min(opts.max_message_size, reply.max_message_size);
+		std::unique_ptr<shm_link> shm;
+		if (got_shm) {
+			ec = shm_link::open(shm, fd, offer, fds, limit, opts.max_queued_bytes);
+			if (ec != datapath::error::Success) {
+				::close(fd);
+				return ec;
+			}
+		}
+		drop_fds(); // sent without being offered
+		auto conn = std::make_shared<uds_connection>(shared_from_this(), pick_loop(), fd, opts, limit);
+		if (shm)
+			conn->use_shared_memory(std::move(shm));
+		if (!conn->start(false, {}, limit))
+			return datapath::error::CriticalFailure;
+		add_member(std::weak_ptr<datapath::detail::connection>(conn));
+		out = std::move(conn);
+		return datapath::error::Success;
 	}
-	auto limit = std::min(opts.max_message_size, reply.max_message_size);
-	auto conn  = std::make_shared<uds_connection>(shared_from_this(), pick_loop(), fd, opts, limit);
-	if (!conn->start(false, {}, limit))
-		return datapath::error::CriticalFailure;
-	add_member(std::weak_ptr<datapath::detail::connection>(conn));
-	out = std::move(conn);
-	return datapath::error::Success;
 }
 
 datapath::error datapath::posix::event_context::listen(std::shared_ptr<datapath::detail::listener>& out,

@@ -144,7 +144,7 @@ pub struct Options {
     pub receive_buffer: usize,
     /// Windows kernel pipe buffer, 0 = same as `receive_buffer` (host only).
     pub pipe_buffer: usize,
-    /// Windows only: move messages through shared memory when both ends set this.
+    /// Windows, Linux, Android: move messages through shared memory when both ends set this.
     pub shared_memory: bool,
     /// Ring size per direction with `shared_memory` (the server's value is used).
     pub shared_memory_size: usize,
