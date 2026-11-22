@@ -168,7 +168,7 @@ TEST(options_defaults_match_cpp)
 	CHECK_EQ(int(co.mmcss), int(cco.mmcss));
 	CHECK_EQ(int(co.alertable), int(cco.alertable));
 	CHECK_EQ(int(co.yield), int(cco.yield));
-	CHECK_EQ(int(co.reserved0), 0);
+	CHECK_EQ(int(co.pair_peer), int(cco.pair_peer));
 
 	datapath_options o;
 	datapath_options_init(&o);

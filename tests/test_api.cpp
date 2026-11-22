@@ -47,6 +47,7 @@ TEST(options_defaults)
 	CHECK_EQ(co.ideal_core, -1);
 	CHECK_EQ(co.priority, 2);
 	CHECK(!co.yield);
+	CHECK(!co.pair_peer);
 
 	datapath::options o;
 	CHECK_EQ(o.max_message_size, uint64_t(64) << 20);
