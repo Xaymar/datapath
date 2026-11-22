@@ -55,8 +55,16 @@ namespace datapath::windows {
 		std::vector<std::weak_ptr<datapath::detail::connection>> _connections;
 		std::vector<std::weak_ptr<datapath::detail::listener>>   _listeners;
 
+		// Core pairing (pair_peer): the physical core thread 0 prefers, as a
+		// group-0 mask (0 = unknown), and the affinity to go back to when the
+		// pairing ends.
+		KAFFINITY         _pair_core   = 0;
+		DWORD_PTR         _restore_mask = 0;
+		std::atomic<bool> _paired{false};
+
 		void run();
 		void dispatch(OVERLAPPED_ENTRY& entry);
+		bool pin_io_thread(DWORD_PTR mask);
 		void shutdown_now();
 		bool on_io_thread() const noexcept;
 
@@ -86,6 +94,18 @@ namespace datapath::windows {
 		bool yield_enabled() const noexcept
 		{
 			return _opts.yield;
+		}
+
+		// Core pairing. Server side: pin the I/O thread to one hyper-thread of its
+		// core and return the logical processor (group 0) the client should take,
+		// or -1. Client side: pin the I/O thread to `cpu`; false if not possible.
+		// unpair() undoes either when the paired connection finishes.
+		int32_t pair_server();
+		bool    pair_client(int32_t cpu);
+		void    unpair();
+		bool    pair_wanted() const noexcept
+		{
+			return _opts.pair_peer && _opts.io_threads == 1 && !_paired.load(std::memory_order_acquire);
 		}
 
 		void add_member(std::weak_ptr<datapath::detail::connection> c);

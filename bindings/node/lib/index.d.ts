@@ -57,6 +57,8 @@ export interface ContextOptions {
 	alertable?: boolean;
 	/** Yield the CPU after sends and between busy-poll iterations. Default false. */
 	yield?: boolean;
+	/** Windows only: pair with a peer that also sets this on the two hyper-threads of one core (needs ioThreads 1). Default false. */
+	pairPeer?: boolean;
 }
 
 /**

@@ -337,6 +337,8 @@ namespace {
 					opts.alertable = o.Get("alertable").As<Napi::Boolean>().Value();
 				if (o.Has("yield") && o.Get("yield").IsBoolean())
 					opts.yield = o.Get("yield").As<Napi::Boolean>().Value();
+				if (o.Has("pairPeer") && o.Get("pairPeer").IsBoolean())
+					opts.pair_peer = o.Get("pairPeer").As<Napi::Boolean>().Value();
 			}
 			ctx = datapath::context::create(opts);
 			if (!ctx)

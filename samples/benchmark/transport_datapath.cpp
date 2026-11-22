@@ -53,6 +53,7 @@ namespace {
 			o.io_threads = c.threads;
 			o.yield      = c.yield;
 			o.alertable  = c.alertable;
+			o.pair_peer  = c.pair;
 			o.mmcss      = c.mmcss;
 			o.priority   = c.priority;
 			o.ideal_core = c.ideal_core;

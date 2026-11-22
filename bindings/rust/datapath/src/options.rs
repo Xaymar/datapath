@@ -58,6 +58,9 @@ pub struct ContextOptions {
     pub alertable: bool,
     /// Yield the CPU after inline writes and while spinning.
     pub yield_cpu: bool,
+    /// Windows only: pair with a peer that also sets this on the two
+    /// hyper-threads of one physical core (needs `io_threads` 1).
+    pub pair_peer: bool,
 }
 
 impl Default for ContextOptions {
@@ -85,6 +88,7 @@ impl Default for ContextOptions {
             mmcss: raw.mmcss != 0,
             alertable: raw.alertable != 0,
             yield_cpu: raw.yield_ != 0,
+            pair_peer: raw.pair_peer != 0,
         }
     }
 }
@@ -113,6 +117,7 @@ impl ContextOptions {
         raw.mmcss = self.mmcss as u8;
         raw.alertable = self.alertable as u8;
         raw.yield_ = self.yield_cpu as u8;
+        raw.pair_peer = self.pair_peer as u8;
         raw
     }
 }

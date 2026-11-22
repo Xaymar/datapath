@@ -952,7 +952,7 @@ NB_MODULE(_core, m)
 		.def(
 			"__init__",
 			[](py_context* self, int64_t spin_us, size_t io_threads, int priority, bool mmcss, int ideal_core,
-			   bool alertable, bool yield_) {
+			   bool alertable, bool yield_, bool pair_peer) {
 				datapath::context_options o;
 				o.spin       = spin_from(spin_us);
 				o.io_threads = io_threads;
@@ -961,6 +961,7 @@ NB_MODULE(_core, m)
 				o.ideal_core = ideal_core;
 				o.alertable  = alertable;
 				o.yield      = yield_;
+				o.pair_peer  = pair_peer;
 				std::shared_ptr<datapath::context> c;
 				{
 					nb::gil_scoped_release release;
@@ -971,7 +972,7 @@ NB_MODULE(_core, m)
 				new (self) py_context(std::move(c));
 			},
 			nb::kw_only(), "spin_us"_a = 50, "io_threads"_a = 1, "priority"_a = 2, "mmcss"_a = false,
-			"ideal_core"_a = -1, "alertable"_a = false, "yield_"_a = false)
+			"ideal_core"_a = -1, "alertable"_a = false, "yield_"_a = false, "pair_peer"_a = false)
 		.def("close", &py_context::close, "Close every socket and server on this context and join its threads.")
 		.def_prop_ro(
 			"closed", [](py_context& c) { return !c.ctx; }, "True once close() was called.")

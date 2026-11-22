@@ -133,7 +133,10 @@ typedef struct datapath_context_options {
 	uint8_t  alertable;
 	/* Yield after inline writes and while spinning. Default 0. */
 	uint8_t  yield;
-	uint8_t  reserved0;
+	/* Windows only: pair a client and server that both set this on one physical
+	 * core (see context_options::pair_peer). Default 0. Was reserved, so older
+	 * callers that zeroed it keep the default. */
+	uint8_t  pair_peer;
 } datapath_context_options;
 
 /* See datapath::options in options.hpp for what each field does. */

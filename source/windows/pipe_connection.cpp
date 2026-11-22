@@ -170,7 +170,7 @@ void datapath::windows::pipe_connection::hello_loop()
 void datapath::windows::pipe_connection::hello_done()
 {
 	datapath::detail::hello h{};
-	if (datapath::detail::decode_hello(_hello, h) != datapath::error::Success) {
+	if (datapath::detail::decode_hello_v2(_hello, h) != datapath::error::Success) {
 		// Answer with our own hello so the client can report VersionMismatch,
 		// then close once it is written.
 		_graceful           = true;
@@ -178,7 +178,8 @@ void datapath::windows::pipe_connection::hello_done()
 		complete_accept();
 		return;
 	}
-	uint64_t limit = std::min(_own_limit, h.max_message_size);
+	_pair_requested = h.version == datapath::detail::protocol_version_pair;
+	uint64_t limit  = std::min(_own_limit, h.max_message_size);
 	_parser.set_limit(limit);
 	_queue.set_limit(limit);
 	if (auto l = _listener.lock()) {
@@ -200,8 +201,19 @@ void datapath::windows::pipe_connection::begin_server_handshake(std::weak_ptr<pi
 
 void datapath::windows::pipe_connection::complete_accept()
 {
-	_wbatch.resize(datapath::detail::hello_size);
-	datapath::detail::encode_hello(_wbatch.data(), {datapath::detail::protocol_version, _own_limit});
+	if (!_pair_requested) {
+		_wbatch.resize(datapath::detail::hello_size);
+		datapath::detail::encode_hello(_wbatch.data(), {datapath::detail::protocol_version, _own_limit});
+	} else {
+		// Version 2: answer with the processor for the client's I/O thread, or -1
+		// when this side doesn't pair (option off, already paired, no SMT).
+		int32_t cpu = _ctx->pair_server();
+		if (cpu >= 0)
+			_paired.store(true, std::memory_order_release);
+		_wbatch.resize(datapath::detail::hello_size + datapath::detail::pair_trailer_size);
+		datapath::detail::encode_hello(_wbatch.data(), {datapath::detail::protocol_version_pair, _own_limit});
+		datapath::detail::encode_pair_trailer(_wbatch.data() + datapath::detail::hello_size, cpu);
+	}
 	_woff = 0;
 	write_loop();
 }
@@ -316,6 +328,8 @@ void datapath::windows::pipe_connection::after_inline_write()
 
 void datapath::windows::pipe_connection::on_finished()
 {
+	if (_paired.exchange(false, std::memory_order_acq_rel))
+		_ctx->unpair();
 	if (auto l = _listener.lock())
 		l->connection_finished();
 }
