@@ -24,7 +24,7 @@ if(WIN32)
 	)
 	# Linked only for its option defaults; the transport compiles the two
 	# helpers above itself so it also builds against a shared library.
-	target_link_libraries(datapath-shm-benchmark PRIVATE datapath bcrypt advapi32)
+	target_link_libraries(datapath-shm-benchmark PRIVATE datapath bcrypt advapi32 psapi)
 	target_include_directories(datapath-shm-benchmark PRIVATE "${PROJECT_SOURCE_DIR}/source")
 endif()
 

@@ -48,6 +48,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include "windows/win.hpp"
 #include <aclapi.h>
 #include <bcrypt.h>
+#include <psapi.h>
 #include <sddl.h>
 
 namespace {
@@ -137,12 +138,36 @@ namespace {
 		}
 	};
 
+	bool env_flag(const char* name, bool fallback)
+	{
+		char  v[8] = {};
+		DWORD n    = GetEnvironmentVariableA(name, v, sizeof(v));
+		return n > 0 ? v[0] != '0' : fallback;
+	}
+
 	// Mirrored rings by default; DATAPATH_SHM_MIRROR=0 selects the padded layout.
 	bool mirror_wanted()
 	{
-		char   v[8] = {};
-		DWORD  n    = GetEnvironmentVariableA("DATAPATH_SHM_MIRROR", v, sizeof(v));
-		return !(n > 0 && v[0] == '0');
+		return env_flag("DATAPATH_SHM_MIRROR", true);
+	}
+
+	// DATAPATH_SHM_LOCK=1: fault in and VirtualLock every ring mapping, so the
+	// working-set manager can't trim pages that then soft-fault on next touch.
+	bool lock_wanted()
+	{
+		return env_flag("DATAPATH_SHM_LOCK", false);
+	}
+
+	void lock_range(void* p, uint64_t size)
+	{
+		SIZE_T lo = 0, hi = 0;
+		if (GetProcessWorkingSetSize(GetCurrentProcess(), &lo, &hi))
+			SetProcessWorkingSetSize(GetCurrentProcess(), lo + SIZE_T(size) + (1u << 20), hi + SIZE_T(size) + (1u << 20));
+		auto* b = static_cast<volatile uint8_t*>(p);
+		for (uint64_t i = 0; i < size; i += 4096)
+			(void)b[i];
+		if (!VirtualLock(p, SIZE_T(size)))
+			std::fprintf(stderr, "shm: VirtualLock failed (%lu)\n", GetLastError());
 	}
 
 	uint64_t align8(uint64_t v)
@@ -220,6 +245,9 @@ namespace {
 				if (!mirror[r].map(section, data_offset + r * cap, cap))
 					return false;
 			mirrored = true;
+			if (lock_wanted())
+				for (auto& m : mirror)
+					lock_range(m.base, 2 * cap);
 			return true;
 		}
 
@@ -493,6 +521,8 @@ namespace {
 			} else {
 				_data[0] = static_cast<uint8_t*>(_o->view) + data_offset;
 				_data[1] = _data[0] + _cap;
+				if (lock_wanted())
+					lock_range(_o->view, data_offset + 2 * _cap);
 			}
 			_tx      = server ? 0 : 1;
 			_rx      = server ? 1 : 0;
@@ -718,7 +748,17 @@ namespace {
 		}
 
 		public:
-		explicit shm_transport(const bench::config& c) : _cfg(c) {}
+		explicit shm_transport(const bench::config& c) : _cfg(c)
+		{
+			// Total page faults of this process, printed when it exits, to see
+			// whether ring pages fault during the run (compare modes per size).
+			std::atexit([] {
+				PROCESS_MEMORY_COUNTERS pmc{};
+				pmc.cb = sizeof(pmc);
+				if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+					std::fprintf(stderr, "shm: pid %lu page faults %lu\n", GetCurrentProcessId(), pmc.PageFaultCount);
+			});
+		}
 
 		~shm_transport() override
 		{
@@ -732,7 +772,9 @@ namespace {
 
 		const char* name() const override
 		{
-			return "shm-prototype";
+			// The config line shows the ring layout and whether pages are locked.
+			bool m = mirror_wanted(), l = lock_wanted();
+			return m ? (l ? "shm-mirrored-locked" : "shm-mirrored") : (l ? "shm-padded-locked" : "shm-padded");
 		}
 
 		bench::status host(const std::string& path, std::function<void(bench::conn_ptr)> on_accept) override
