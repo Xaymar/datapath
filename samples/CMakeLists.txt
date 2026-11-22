@@ -16,6 +16,18 @@ target_link_libraries(datapath-benchmark PRIVATE datapath)
 add_executable(datapath-benchmark-c ${BENCH_HARNESS} benchmark/transport_datapath_c.cpp)
 target_link_libraries(datapath-benchmark-c PRIVATE datapath)
 
+# PROTOTYPE: shared-memory transport (Windows only), to measure against the pipe.
+if(WIN32)
+	add_executable(datapath-shm-benchmark ${BENCH_HARNESS} benchmark/transport_shm.cpp
+		"${PROJECT_SOURCE_DIR}/source/windows/path.cpp"
+		"${PROJECT_SOURCE_DIR}/source/windows/security.cpp"
+	)
+	# Linked only for its option defaults; the transport compiles the two
+	# helpers above itself so it also builds against a shared library.
+	target_link_libraries(datapath-shm-benchmark PRIVATE datapath bcrypt advapi32)
+	target_include_directories(datapath-shm-benchmark PRIVATE "${PROJECT_SOURCE_DIR}/source")
+endif()
+
 add_executable(datapath-echo echo/main.cpp)
 target_link_libraries(datapath-echo PRIVATE datapath)
 
