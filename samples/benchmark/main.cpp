@@ -45,6 +45,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <cstdlib>
 #include <cerrno>
 #include <cstring>
+#include <functional>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -76,6 +77,9 @@ namespace {
 	constexpr uint8_t tag_bulk  = 'B';
 	constexpr uint8_t tag_stats = 'S';
 	constexpr uint8_t tag_quit  = 'Q';
+
+	// Local mode: runs right before the client ends the process.
+	std::function<void()> before_exit;
 
 
 	int current_pid()
@@ -470,6 +474,8 @@ namespace {
 		uint8_t q = tag_quit;
 		pingers[0]->sock->send(&q, 1);
 		std::this_thread::sleep_for(std::chrono::milliseconds(50));
+		if (before_exit)
+			before_exit();
 		std::fflush(stdout);
 		std::exit(0); // skip transport teardown
 
@@ -564,6 +570,15 @@ namespace {
 				AssignProcessToJobObject(j, pi.hProcess);
 			ResumeThread(pi.hThread);
 		}
+		// CPU time the process has used so far, in seconds (-1 if unknown).
+		double cpu_seconds() const
+		{
+			FILETIME created, exited, kernel, user;
+			if (!ok || !GetProcessTimes(pi.hProcess, &created, &exited, &kernel, &user))
+				return -1;
+			auto ticks = [](const FILETIME& f) { return (uint64_t(f.dwHighDateTime) << 32) | f.dwLowDateTime; };
+			return double(ticks(kernel) + ticks(user)) / 1e7;
+		}
 		// Wait up to `ms` for a clean exit, then kill.
 		void finish(int ms)
 		{
@@ -589,6 +604,30 @@ namespace {
 				argv.push_back(&a[0]);
 			argv.push_back(nullptr);
 			ok = posix_spawn(&pid, "/proc/self/exe", nullptr, nullptr, argv.data(), environ) == 0;
+		}
+		// CPU time the process has used so far, in seconds (-1 if unknown).
+		double cpu_seconds() const
+		{
+#ifdef __linux__
+			if (!ok)
+				return -1;
+			std::string path = "/proc/" + std::to_string(pid) + "/stat";
+			FILE*       f    = std::fopen(path.c_str(), "r");
+			if (!f)
+				return -1;
+			char   buf[1024];
+			size_t n = std::fread(buf, 1, sizeof(buf) - 1, f);
+			std::fclose(f);
+			buf[n]     = 0;
+			// Fields after the parenthesised command name; utime and stime are 14 and 15.
+			const char* p = std::strrchr(buf, ')');
+			unsigned long long utime = 0, stime = 0;
+			if (!p || std::sscanf(p + 2, "%*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %llu %llu", &utime, &stime) != 2)
+				return -1;
+			return double(utime + stime) / double(sysconf(_SC_CLK_TCK));
+#else
+			return -1;
+#endif
 		}
 		void finish(int ms)
 		{
@@ -638,7 +677,9 @@ namespace {
 											: std::to_string(c.ideal_core + int(c.threads)));
 
 		std::unique_ptr<child_process> stress;
+		unsigned                       stress_threads = 0;
 		if (c.stress >= 0) {
+			stress_threads = c.stress > 0 ? unsigned(c.stress) : std::max(1u, std::thread::hardware_concurrency());
 			stress = std::make_unique<child_process>(
 				std::vector<std::string>{"stress", std::to_string(c.stress), std::to_string(c.stress_nice)});
 			if (!stress->ok) {
@@ -651,6 +692,24 @@ namespace {
 		if (!server.ok) {
 			std::fprintf(stderr, "failed to start server process\n");
 			return 1;
+		}
+		// A stress process that does not get its CPU time makes a "stress" run an
+		// idle run. Report how busy it actually was, so such runs can be spotted.
+		// run_client() leaves with std::exit(), so this runs from its exit hook.
+		if (stress) {
+			double cpu_before  = stress->cpu_seconds();
+			auto   wall_before = std::chrono::steady_clock::now();
+			before_exit        = [&stress, stress_threads, cpu_before, wall_before] {
+                double cpu_after = stress->cpu_seconds();
+                double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - wall_before).count();
+                if (cpu_before < 0 || cpu_after < 0 || seconds <= 0)
+                    return;
+                double busy = (cpu_after - cpu_before) / seconds;
+                std::printf("stress: %u threads averaged %.1f busy cores over %.1f s\n", stress_threads, busy, seconds);
+                if (busy < 0.5 * stress_threads)
+                    std::fprintf(stderr, "warning: the stress process got under half its CPU time; this was not a "
+                                         "full-load run\n");
+			};
 		}
 		int rc = run_client(c);
 		server.finish(5000);
