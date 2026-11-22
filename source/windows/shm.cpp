@@ -519,16 +519,20 @@ bool datapath::windows::shm_channel::put(cursor& c, uint64_t len, bool more)
 }
 
 // Write fragments of the message at `c` (`total` bytes left) while they fit.
-bool datapath::windows::shm_channel::write_message(cursor& c, uint64_t total, bool, size_t& written)
+// `complete` is set once its last fragment is in the ring. An empty message is
+// one empty record, so it is delivered like any other.
+bool datapath::windows::shm_channel::write_message(cursor& c, uint64_t total, bool& complete, size_t& written)
 {
 	uint64_t frag_max = (_mirror ? _cap - 8 : _cap / 2 - 8) - page;
 	written           = 0;
-	while (written < total) {
+	complete          = false;
+	do {
 		uint64_t n = std::min<uint64_t>(total - written, frag_max);
 		if (!put(c, n, written + n < total))
 			break;
 		written += size_t(n);
-	}
+		complete = written == total;
+	} while (!complete);
 	return !_broken;
 }
 
@@ -544,11 +548,12 @@ datapath::error datapath::windows::shm_channel::send(const buffer_view* parts, s
 	if (_broken)
 		return datapath::error::Closed;
 	cursor c{parts, count};
-	size_t written = 0;
+	size_t written  = 0;
+	bool   complete = false;
 	if (_pending.empty()) {
-		if (!write_message(c, total, true, written))
+		if (!write_message(c, total, complete, written))
 			return datapath::error::Closed;
-		if (written == total)
+		if (complete)
 			return datapath::error::Success;
 	} else if (_pending_bytes + total > _max_queued) {
 		return datapath::error::WouldBlock;
@@ -572,11 +577,12 @@ bool datapath::windows::shm_channel::drain(bool& need_space)
 		auto&       p = _pending.front();
 		buffer_view v{p.bytes.data() + p.off, p.bytes.size() - p.off};
 		cursor      c{&v, 1};
-		size_t      written = 0;
-		write_message(c, v.size, false, written);
+		size_t      written  = 0;
+		bool        complete = false;
+		write_message(c, v.size, complete, written);
 		p.off += written;
 		_pending_bytes -= written;
-		if (p.off < p.bytes.size())
+		if (!complete)
 			break;
 		_pending.pop_front();
 	}

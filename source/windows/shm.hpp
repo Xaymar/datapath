@@ -89,7 +89,7 @@ namespace datapath::windows {
 		struct cursor;
 		uint64_t free_space();
 		bool     put(cursor& c, uint64_t len, bool more);
-		bool     write_message(cursor& c, uint64_t total, bool may_wait_partial, size_t& written);
+		bool     write_message(cursor& c, uint64_t total, bool& complete, size_t& written);
 		void     wake_reader();
 
 		shm_channel(std::unique_ptr<objects> o, bool server, uint64_t limit, uint64_t max_queued);

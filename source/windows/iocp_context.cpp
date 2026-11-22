@@ -440,9 +440,16 @@ void datapath::windows::iocp_context::run()
 			if (quit)
 				return;
 			refresh();
+			bool work = false;
 			for (auto& t : polled)
 				if (t->owner.load(std::memory_order_relaxed) == me && !t->prepare_block())
-					return; // work arrived: keep spinning
+					work = true;
+			if (work) {
+				// Work arrived meanwhile: handle it here (with no spin budget this is
+				// the only place rings get polled), then spin again.
+				poll();
+				return;
+			}
 			pump(INFINITE);
 		};
 		if (_opts.yield)
