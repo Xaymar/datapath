@@ -38,6 +38,7 @@ SPDX-License-Identifier: BSD-3-Clause
 // ping is sent from inside the receive callback, so no extra thread wake-up
 // is included.
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -62,6 +63,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #ifdef __linux__
 #include <sys/prctl.h>
 #endif
+#include <sched.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -77,6 +79,58 @@ namespace {
 	constexpr uint8_t tag_bulk  = 'B';
 	constexpr uint8_t tag_stats = 'S';
 	constexpr uint8_t tag_quit  = 'Q';
+	constexpr uint8_t tag_cpus  = 'C';
+
+	// Which logical CPUs handled the ping-pong messages, to see where the I/O
+	// threads ran (e.g. under --stress).
+	struct cpu_histogram {
+		static constexpr size_t      max_cpus = 256;
+		std::atomic<uint64_t>        n[max_cpus] = {};
+
+		static unsigned current()
+		{
+#ifdef _WIN32
+			PROCESSOR_NUMBER pn;
+			GetCurrentProcessorNumberEx(&pn);
+			return unsigned(pn.Group) * 64 + pn.Number;
+#elif defined(__linux__)
+			int c = sched_getcpu();
+			return c < 0 ? 0 : unsigned(c);
+#else
+			return 0;
+#endif
+		}
+		void hit()
+		{
+			n[current() % max_cpus].fetch_add(1, std::memory_order_relaxed);
+		}
+		void take(uint64_t* out)
+		{
+			for (size_t i = 0; i < max_cpus; i++)
+				out[i] = n[i].exchange(0, std::memory_order_relaxed);
+		}
+		// "cpu5 97.1% cpu4 2.9%": CPUs that handled at least 0.1%, busiest first.
+		static std::string describe(const uint64_t* counts)
+		{
+			uint64_t total = 0;
+			for (size_t i = 0; i < max_cpus; i++)
+				total += counts[i];
+			std::vector<std::pair<uint64_t, size_t>> v;
+			for (size_t i = 0; i < max_cpus; i++)
+				if (counts[i] && counts[i] * 1000 >= total)
+					v.emplace_back(counts[i], i);
+			std::sort(v.begin(), v.end(), [](auto& a, auto& b) { return a.first > b.first; });
+			std::string out;
+			char        buf[48];
+			for (auto& e : v) {
+				std::snprintf(buf, sizeof(buf), "%scpu%zu %.1f%%", out.empty() ? "" : " ", e.second,
+							  100.0 * double(e.first) / double(total));
+				out += buf;
+			}
+			return out.empty() ? "-" : out;
+		}
+	};
+	cpu_histogram own_cpus;
 
 	// Local mode: runs right before the client ends the process.
 	std::function<void()> before_exit;
@@ -202,9 +256,19 @@ namespace {
 					return;
 				switch (d[0]) {
 				case tag_ping:
+					own_cpus.hit();
 					while (sock->send(d, n) == status::would_block)
 						std::this_thread::yield();
 					break;
+				case tag_cpus: {
+					std::vector<uint8_t> reply(1 + 8 * cpu_histogram::max_cpus);
+					reply[0] = tag_cpus;
+					uint64_t counts[cpu_histogram::max_cpus];
+					own_cpus.take(counts);
+					std::memcpy(reply.data() + 1, counts, sizeof(counts));
+					sock->send(reply.data(), reply.size());
+					break;
+				}
 				case tag_bulk:
 					*bulk += n;
 					break;
@@ -246,6 +310,8 @@ namespace {
 		std::condition_variable cv;
 		bool                    finished = false;
 		bool                    failed   = false;
+		uint64_t                peer_cpus[cpu_histogram::max_cpus] = {};
+		bool                    have_cpus = false;
 
 		void send_one()
 		{
@@ -265,9 +331,17 @@ namespace {
 			cv.notify_all();
 		}
 
-		void on_message(const uint8_t*, size_t)
+		void on_message(const uint8_t* d, size_t n)
 		{
 			int64_t t = now_ns();
+			if (n == 1 + sizeof(peer_cpus) && d[0] == tag_cpus) {
+				std::lock_guard<std::mutex> l(lock);
+				std::memcpy(peer_cpus, d + 1, sizeof(peer_cpus));
+				have_cpus = true;
+				cv.notify_all();
+				return;
+			}
+			own_cpus.hit();
 			if (done >= warmup)
 				samples.push_back(t - sent_at);
 			done++;
@@ -275,6 +349,23 @@ namespace {
 				send_one();
 			else
 				finish(false);
+		}
+
+		// Where the server's I/O thread handled pings since the last call.
+		bool server_cpus(uint64_t* out)
+		{
+			{
+				std::lock_guard<std::mutex> l(lock);
+				have_cpus = false;
+			}
+			uint8_t q = tag_cpus;
+			if (sock->send(&q, 1) != status::ok)
+				return false;
+			std::unique_lock<std::mutex> l(lock);
+			if (!cv.wait_for(l, std::chrono::seconds(5), [&] { return have_cpus; }))
+				return false;
+			std::memcpy(out, peer_cpus, sizeof(peer_cpus));
+			return true;
 		}
 
 		bool wait()
@@ -414,6 +505,33 @@ namespace {
 						return 1;
 			}
 		}
+#ifdef _WIN32
+		{
+			// Which logical CPUs share a physical core, to read the "cpus" lines.
+			DWORD len = 0;
+			GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &len);
+			std::vector<uint8_t> buf(len);
+			if (len && GetLogicalProcessorInformationEx(RelationProcessorCore,
+														 reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buf.data()), &len)) {
+				std::printf("%10s ", "cores");
+				for (DWORD off = 0; off < len;) {
+					auto* e = reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buf.data() + off);
+					const GROUP_AFFINITY& g = e->Processor.GroupMask[0];
+					const char*           sep = " ";
+					for (unsigned bit = 0; bit < 64; bit++)
+						if (g.Mask & (KAFFINITY(1) << bit)) {
+							std::printf("%s%u", sep, unsigned(g.Group) * 64 + bit);
+							sep = ",";
+						}
+					off += e->Size;
+				}
+				std::printf("\n");
+			}
+		}
+#endif
+		uint64_t cpus[cpu_histogram::max_cpus];
+		own_cpus.take(cpus); // forget the warm-up
+		pingers[0]->server_cpus(cpus);
 
 		for (size_t size : c.sizes) {
 			size = std::max<size_t>(size, 1);
@@ -465,6 +583,11 @@ namespace {
 				std::printf(" %9.2f %9.2f", *std::min_element(p999.begin(), p999.end()),
 							*std::max_element(p999.begin(), p999.end()));
 			std::printf("\n");
+			// Where both I/O threads ran for this size (all clients together).
+			own_cpus.take(cpus);
+			std::string client_where = cpu_histogram::describe(cpus);
+			std::string server_where = pingers[0]->server_cpus(cpus) ? cpu_histogram::describe(cpus) : "?";
+			std::printf("%10s  client %s | server %s\n", "cpus", client_where.c_str(), server_where.c_str());
 			std::fflush(stdout);
 		}
 
