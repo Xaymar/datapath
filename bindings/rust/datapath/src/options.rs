@@ -144,6 +144,10 @@ pub struct Options {
     pub receive_buffer: usize,
     /// Windows kernel pipe buffer, 0 = same as `receive_buffer` (host only).
     pub pipe_buffer: usize,
+    /// Windows only: move messages through shared memory when both ends set this.
+    pub shared_memory: bool,
+    /// Ring size per direction with `shared_memory` (the server's value is used).
+    pub shared_memory_size: usize,
 }
 
 impl Default for Options {
@@ -167,6 +171,8 @@ impl Default for Options {
             connect_timeout: Duration::from_millis(raw.connect_timeout_ms.max(0) as u64),
             receive_buffer: raw.receive_buffer as usize,
             pipe_buffer: raw.pipe_buffer as usize,
+            shared_memory: raw.shared_memory != 0,
+            shared_memory_size: raw.shared_memory_size as usize,
         }
     }
 }
@@ -191,6 +197,8 @@ impl Options {
         raw.connect_timeout_ms = i64::try_from(self.connect_timeout.as_millis()).unwrap_or(i64::MAX);
         raw.receive_buffer = self.receive_buffer as u64;
         raw.pipe_buffer = self.pipe_buffer as u64;
+        raw.shared_memory = u8::from(self.shared_memory);
+        raw.shared_memory_size = self.shared_memory_size as u64;
         raw
     }
 }

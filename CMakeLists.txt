@@ -86,6 +86,8 @@ if(WIN32)
 		source/windows/pipe_server.hpp
 		source/windows/security.cpp
 		source/windows/security.hpp
+		source/windows/shm.cpp
+		source/windows/shm.hpp
 		source/windows/win.hpp
 	)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR ANDROID OR APPLE)

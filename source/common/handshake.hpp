@@ -13,6 +13,14 @@ SPDX-License-Identifier: BSD-3-Clause
 // client's I/O thread (-1 = no pairing), uint32 reserved. A server that only
 // knows version 1 answers with version 1 and closes; the client then connects
 // again with version 1.
+//
+// Version 3 (Windows, extensions): the client sends a version 3 hello followed
+// by a request trailer: uint32 flags (ext_pair, ext_shared_memory), uint32
+// reserved. A server that knows version 3 answers with a version 3 hello and a
+// reply trailer: int32 pair processor (-1 = none), uint32 accepted flags. When
+// ext_shared_memory was accepted, a shared-memory offer follows (see
+// source/windows/shm.hpp). Servers that don't know version 3 answer with
+// version 1 and close; the client then falls back to version 2 or 1.
 
 #pragma once
 #include <datapath/error.hpp>
@@ -26,6 +34,10 @@ namespace datapath::detail {
 	constexpr uint32_t protocol_version_pair = 2;
 	constexpr size_t   hello_size            = 16;
 	constexpr size_t   pair_trailer_size     = 8;
+	constexpr uint32_t protocol_version_ext  = 3;
+	constexpr size_t   ext_trailer_size      = 8;
+	constexpr uint32_t ext_pair              = 1;
+	constexpr uint32_t ext_shared_memory     = 2;
 
 	struct hello {
 		uint32_t version;
@@ -60,6 +72,31 @@ namespace datapath::detail {
 		if (out.version != protocol_version && out.version != protocol_version_pair)
 			return datapath::error::VersionMismatch;
 		return datapath::error::Success;
+	}
+
+	// Accepts versions 1 to 3.
+	inline datapath::error decode_hello_any(const uint8_t* in, hello& out) noexcept
+	{
+		if (std::memcmp(in, "DPTH", 4) != 0)
+			return datapath::error::VersionMismatch;
+		out.version          = load_le32(in + 4);
+		out.max_message_size = load_le64(in + 8);
+		if (out.version < protocol_version || out.version > protocol_version_ext)
+			return datapath::error::VersionMismatch;
+		return datapath::error::Success;
+	}
+
+	// Version 3 trailers. Request: flags, reserved. Reply: pair processor, flags.
+	inline void encode_ext_trailer(uint8_t* out, uint32_t first, uint32_t second) noexcept
+	{
+		store_le32(out, first);
+		store_le32(out + 4, second);
+	}
+
+	inline void decode_ext_trailer(const uint8_t* in, uint32_t& first, uint32_t& second) noexcept
+	{
+		first  = load_le32(in);
+		second = load_le32(in + 4);
 	}
 
 	inline void encode_pair_trailer(uint8_t* out, int32_t cpu) noexcept
