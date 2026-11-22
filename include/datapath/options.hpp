@@ -99,5 +99,22 @@ namespace datapath {
 		// each connection on macOS (both ends; the OS default is 8 KiB). 0 = same
 		// as receive_buffer. Unused on Linux.
 		size_t pipe_buffer = size_t(1) << 20;
+		// Windows only, opt-in: move messages through shared memory instead of the
+		// pipe when both ends set this. The pipe then only carries the handshake
+		// and tells each side when the other one is gone. Each direction gets a
+		// ring of shared_memory_size bytes in a section that only the two users
+		// may open; an idle receiver spins (context_options::spin) and is woken
+		// with an event after that. On a Ryzen 9 7940HS (processes on separate
+		// cores) this measured p99.9 under full CPU load 64 B 3 us vs 38 us,
+		// 16 KiB 77 vs 230 us, idle 64 B 1.1 vs 7.4 us. Both processes must be in
+		// the same logon session, or the server must be allowed to create global
+		// objects (services are). A peer without this option, or an older library,
+		// connects over the pipe as usual. DATAPATH_SHARED_MEMORY=1 or 0 in the
+		// environment overrides this setting for every connection in the process.
+		bool shared_memory = false;
+		// Ring size per direction with shared_memory, rounded up to a power of two
+		// (64 KiB .. 1 GiB). Messages larger than about the ring size are sent in
+		// pieces. The server's value is used.
+		size_t shared_memory_size = size_t(4) << 20;
 	};
 } // namespace datapath

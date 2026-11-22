@@ -42,6 +42,19 @@ namespace datapath::windows {
 		virtual void on_io(io_op* op, DWORD bytes, DWORD err) = 0;
 	};
 
+	// Something the I/O threads busy-poll besides the port (shared-memory rings).
+	// Each target is polled by the thread that owns it; a thread that handles
+	// its wake-up packet takes it over.
+	class poll_target {
+		public:
+		virtual ~poll_target() = default;
+		// Handle new work; true if there was some.
+		virtual bool poll() = 0;
+		// About to block: arm the wake-up. False if work arrived meanwhile.
+		virtual bool prepare_block() = 0;
+		std::atomic<int> owner{0};
+	};
+
 	class iocp_context : public datapath::detail::context_impl, public std::enable_shared_from_this<iocp_context> {
 		HANDLE                          _port = nullptr;
 		datapath::context_options       _opts;
@@ -50,6 +63,10 @@ namespace datapath::windows {
 		std::atomic<int64_t>            _outstanding{0};
 		std::mutex                      _wait_lock;
 		std::condition_variable         _wait_cv;
+
+		std::mutex                                       _poll_lock;
+		std::vector<std::shared_ptr<poll_target>>        _pollers;
+		std::atomic<uint64_t>                            _poll_version{0};
 
 		std::mutex                                            _members_lock;
 		std::vector<std::weak_ptr<datapath::detail::connection>> _connections;
@@ -73,6 +90,17 @@ namespace datapath::windows {
 		~iocp_context() override;
 
 		bool start();
+
+		HANDLE port() const noexcept
+		{
+			return _port;
+		}
+		// Index of the calling I/O thread, or 0 elsewhere.
+		static int thread_index() noexcept;
+		void add_poller(std::shared_ptr<poll_target> t);
+		void remove_poller(poll_target* t);
+		// Whether connections with these options should use shared memory.
+		static bool shared_memory_wanted(const datapath::options& opts) noexcept;
 
 		// Associate a handle with the port and enable skip-on-success completions.
 		bool associate(HANDLE h);

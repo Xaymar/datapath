@@ -13,6 +13,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include "path.hpp"
 #include "pipe_connection.hpp"
 #include "pipe_server.hpp"
+#include "shm.hpp"
 
 #ifndef FILE_SKIP_COMPLETION_PORT_ON_SUCCESS
 #define FILE_SKIP_COMPLETION_PORT_ON_SUCCESS 0x1
@@ -24,6 +25,7 @@ SPDX-License-Identifier: BSD-3-Clause
 namespace {
 	// The context whose I/O thread is running on this thread, if any.
 	thread_local const datapath::windows::iocp_context* tl_context = nullptr;
+	thread_local int                                     tl_index   = 0;
 
 	using rtl_nt_status_to_dos_error_t = ULONG(WINAPI*)(LONG);
 
@@ -279,6 +281,7 @@ bool datapath::windows::iocp_context::start()
 	for (size_t i = 0; i < _opts.io_threads; i++)
 		_threads.emplace_back([this, i, cores, avoid, keep = shared_from_this()] {
 			tl_context = keep.get();
+			tl_index   = int(i);
 			apply_ideal_core(_opts, cores, avoid, i);
 			run();
 		});
@@ -411,16 +414,50 @@ void datapath::windows::iocp_context::run()
         }
         return n > 0;
 	};
+	// Shared-memory rings this thread busy-polls along with the port. The list
+	// is copied from the context whenever it changes (never while idle).
+	std::vector<std::shared_ptr<poll_target>> polled;
+	uint64_t                                  polled_version = ~uint64_t(0);
+	const int                                 me             = tl_index;
+	auto                                      refresh        = [&] {
+        uint64_t v = _poll_version.load(std::memory_order_acquire);
+        if (v == polled_version)
+            return;
+        std::lock_guard<std::mutex> l(_poll_lock);
+        polled         = _pollers;
+        polled_version = _poll_version.load(std::memory_order_relaxed);
+	};
+	auto poll = [&] {
+		bool work = pump(0);
+		refresh();
+		for (auto& t : polled)
+			if (t->owner.load(std::memory_order_relaxed) == me)
+				work |= t->poll();
+		return work;
+	};
 	while (!quit) {
 		auto block = [&] {
-			if (!quit)
-				pump(INFINITE);
+			if (quit)
+				return;
+			refresh();
+			bool work = false;
+			for (auto& t : polled)
+				if (t->owner.load(std::memory_order_relaxed) == me && !t->prepare_block())
+					work = true;
+			if (work) {
+				// Work arrived meanwhile: handle it here (with no spin budget this is
+				// the only place rings get polled), then spin again.
+				poll();
+				return;
+			}
+			pump(INFINITE);
 		};
 		if (_opts.yield)
-			datapath::detail::spin_then_block(_opts.spin, [&] { return !quit && pump(0); }, block, [] { Sleep(0); });
+			datapath::detail::spin_then_block(_opts.spin, [&] { return !quit && poll(); }, block, [] { Sleep(0); });
 		else
-			datapath::detail::spin_then_block(_opts.spin, [&] { return !quit && pump(0); }, block);
+			datapath::detail::spin_then_block(_opts.spin, [&] { return !quit && poll(); }, block);
 	}
+	polled.clear();
 	revert_thread_scheduling(mmcss);
 }
 
@@ -439,6 +476,38 @@ void datapath::windows::iocp_context::add_member(std::weak_ptr<datapath::detail:
 	_listeners.erase(std::remove_if(_listeners.begin(), _listeners.end(), [](auto& w) { return w.expired(); }),
 					 _listeners.end());
 	_listeners.push_back(std::move(l));
+}
+
+int datapath::windows::iocp_context::thread_index() noexcept
+{
+	return tl_index;
+}
+
+void datapath::windows::iocp_context::add_poller(std::shared_ptr<poll_target> t)
+{
+	std::lock_guard<std::mutex> l(_poll_lock);
+	_pollers.push_back(std::move(t));
+	_poll_version.fetch_add(1, std::memory_order_release);
+}
+
+void datapath::windows::iocp_context::remove_poller(poll_target* t)
+{
+	std::lock_guard<std::mutex> l(_poll_lock);
+	_pollers.erase(std::remove_if(_pollers.begin(), _pollers.end(), [t](auto& p) { return p.get() == t; }),
+				   _pollers.end());
+	_poll_version.fetch_add(1, std::memory_order_release);
+}
+
+bool datapath::windows::iocp_context::shared_memory_wanted(const datapath::options& opts) noexcept
+{
+	// DATAPATH_SHARED_MEMORY=1/0 overrides the option for the whole process.
+	static const int forced = [] {
+		char  v[4] = {};
+		DWORD n    = GetEnvironmentVariableA("DATAPATH_SHARED_MEMORY", v, sizeof(v));
+		return n > 0 && n < sizeof(v) ? (v[0] == '0' ? 0 : 1) : -1;
+	}();
+	bool want = forced < 0 ? opts.shared_memory : forced == 1;
+	return want && shm_channel::supported();
 }
 
 bool datapath::windows::iocp_context::on_io_thread() const noexcept
@@ -487,6 +556,8 @@ void datapath::windows::iocp_context::shutdown_now()
 		if (t.joinable())
 			t.join();
 	_threads.clear();
+	std::lock_guard<std::mutex> l(_poll_lock);
+	_pollers.clear();
 }
 
 datapath::error datapath::windows::iocp_context::connect(std::shared_ptr<datapath::detail::connection>& out,
@@ -508,7 +579,14 @@ datapath::error datapath::windows::iocp_context::connect(std::shared_ptr<datapat
 	HANDLE                  h        = INVALID_HANDLE_VALUE;
 	datapath::detail::hello reply{};
 	int32_t                 pair_cpu = -1;
-	for (bool want_pair = pair_wanted();; want_pair = false) {
+	// Version 3 when asking for shared memory, else version 2 for pairing, else 1.
+	// A server that doesn't know the version answers with version 1 and closes:
+	// connect again one step lower.
+	bool                         want_ext = shared_memory_wanted(opts);
+	bool                         got_shm  = false;
+	uint8_t                      offer[shm_offer_size];
+	std::unique_ptr<shm_channel> shm;
+	for (bool want_pair = pair_wanted();; want_ext ? (void)(want_ext = false) : (void)(want_pair = false)) {
 		for (;;) {
 			// SECURITY_IDENTIFICATION: the server may identify the client but never act
 			// with its token (blocks named-pipe impersonation attacks).
@@ -557,17 +635,45 @@ datapath::error datapath::windows::iocp_context::connect(std::shared_ptr<datapat
 
 		// With pair_peer, ask for version 2 (core pairing). A server that answers
 		// version 1 doesn't know it and closes this connection: connect again.
-		uint8_t hello[datapath::detail::hello_size];
-		datapath::detail::encode_hello(hello, {want_pair ? datapath::detail::protocol_version_pair
-														 : datapath::detail::protocol_version,
-											   opts.max_message_size});
-		datapath::error ec = transfer(true, hello, sizeof(hello));
+		uint8_t  hello[datapath::detail::hello_size + datapath::detail::ext_trailer_size];
+		uint32_t version = want_ext    ? datapath::detail::protocol_version_ext
+						   : want_pair ? datapath::detail::protocol_version_pair
+									   : datapath::detail::protocol_version;
+		datapath::detail::encode_hello(hello, {version, opts.max_message_size});
+		DWORD hello_out = DWORD(datapath::detail::hello_size);
+		if (want_ext) {
+			datapath::detail::encode_ext_trailer(hello + datapath::detail::hello_size,
+												 datapath::detail::ext_shared_memory
+													 | (want_pair ? datapath::detail::ext_pair : 0),
+												 0);
+			hello_out += DWORD(datapath::detail::ext_trailer_size);
+		}
+		datapath::error ec = transfer(true, hello, hello_out);
 		if (ec == datapath::error::Success)
-			ec = transfer(false, hello, sizeof(hello));
+			ec = transfer(false, hello, DWORD(datapath::detail::hello_size));
 		if (ec == datapath::error::Success)
-			ec = want_pair ? datapath::detail::decode_hello_v2(hello, reply) : datapath::detail::decode_hello(hello, reply);
+			ec = want_ext ? datapath::detail::decode_hello_any(hello, reply)
+				 : want_pair ? datapath::detail::decode_hello_v2(hello, reply)
+							 : datapath::detail::decode_hello(hello, reply);
 		bool fallback = false;
-		if (ec == datapath::error::Success && want_pair) {
+		if (ec == datapath::error::Success && want_ext) {
+			if (reply.version == datapath::detail::protocol_version_ext) {
+				uint8_t trailer[datapath::detail::ext_trailer_size];
+				ec = transfer(false, trailer, sizeof(trailer));
+				uint32_t cpu = 0, accepted = 0;
+				if (ec == datapath::error::Success) {
+					datapath::detail::decode_ext_trailer(trailer, cpu, accepted);
+					pair_cpu = (accepted & datapath::detail::ext_pair) ? int32_t(cpu) : -1;
+					got_shm  = (accepted & datapath::detail::ext_shared_memory) != 0;
+				}
+				if (ec == datapath::error::Success && got_shm)
+					ec = transfer(false, offer, sizeof(offer));
+			} else if (reply.version == datapath::detail::protocol_version) {
+				fallback = true;
+			} else {
+				ec = datapath::error::VersionMismatch;
+			}
+		} else if (ec == datapath::error::Success && want_pair) {
 			if (reply.version == datapath::detail::protocol_version_pair) {
 				uint8_t trailer[datapath::detail::pair_trailer_size];
 				ec = transfer(false, trailer, sizeof(trailer));
@@ -589,9 +695,18 @@ datapath::error datapath::windows::iocp_context::connect(std::shared_ptr<datapat
 		break;
 	}
 
-	bool skip  = associate(h);
 	auto limit = std::min(opts.max_message_size, reply.max_message_size);
+	if (got_shm) {
+		auto ec = shm_channel::open(shm, offer, limit, opts.max_queued_bytes);
+		if (ec != datapath::error::Success) {
+			CloseHandle(h);
+			return ec;
+		}
+	}
+	bool skip  = associate(h);
 	auto conn  = std::make_shared<pipe_connection>(shared_from_this(), h, skip, opts, limit);
+	if (shm)
+		conn->use_shared_memory(std::move(shm));
 	if (pair_cpu >= 0 && pair_client(pair_cpu))
 		conn->set_paired();
 	add_member(std::weak_ptr<datapath::detail::connection>(conn));

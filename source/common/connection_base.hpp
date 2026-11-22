@@ -92,6 +92,16 @@ namespace datapath::detail {
 			return !_closed.load(std::memory_order_acquire);
 		}
 
+		// Deliver one message that did not come through the parser (shared memory).
+		// Same rules as consume(): only from the read chain. False once closed.
+		bool deliver_message(const uint8_t* data, size_t size)
+		{
+			std::lock_guard<std::recursive_mutex> cb(_callback_lock);
+			if (_closed.load(std::memory_order_acquire))
+				return false;
+			return deliver(data, size);
+		}
+
 		// Feed `n` freshly read bytes to the parser. Returns false when the read
 		// chain must stop (and has called finish_close()).
 		bool consume(size_t n)

@@ -495,6 +495,8 @@ namespace {
 				return 1;
 			}
 			pinger* raw = p.get();
+			// A peer that goes away mid-run fails the run instead of hanging it.
+			p->sock->on_close([raw] { raw->finish(true); });
 			p->sock->on_message([raw](const uint8_t* d, size_t n) { raw->on_message(d, n); });
 			pingers.push_back(std::move(p));
 		}
@@ -507,7 +509,7 @@ namespace {
 			bulk->start();
 		}
 
-		std::printf("IPC benchmark: transport=%s platform=%s spin=%ldus io_threads=%s clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s mmcss=%s priority=%d stress=%s ideal_core=%s load=%s pin=%s pair=%s\n",
+		std::printf("IPC benchmark: transport=%s platform=%s spin=%ldus io_threads=%s clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s mmcss=%s priority=%d stress=%s ideal_core=%s load=%s pin=%s pair=%s shm=%s\n",
 					tp->name(), platform_name(), c.spin, c.threads ? std::to_string(c.threads).c_str() : "auto", c.clients, c.buffer, c.pipe_buffer, c.yield ? "on" : "off", c.alertable ? "on" : "off", c.mmcss ? "on" : "off", c.priority,
 					c.stress < 0 ? "off"
 								 : ((c.stress == 0 ? std::string("all cores") : std::to_string(c.stress)) +
@@ -515,7 +517,12 @@ namespace {
 									   .c_str(),
 					c.ideal_core == -2 ? "off" : c.ideal_core == -1 ? "auto" : std::to_string(c.ideal_core).c_str(), c.load ? "1MiB stream" : "off",
 					c.affinity < 0 && c.pin_server < 0 ? "off" : (std::to_string(c.affinity) + "," + std::to_string(c.pin_server)).c_str(),
-					c.pair ? "on" : "off");
+					c.pair ? "on" : "off",
+					// The library reads DATAPATH_SHARED_MEMORY=1/0 itself (Windows).
+					[] {
+						const char* v = std::getenv("DATAPATH_SHARED_MEMORY");
+						return !v || !*v ? "default" : v[0] == '0' ? "off" : "on";
+					}());
 		std::printf("Full round-trip latency in microseconds.\n");
 		if (c.runs > 1)
 			std::printf("Each row: median of %zu runs; p99.9 lo/hi = lowest/highest p99.9 of any run.\n", c.runs);
@@ -614,6 +621,17 @@ namespace {
 			}
 			double secs = double(now_ns() - t0) / 1e9;
 			double mibs = double(size) * double((count + warmup) * pingers.size()) * 2.0 / secs / (1 << 20);
+			if (const char* dir = std::getenv("DATAPATH_BENCH_DUMP")) {
+				// Every sample of the first client in send order, to see where slow
+				// round trips fall (one file per size and run).
+				std::string path = std::string(dir) + "/" + std::to_string(size) + "_" + std::to_string(run) + ".txt";
+				if (FILE* f = std::fopen(path.c_str(), "w")) {
+					auto& v = pingers[0]->samples;
+					for (size_t i = 0; i < v.size(); i++)
+						std::fprintf(f, "%zu %lld\n", i, (long long)v[i]);
+					std::fclose(f);
+				}
+			}
 			results.push_back({summarize(all), mibs});
 			}
 
