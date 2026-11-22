@@ -38,6 +38,10 @@ namespace {
 		{
 			_s->on_message(std::move(fn));
 		}
+		void on_close(std::function<void()> fn) override
+		{
+			_s->on_close([fn = std::move(fn)](datapath::error) { fn(); });
+		}
 	};
 
 	class dp_transport : public bench::transport {

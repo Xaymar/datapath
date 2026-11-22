@@ -171,6 +171,7 @@ namespace {
 		std::atomic<bool> _started{false};
 		std::atomic<bool> _closed{false};
 		bench::message_fn _fn;
+		std::function<void()> _close_fn;
 		std::vector<uint8_t> _assembly, _scratch;
 
 		ring_ctl& tx() const
@@ -190,11 +191,16 @@ namespace {
 			return _o->events[ring * 2 + 1];
 		}
 
-		void fail(const char* why)
+		// The connection ended on its own. `why` is printed for protocol errors
+		// only; a peer that closed or died is reported through on_close.
+		void fail(const char* why, bool report = true)
 		{
 			if (!_closed.exchange(true)) {
-				std::fprintf(stderr, "shm: connection closed: %s\n", why);
+				if (report)
+					std::fprintf(stderr, "shm: connection closed: %s\n", why);
 				SetEvent(_stop);
+				if (_close_fn)
+					_close_fn();
 			}
 		}
 
@@ -349,7 +355,7 @@ namespace {
 			// The peer never writes to the pipe after the handshake: this read only
 			// completes when the peer closes it or its process ends.
 			if (!pipe_ev || ReadFile(_pipe, &probe, 1, nullptr, &ov) || GetLastError() != ERROR_IO_PENDING) {
-				fail("pipe closed");
+				fail("pipe closed", false);
 			}
 			while (!_closed.load(std::memory_order_acquire)) {
 				datapath::detail::spin_then_block(
@@ -367,7 +373,7 @@ namespace {
 						DWORD  w     = WaitForMultipleObjects(3, hs, FALSE, INFINITE);
 						rx().reader_waiting.store(0, std::memory_order_relaxed);
 						if (w == WAIT_OBJECT_0 + 1)
-							fail("peer closed the pipe (process ended or closed)");
+							fail("peer closed the pipe", false);
 					});
 			}
 			CancelIoEx(_pipe, &ov);
@@ -436,6 +442,12 @@ namespace {
 				size -= size_t(n);
 			}
 			return bench::status::ok;
+		}
+
+		void on_close(std::function<void()> fn) override
+		{
+			if (!_started.load())
+				_close_fn = std::move(fn);
 		}
 
 		void on_message(bench::message_fn fn) override

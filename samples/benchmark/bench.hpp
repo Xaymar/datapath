@@ -54,6 +54,12 @@ namespace bench {
 		virtual status send(const void* data, size_t size) = 0;
 		// First call starts receiving.
 		virtual void on_message(message_fn fn) = 0;
+		// Called once if the connection ends on its own (peer gone, I/O error).
+		// Set before on_message. Transports without support never call it.
+		virtual void on_close(std::function<void()> fn)
+		{
+			(void)fn;
+		}
 	};
 	using conn_ptr = std::shared_ptr<connection>;
 

@@ -491,6 +491,8 @@ namespace {
 				return 1;
 			}
 			pinger* raw = p.get();
+			// A peer that goes away mid-run fails the run instead of hanging it.
+			p->sock->on_close([raw] { raw->finish(true); });
 			p->sock->on_message([raw](const uint8_t* d, size_t n) { raw->on_message(d, n); });
 			pingers.push_back(std::move(p));
 		}
