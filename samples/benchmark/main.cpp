@@ -28,6 +28,9 @@ SPDX-License-Identifier: BSD-3-Clause
 //   --stress N                                  local mode: load all cores with N busy threads in a
 //                                               separate process (0 = one per logical core)
 //   --stress-nice N                             Linux: run the stress process at nice N (default 0)
+//   --pin C,S                                   local mode: pin the client process to logical CPU C and
+//                                               the server process to S (the stress process stays free)
+//   --affinity N                                server/client mode: pin this process to logical CPU N
 //   --mmcss / --no-mmcss                        Windows: register I/O threads with MMCSS (default on)
 //   --priority 0..3                             I/O thread priority (normal .. time critical, default 2);
 //                                               Linux: nice -0/-4/-12/-19 where RLIMIT_NICE allows
@@ -38,6 +41,7 @@ SPDX-License-Identifier: BSD-3-Clause
 // ping is sent from inside the receive callback, so no extra thread wake-up
 // is included.
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -45,6 +49,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <cstdlib>
 #include <cerrno>
 #include <cstring>
+#include <functional>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -61,6 +66,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #ifdef __linux__
 #include <sys/prctl.h>
 #endif
+#include <sched.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -76,6 +82,61 @@ namespace {
 	constexpr uint8_t tag_bulk  = 'B';
 	constexpr uint8_t tag_stats = 'S';
 	constexpr uint8_t tag_quit  = 'Q';
+	constexpr uint8_t tag_cpus  = 'C';
+
+	// Which logical CPUs handled the ping-pong messages, to see where the I/O
+	// threads ran (e.g. under --stress).
+	struct cpu_histogram {
+		static constexpr size_t      max_cpus = 256;
+		std::atomic<uint64_t>        n[max_cpus] = {};
+
+		static unsigned current()
+		{
+#ifdef _WIN32
+			PROCESSOR_NUMBER pn;
+			GetCurrentProcessorNumberEx(&pn);
+			return unsigned(pn.Group) * 64 + pn.Number;
+#elif defined(__linux__)
+			int c = sched_getcpu();
+			return c < 0 ? 0 : unsigned(c);
+#else
+			return 0;
+#endif
+		}
+		void hit()
+		{
+			n[current() % max_cpus].fetch_add(1, std::memory_order_relaxed);
+		}
+		void take(uint64_t* out)
+		{
+			for (size_t i = 0; i < max_cpus; i++)
+				out[i] = n[i].exchange(0, std::memory_order_relaxed);
+		}
+		// "cpu5 97.1% cpu4 2.9%": CPUs that handled at least 0.1%, busiest first.
+		static std::string describe(const uint64_t* counts)
+		{
+			uint64_t total = 0;
+			for (size_t i = 0; i < max_cpus; i++)
+				total += counts[i];
+			std::vector<std::pair<uint64_t, size_t>> v;
+			for (size_t i = 0; i < max_cpus; i++)
+				if (counts[i] && counts[i] * 1000 >= total)
+					v.emplace_back(counts[i], i);
+			std::sort(v.begin(), v.end(), [](auto& a, auto& b) { return a.first > b.first; });
+			std::string out;
+			char        buf[48];
+			for (auto& e : v) {
+				std::snprintf(buf, sizeof(buf), "%scpu%zu %.1f%%", out.empty() ? "" : " ", e.second,
+							  100.0 * double(e.first) / double(total));
+				out += buf;
+			}
+			return out.empty() ? "-" : out;
+		}
+	};
+	cpu_histogram own_cpus;
+
+	// Local mode: runs right before the client ends the process.
+	std::function<void()> before_exit;
 
 
 	int current_pid()
@@ -154,6 +215,17 @@ namespace {
 				c.ideal_core  = v == "off" ? -2 : v == "auto" ? -1 : int(std::strtol(v.c_str(), nullptr, 10));
 			} else if (a == "--stress") {
 				c.stress = int(std::strtol(next(), nullptr, 10));
+			} else if (a == "--pin") {
+				std::string v     = next();
+				size_t      comma = v.find(',');
+				if (comma == std::string::npos) {
+					std::fprintf(stderr, "--pin needs client,server\n");
+					return false;
+				}
+				c.affinity   = int(std::strtol(v.substr(0, comma).c_str(), nullptr, 10));
+				c.pin_server = int(std::strtol(v.substr(comma + 1).c_str(), nullptr, 10));
+			} else if (a == "--affinity") {
+				c.affinity = int(std::strtol(next(), nullptr, 10));
 			} else if (a == "--stress-nice") {
 				c.stress_nice = int(std::strtol(next(), nullptr, 10));
 			} else if (a == "--runs") {
@@ -176,10 +248,39 @@ namespace {
 		return true;
 	}
 
+	// Pin the whole process (every thread, also ones created later) to one
+	// logical CPU. Called before the transport starts its threads.
+	bool pin_process(int cpu)
+	{
+		if (cpu < 0)
+			return true;
+#ifdef _WIN32
+		if (cpu >= 64 || !SetProcessAffinityMask(GetCurrentProcess(), DWORD_PTR(1) << cpu)) {
+			std::fprintf(stderr, "could not pin the process to cpu%d\n", cpu);
+			return false;
+		}
+		return true;
+#elif defined(__linux__)
+		cpu_set_t set;
+		CPU_ZERO(&set);
+		CPU_SET(cpu, &set);
+		if (sched_setaffinity(0, sizeof(set), &set) != 0) {
+			std::fprintf(stderr, "could not pin the process to cpu%d: %s\n", cpu, std::strerror(errno));
+			return false;
+		}
+		return true;
+#else
+		std::fprintf(stderr, "--affinity is not supported on this platform\n");
+		return false;
+#endif
+	}
+
 	// ---------------------------------------------------------------- server
 
 	int run_server(const config& c)
 	{
+		if (!pin_process(c.affinity))
+			return 1;
 		auto                    tp = bench::make_transport(c);
 		std::mutex              lock;
 		std::condition_variable cv;
@@ -198,9 +299,19 @@ namespace {
 					return;
 				switch (d[0]) {
 				case tag_ping:
+					own_cpus.hit();
 					while (sock->send(d, n) == status::would_block)
 						std::this_thread::yield();
 					break;
+				case tag_cpus: {
+					std::vector<uint8_t> reply(1 + 8 * cpu_histogram::max_cpus);
+					reply[0] = tag_cpus;
+					uint64_t counts[cpu_histogram::max_cpus];
+					own_cpus.take(counts);
+					std::memcpy(reply.data() + 1, counts, sizeof(counts));
+					sock->send(reply.data(), reply.size());
+					break;
+				}
 				case tag_bulk:
 					*bulk += n;
 					break;
@@ -242,6 +353,8 @@ namespace {
 		std::condition_variable cv;
 		bool                    finished = false;
 		bool                    failed   = false;
+		uint64_t                peer_cpus[cpu_histogram::max_cpus] = {};
+		bool                    have_cpus = false;
 
 		void send_one()
 		{
@@ -261,9 +374,17 @@ namespace {
 			cv.notify_all();
 		}
 
-		void on_message(const uint8_t*, size_t)
+		void on_message(const uint8_t* d, size_t n)
 		{
 			int64_t t = now_ns();
+			if (n == 1 + sizeof(peer_cpus) && d[0] == tag_cpus) {
+				std::lock_guard<std::mutex> l(lock);
+				std::memcpy(peer_cpus, d + 1, sizeof(peer_cpus));
+				have_cpus = true;
+				cv.notify_all();
+				return;
+			}
+			own_cpus.hit();
 			if (done >= warmup)
 				samples.push_back(t - sent_at);
 			done++;
@@ -271,6 +392,23 @@ namespace {
 				send_one();
 			else
 				finish(false);
+		}
+
+		// Where the server's I/O thread handled pings since the last call.
+		bool server_cpus(uint64_t* out)
+		{
+			{
+				std::lock_guard<std::mutex> l(lock);
+				have_cpus = false;
+			}
+			uint8_t q = tag_cpus;
+			if (sock->send(&q, 1) != status::ok)
+				return false;
+			std::unique_lock<std::mutex> l(lock);
+			if (!cv.wait_for(l, std::chrono::seconds(5), [&] { return have_cpus; }))
+				return false;
+			std::memcpy(out, peer_cpus, sizeof(peer_cpus));
+			return true;
 		}
 
 		bool wait()
@@ -341,6 +479,8 @@ namespace {
 
 	int run_client(const config& c)
 	{
+		if (!pin_process(c.affinity))
+			return 1;
 		auto tp = bench::make_transport(c);
 
 		std::vector<std::unique_ptr<pinger>> pingers;
@@ -363,13 +503,14 @@ namespace {
 			bulk->start();
 		}
 
-		std::printf("IPC benchmark: transport=%s platform=%s spin=%ldus io_threads=%s clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s mmcss=%s priority=%d stress=%s ideal_core=%s load=%s\n",
+		std::printf("IPC benchmark: transport=%s platform=%s spin=%ldus io_threads=%s clients=%zu buffer=%zu pipe_buffer=%zu yield=%s alertable=%s mmcss=%s priority=%d stress=%s ideal_core=%s load=%s pin=%s\n",
 					tp->name(), platform_name(), c.spin, c.threads ? std::to_string(c.threads).c_str() : "auto", c.clients, c.buffer, c.pipe_buffer, c.yield ? "on" : "off", c.alertable ? "on" : "off", c.mmcss ? "on" : "off", c.priority,
 					c.stress < 0 ? "off"
 								 : ((c.stress == 0 ? std::string("all cores") : std::to_string(c.stress)) +
 									(c.stress_nice ? " nice " + std::to_string(c.stress_nice) : std::string()))
 									   .c_str(),
-					c.ideal_core == -2 ? "off" : c.ideal_core == -1 ? "auto" : std::to_string(c.ideal_core).c_str(), c.load ? "1MiB stream" : "off");
+					c.ideal_core == -2 ? "off" : c.ideal_core == -1 ? "auto" : std::to_string(c.ideal_core).c_str(), c.load ? "1MiB stream" : "off",
+					c.affinity < 0 && c.pin_server < 0 ? "off" : (std::to_string(c.affinity) + "," + std::to_string(c.pin_server)).c_str());
 		std::printf("Full round-trip latency in microseconds.\n");
 		if (c.runs > 1)
 			std::printf("Each row: median of %zu runs; p99.9 lo/hi = lowest/highest p99.9 of any run.\n", c.runs);
@@ -410,6 +551,33 @@ namespace {
 						return 1;
 			}
 		}
+#ifdef _WIN32
+		{
+			// Which logical CPUs share a physical core, to read the "cpus" lines.
+			DWORD len = 0;
+			GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &len);
+			std::vector<uint8_t> buf(len);
+			if (len && GetLogicalProcessorInformationEx(RelationProcessorCore,
+														 reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buf.data()), &len)) {
+				std::printf("%10s ", "cores");
+				for (DWORD off = 0; off < len;) {
+					auto* e = reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buf.data() + off);
+					const GROUP_AFFINITY& g = e->Processor.GroupMask[0];
+					const char*           sep = " ";
+					for (unsigned bit = 0; bit < 64; bit++)
+						if (g.Mask & (KAFFINITY(1) << bit)) {
+							std::printf("%s%u", sep, unsigned(g.Group) * 64 + bit);
+							sep = ",";
+						}
+					off += e->Size;
+				}
+				std::printf("\n");
+			}
+		}
+#endif
+		uint64_t cpus[cpu_histogram::max_cpus];
+		own_cpus.take(cpus); // forget the warm-up
+		pingers[0]->server_cpus(cpus);
 
 		for (size_t size : c.sizes) {
 			size = std::max<size_t>(size, 1);
@@ -461,6 +629,11 @@ namespace {
 				std::printf(" %9.2f %9.2f", *std::min_element(p999.begin(), p999.end()),
 							*std::max_element(p999.begin(), p999.end()));
 			std::printf("\n");
+			// Where both I/O threads ran for this size (all clients together).
+			own_cpus.take(cpus);
+			std::string client_where = cpu_histogram::describe(cpus);
+			std::string server_where = pingers[0]->server_cpus(cpus) ? cpu_histogram::describe(cpus) : "?";
+			std::printf("%10s  client %s | server %s\n", "cpus", client_where.c_str(), server_where.c_str());
 			std::fflush(stdout);
 		}
 
@@ -470,6 +643,8 @@ namespace {
 		uint8_t q = tag_quit;
 		pingers[0]->sock->send(&q, 1);
 		std::this_thread::sleep_for(std::chrono::milliseconds(50));
+		if (before_exit)
+			before_exit();
 		std::fflush(stdout);
 		std::exit(0); // skip transport teardown
 
@@ -564,6 +739,15 @@ namespace {
 				AssignProcessToJobObject(j, pi.hProcess);
 			ResumeThread(pi.hThread);
 		}
+		// CPU time the process has used so far, in seconds (-1 if unknown).
+		double cpu_seconds() const
+		{
+			FILETIME created, exited, kernel, user;
+			if (!ok || !GetProcessTimes(pi.hProcess, &created, &exited, &kernel, &user))
+				return -1;
+			auto ticks = [](const FILETIME& f) { return (uint64_t(f.dwHighDateTime) << 32) | f.dwLowDateTime; };
+			return double(ticks(kernel) + ticks(user)) / 1e7;
+		}
 		// Wait up to `ms` for a clean exit, then kill.
 		void finish(int ms)
 		{
@@ -589,6 +773,30 @@ namespace {
 				argv.push_back(&a[0]);
 			argv.push_back(nullptr);
 			ok = posix_spawn(&pid, "/proc/self/exe", nullptr, nullptr, argv.data(), environ) == 0;
+		}
+		// CPU time the process has used so far, in seconds (-1 if unknown).
+		double cpu_seconds() const
+		{
+#ifdef __linux__
+			if (!ok)
+				return -1;
+			std::string path = "/proc/" + std::to_string(pid) + "/stat";
+			FILE*       f    = std::fopen(path.c_str(), "r");
+			if (!f)
+				return -1;
+			char   buf[1024];
+			size_t n = std::fread(buf, 1, sizeof(buf) - 1, f);
+			std::fclose(f);
+			buf[n]     = 0;
+			// Fields after the parenthesised command name; utime and stime are 14 and 15.
+			const char* p = std::strrchr(buf, ')');
+			unsigned long long utime = 0, stime = 0;
+			if (!p || std::sscanf(p + 2, "%*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %llu %llu", &utime, &stime) != 2)
+				return -1;
+			return double(utime + stime) / double(sysconf(_SC_CLK_TCK));
+#else
+			return -1;
+#endif
 		}
 		void finish(int ms)
 		{
@@ -630,6 +838,10 @@ namespace {
 										 "--priority", std::to_string(c.priority)};
 		if (c.alertable)
 			args.push_back("--alertable");
+		if (c.pin_server >= 0) {
+			args.push_back("--affinity");
+			args.push_back(std::to_string(c.pin_server));
+		}
 		// The server's I/O threads take the physical cores after the client's. With
 		// --threads auto each process covers every core, so both start at N.
 		args.push_back("--ideal-core");
@@ -638,7 +850,9 @@ namespace {
 											: std::to_string(c.ideal_core + int(c.threads)));
 
 		std::unique_ptr<child_process> stress;
+		unsigned                       stress_threads = 0;
 		if (c.stress >= 0) {
+			stress_threads = c.stress > 0 ? unsigned(c.stress) : std::max(1u, std::thread::hardware_concurrency());
 			stress = std::make_unique<child_process>(
 				std::vector<std::string>{"stress", std::to_string(c.stress), std::to_string(c.stress_nice)});
 			if (!stress->ok) {
@@ -651,6 +865,24 @@ namespace {
 		if (!server.ok) {
 			std::fprintf(stderr, "failed to start server process\n");
 			return 1;
+		}
+		// A stress process that does not get its CPU time makes a "stress" run an
+		// idle run. Report how busy it actually was, so such runs can be spotted.
+		// run_client() leaves with std::exit(), so this runs from its exit hook.
+		if (stress) {
+			double cpu_before  = stress->cpu_seconds();
+			auto   wall_before = std::chrono::steady_clock::now();
+			before_exit        = [&stress, stress_threads, cpu_before, wall_before] {
+                double cpu_after = stress->cpu_seconds();
+                double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - wall_before).count();
+                if (cpu_before < 0 || cpu_after < 0 || seconds <= 0)
+                    return;
+                double busy = (cpu_after - cpu_before) / seconds;
+                std::printf("stress: %u threads averaged %.1f busy cores over %.1f s\n", stress_threads, busy, seconds);
+                if (busy < 0.5 * stress_threads)
+                    std::fprintf(stderr, "warning: the stress process got under half its CPU time; this was not a "
+                                         "full-load run\n");
+			};
 		}
 		int rc = run_client(c);
 		server.finish(5000);

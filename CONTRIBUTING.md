@@ -41,6 +41,7 @@ On Windows, run `build\samples\Release\datapath-benchmark.exe local`. Useful var
 * `--threads 2` uses two I/O threads per process.
 * `--threads auto` uses one I/O thread per physical core (`context_options::io_threads = 0`). Compare it with `--ideal-core off` on Windows to see what pairing threads with cores does.
 * `--stress 0` loads every logical core from a separate process; on Linux, `--stress-nice N` runs that process at nice N to test the priority gap.
+* `--pin C,S` pins the client process to logical CPU C and the server process to S. Use it with `--stress`: without it, each invocation's latency depends on where the scheduler happens to put the two I/O threads (on Irkela, 16 KiB p99.9 was 15 µs with both on the two hyper-threads of one core, ~200 µs on separate cores, and ~1.1 ms when one of them was on core 0), for DataPath and libuv alike. Each run prints which CPUs handled the messages (`cpus` lines).
 * `--sizes 8,64,4096` picks the message sizes. The default is 8 B to 64 KiB; add `1048576,16777216` to measure bulk-sized messages.
 
 You can also run `server <name>` and `client <name>` separately, in two terminals.
