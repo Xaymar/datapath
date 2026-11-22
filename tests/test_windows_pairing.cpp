@@ -19,6 +19,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <vector>
 #include "check.hpp"
 #include "common/handshake.hpp"
+#include "raw_peer.hpp"
 #include "windows/win.hpp"
 
 using datapath::error;
@@ -221,18 +222,12 @@ TEST(server_answers_version_2_with_trailer)
 		accepted = s;
 		return true;
 	});
-	std::wstring path = L"\\\\.\\pipe\\" + std::wstring(name.begin(), name.end());
-	HANDLE       h    = CreateFileW(path.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
-	CHECK(h != INVALID_HANDLE_VALUE);
+	auto peer = raw::connect(name); // retries while the server's instance is busy
+	CHECK(peer != nullptr);
 	uint8_t hello[datapath::detail::hello_size + datapath::detail::pair_trailer_size] = {};
 	datapath::detail::encode_hello(hello, {datapath::detail::protocol_version_pair, 1024});
-	DWORD n = 0;
-	CHECK(WriteFile(h, hello, datapath::detail::hello_size, &n, nullptr));
-	DWORD total = 0;
-	while (total < sizeof(hello) && ReadFile(h, hello + total, DWORD(sizeof(hello) - total), &n, nullptr) && n)
-		total += n;
-	CloseHandle(h);
-	CHECK_EQ(total, DWORD(sizeof(hello)));
+	CHECK(raw::write(*peer, hello, datapath::detail::hello_size));
+	CHECK(raw::read(*peer, hello, sizeof(hello), 5000));
 	datapath::detail::hello reply{};
 	CHECK_EQ(datapath::detail::decode_hello_v2(hello, reply), error::Success);
 	CHECK_EQ(reply.version, datapath::detail::protocol_version_pair);
