@@ -611,6 +611,17 @@ namespace {
 			}
 			double secs = double(now_ns() - t0) / 1e9;
 			double mibs = double(size) * double((count + warmup) * pingers.size()) * 2.0 / secs / (1 << 20);
+			if (const char* dir = std::getenv("DATAPATH_BENCH_DUMP")) {
+				// Every sample of the first client in send order, to see where slow
+				// round trips fall (one file per size and run).
+				std::string path = std::string(dir) + "/" + std::to_string(size) + "_" + std::to_string(run) + ".txt";
+				if (FILE* f = std::fopen(path.c_str(), "w")) {
+					auto& v = pingers[0]->samples;
+					for (size_t i = 0; i < v.size(); i++)
+						std::fprintf(f, "%zu %lld\n", i, (long long)v[i]);
+					std::fclose(f);
+				}
+			}
 			results.push_back({summarize(all), mibs});
 			}
 
