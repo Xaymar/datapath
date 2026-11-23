@@ -72,6 +72,8 @@ set(DATAPATH_SOURCES
 	source/common/handshake.hpp
 	source/common/send_queue.cpp
 	source/common/send_queue.hpp
+	source/common/shm_ring.cpp
+	source/common/shm_ring.hpp
 	source/common/spin.hpp
 )
 if(WIN32)
@@ -99,6 +101,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR ANDROID OR APPLE)
 		source/posix/path.cpp
 		source/posix/path.hpp
 		source/posix/platform.hpp
+		source/posix/shm.cpp
+		source/posix/shm.hpp
 		source/posix/uds_connection.cpp
 		source/posix/uds_connection.hpp
 		source/posix/uds_server.cpp

@@ -26,6 +26,16 @@ namespace datapath::posix {
 		virtual void on_post(int kind) = 0;
 	};
 
+	// Something a loop busy-polls besides its descriptors (shared-memory rings).
+	class poll_target {
+		public:
+		virtual ~poll_target() = default;
+		// Handle new work; true if there was some. Runs on the loop thread.
+		virtual bool poll() = 0;
+		// About to block: arm the wake-up. False if work arrived meanwhile.
+		virtual bool prepare_block() = 0;
+	};
+
 	class event_context;
 
 	class event_loop {
@@ -47,6 +57,10 @@ namespace datapath::posix {
 
 		std::mutex                                                 _reg_lock;
 		std::unordered_map<fd_target*, std::shared_ptr<fd_target>> _registered;
+
+		std::mutex                                _poll_lock;
+		std::vector<std::shared_ptr<poll_target>> _pollers;
+		std::atomic<uint64_t>                     _poll_version{0};
 
 		bool drain_posts(bool& quit);
 		void run();
@@ -76,6 +90,10 @@ namespace datapath::posix {
 		void unregister(fd_target* target);
 
 		bool post(std::shared_ptr<fd_target> target, int kind);
+
+		// Poll `t` along with the descriptors until remove_poller().
+		void add_poller(std::shared_ptr<poll_target> t);
+		void remove_poller(poll_target* t);
 	};
 
 	class event_context : public datapath::detail::context_impl, public std::enable_shared_from_this<event_context> {
