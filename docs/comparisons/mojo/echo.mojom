@@ -1,0 +1,21 @@
+// Low Latency IPC Library for high-speed traffic
+// Copyright (C) 2019 - 2026 Narta Xaymar Dirks <info@xaymar.com>
+//
+// SPDX-License-Identifier: BSD-3-Clause
+
+// Ping-pong interface for the DataPath comparison benchmark.
+module datapath_bench.mojom;
+
+import "mojo/public/mojom/base/big_buffer.mojom";
+
+interface Echo {
+  // Returns `data` unchanged.
+  Ping(array<uint8> data) => (array<uint8> data);
+  // Same with BigBuffer: payloads over 64 KiB travel in a shared-memory
+  // region instead of inline in the message.
+  PingBig(mojo_base.mojom.BigBuffer data) => (mojo_base.mojom.BigBuffer data);
+  // Which logical CPUs handled pings since the last call (DataPath's "cpus").
+  Cpus() => (array<uint64> counts);
+  // Ends the server process.
+  Quit();
+};

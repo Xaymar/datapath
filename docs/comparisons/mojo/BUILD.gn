@@ -1,0 +1,27 @@
+# Low Latency IPC Library for high-speed traffic
+# Copyright (C) 2019 - 2026 Narta Xaymar Dirks <info@xaymar.com>
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+# Mojo ping-pong benchmark mirroring DataPath's samples/benchmark harness.
+import("//mojo/public/tools/bindings/mojom.gni")
+
+mojom("echo_mojom") {
+  sources = [ "echo.mojom" ]
+  deps = [ "//mojo/public/mojom/base" ]
+}
+
+executable("datapath_mojo_bench") {
+  testonly = false
+  sources = [ "datapath_mojo_bench.cc" ]
+  deps = [
+    ":echo_mojom",
+    "//base",
+    "//mojo/core/embedder",
+    "//mojo/public/cpp/base",
+    "//mojo/core/embedder:features",
+    "//mojo/public/cpp/bindings",
+    "//mojo/public/cpp/platform",
+    "//mojo/public/cpp/system",
+  ]
+}

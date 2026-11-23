@@ -55,7 +55,7 @@ For stable numbers on Windows, use the High Performance power plan. Run from a f
 ### Comparing with libuv
 Configure with `-DDATAPATH_BUILD_COMPARE=ON` to also build `libuv-benchmark`; CMake downloads libuv 1.52.1. It runs the same harness over libuv named pipes / Unix sockets: same framing, clock, sizes, `--runs`, `--stress`. It also uses the same `--spin`, `--priority` and `--mmcss` policy on its loop thread, so both libraries can be compared with identical settings. libuv itself has none of these, so use `--spin 0 --no-mmcss --priority 0` to measure libuv as it ships. The matrix scripts include libuv runs when the executable exists.
 
-When you report numbers, lead with p99.9, say which machine, OS and power plan they came from, and give the flags. A p50 improvement that costs tail latency is a regression for this project.
+When you report numbers, lead with p99.9, say which machine, OS and power plan they came from, and give the flags. A p50 improvement that costs tail latency is a regression for this project. Published numbers use worst-case placement: `--pin` the client and server to different physical cores, on different CCDs and NUMA nodes where the machine has them ([methodology](docs/comparisons/README.md#methodology)).
 
 ## Python bindings
 The bindings live in `python/` (nanobind, built by scikit-build-core from `pyproject.toml` in the repository root). Build and test them with:
