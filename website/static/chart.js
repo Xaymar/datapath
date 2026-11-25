@@ -31,6 +31,8 @@
 		case "square": return '<rect x="' + (x - r * .85) + '" y="' + (y - r * .85) + '" width="' + r * 1.7 + '" height="' + r * 1.7 + '" rx="1.5"';
 		case "diamond": d = "M" + x + "," + (y - r * 1.2) + " l" + r * 1.2 + "," + r * 1.2 + " l" + -r * 1.2 + "," + r * 1.2 + " l" + -r * 1.2 + "," + -r * 1.2 + "z"; break;
 		case "triangle": d = "M" + x + "," + (y - r * 1.15) + " l" + r * 1.15 + "," + r * 1.9 + " l" + -r * 2.3 + ",0z"; break;
+		case "triangle-down": d = "M" + x + "," + (y + r * 1.15) + " l" + r * 1.15 + "," + -r * 1.9 + " l" + -r * 2.3 + ",0z"; break;
+		case "plus": var a = r * .4, b = r * 1.15; d = "M" + (x - a) + "," + (y - b) + " h" + 2 * a + " v" + (b - a) + " h" + (b - a) + " v" + 2 * a + " h" + (a - b) + " v" + (b - a) + " h" + -2 * a + " v" + (a - b) + " h" + (a - b) + " v" + -2 * a + " h" + (b - a) + "z"; break;
 		default: return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '"';
 		}
 		return '<path d="' + d + '"';

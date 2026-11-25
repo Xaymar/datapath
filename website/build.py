@@ -287,6 +287,10 @@ def _shape(el: str) -> str:
 		return "circle"
 	if el.startswith("<rect"):
 		return "square"
+	if "l6,-10" in el:
+		return "triangle-down"
+	if " h" in el and " v" in el:
+		return "plus"
 	if "l6,10" in el:
 		return "triangle"
 	if "l6,6" in el:
@@ -330,7 +334,14 @@ def graph_data(svg: str) -> dict:
 		rows = panels.setdefault(panel, {})
 		rows.setdefault(size, {})[cls] = [float(tm.group(4)), float(tm.group(5)), float(tm.group(6))]
 	size_key = lambda s: float(s.split()[0]) * _UNITS[s.split()[1]]
-	notes = [html.unescape(t) for t in re.findall(r'<text class="t4" x="16"[^>]*>([^<]*)</text>', svg)]
+	notes: list[str] = []
+	for t in re.findall(r'<text class="t4" x="16"[^>]*>([^<]*)</text>', svg):
+		t = html.unescape(t).strip()
+		# A footnote wrapped onto two SVG lines continues without a full stop.
+		if notes and not notes[-1].endswith("."):
+			notes[-1] += " " + t
+		else:
+			notes.append(t)
 	return {
 		"title": html.unescape(title),
 		"machine": html.unescape(title.split(":")[0]),
