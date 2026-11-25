@@ -24,6 +24,7 @@ name: Release
 on:
   push:
     tags: ['v*']
+    branches: [release-packaging] # TEMPORARY: dry-run test before the PR
   workflow_dispatch:
     inputs:
       target:
