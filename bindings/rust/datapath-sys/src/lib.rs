@@ -188,12 +188,13 @@ mod tests {
         }
     }
 
-    // Crate versions follow the library's ABI.patch: major = ABI, minor = patch.
+    // Crate versions are the library's version: (major << 22) | (minor << 12) | patch.
     #[test]
     fn crate_version_matches_library() {
         let v = unsafe { datapath_version() };
-        assert_eq!(v >> 16, env!("CARGO_PKG_VERSION_MAJOR").parse::<u32>().unwrap());
-        assert_eq!(v & 0xffff, env!("CARGO_PKG_VERSION_MINOR").parse::<u32>().unwrap());
+        assert_eq!(v >> 22, env!("CARGO_PKG_VERSION_MAJOR").parse::<u32>().unwrap());
+        assert_eq!((v >> 12) & 0x3ff, env!("CARGO_PKG_VERSION_MINOR").parse::<u32>().unwrap());
+        assert_eq!(v & 0xfff, env!("CARGO_PKG_VERSION_PATCH").parse::<u32>().unwrap());
     }
 
     #[test]

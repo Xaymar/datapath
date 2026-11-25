@@ -49,10 +49,10 @@ pub use socket::{Socket, SocketRef};
 /// The raw C API, for anything the safe wrappers do not cover.
 pub use sys;
 
-/// Version of the loaded library as `(abi, patch)`.
-pub fn version() -> (u16, u16) {
+/// Version of the loaded library as `(major, minor, patch)`.
+pub fn version() -> (u16, u16, u16) {
     let v = unsafe { sys::datapath_version() };
-    ((v >> 16) as u16, v as u16)
+    ((v >> 22) as u16, ((v >> 12) & 0x3ff) as u16, (v & 0xfff) as u16)
 }
 
 /// Connect to `path` with default options on the default context.
