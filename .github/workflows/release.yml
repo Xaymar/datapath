@@ -7,14 +7,17 @@
 # them. Nothing reaches a real registry unless all of these hold:
 #   - the run was started by hand with target "release",
 #   - it runs on a tag vX.Y.Z whose version matches every package, and
-#   - the registry's GitHub environment (pypi, npm, crates-io) lets it through,
+#   - the registry's GitHub environment (pypi, crates-io) lets it through,
 #     which can require a reviewer's approval.
 #
 # Targets:
 #   dry-run  build and check everything; `npm publish --dry-run`,
 #            `cargo publish --dry-run`, `twine check`. Uploads nothing. (default)
 #   test     dry-run plus an upload to TestPyPI.
-#   release  upload to PyPI, npm and crates.io (tags only).
+#   release  upload to PyPI and crates.io (tags only).
+#
+# npm is published by hand: download the `npm-package` artifact (also attached
+# to the draft GitHub Release) and run `npm publish <tgz> --access public`.
 #
 # Pushing a vX.Y.Z tag runs a dry run and creates a *draft* GitHub Release with
 # the source tarball and the prebuilt C/C++ archives; publishing the draft is
@@ -267,28 +270,6 @@ jobs:
         with:
           name: npm-package
       - run: npm publish xaymar-datapath-*.tgz --access public --dry-run
-
-  publish-npm:
-    name: Publish to npm
-    if: inputs.target == 'release' && needs.version.outputs.is_tag == 'true'
-    needs: [version, npm-dry-run]
-    runs-on: ubuntu-24.04
-    environment:
-      name: npm
-      url: https://www.npmjs.com/package/@xaymar/datapath
-    permissions:
-      id-token: write # trusted publishing and provenance
-    steps:
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-      - name: npm 11.5.1 or newer (trusted publishing)
-        run: npm install -g npm@11 && npm --version
-      - uses: actions/download-artifact@v4
-        with:
-          name: npm-package
-      - run: npm publish xaymar-datapath-*.tgz --access public
 
   # Rust ----------------------------------------------------------------------
 
