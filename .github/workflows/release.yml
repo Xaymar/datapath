@@ -288,7 +288,16 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: npm-package
-      - run: npm publish xaymar-datapath-*.tgz --access public
+      # npm versions are immutable; one published by hand is left alone.
+      - name: Publish
+        shell: bash
+        run: |
+          version="${{ needs.version.outputs.version }}"
+          if npm view "@xaymar/datapath@$version" version > /dev/null 2>&1; then
+            echo "::notice::@xaymar/datapath@$version is already on npm; skipping"
+          else
+            npm publish xaymar-datapath-*.tgz --access public
+          fi
 
   # Rust ----------------------------------------------------------------------
 
