@@ -11,15 +11,16 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <mutex>
 #include <string>
 #include <vector>
+#include "common/compat.hpp"
 #include "common/detail.hpp"
 #include "iocp_context.hpp"
 
-namespace datapath::windows {
+namespace datapath { namespace windows {
 	class pipe_connection;
 
 	class pipe_listener : public datapath::detail::listener,
 						  public io_target,
-						  public std::enable_shared_from_this<pipe_listener> {
+						  public datapath::detail::enable_weak_from_this<pipe_listener> {
 		struct instance {
 			io_op  op;
 			HANDLE h    = INVALID_HANDLE_VALUE;
@@ -63,4 +64,4 @@ namespace datapath::windows {
 		void            release() override;
 		void            on_io(io_op* op, DWORD bytes, DWORD err) override;
 	};
-} // namespace datapath::windows
+}} // namespace datapath::windows

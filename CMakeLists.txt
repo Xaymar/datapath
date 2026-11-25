@@ -27,7 +27,25 @@ option(DATAPATH_BUILD_SAMPLES "Build samples and the benchmark." ${DATAPATH_TOPL
 option(DATAPATH_BUILD_TESTS "Build tests." ${DATAPATH_TOPLEVEL})
 option(DATAPATH_BUILD_PYTHON "Build the Python extension module (normally driven by pyproject.toml)." OFF)
 
-set(CMAKE_CXX_STANDARD 17)
+# The library builds with C++11 or newer; newer standards let it use newer
+# standard library facilities (see source/common/compat.hpp). An explicit
+# CMAKE_CXX_STANDARD picks the default. Tests, samples and the Python module
+# need C++17 and use the larger of 17 and this.
+if(DEFINED CMAKE_CXX_STANDARD)
+	set(_datapath_default_std ${CMAKE_CXX_STANDARD})
+else()
+	set(_datapath_default_std 17)
+endif()
+set(DATAPATH_CXX_STANDARD ${_datapath_default_std} CACHE STRING "C++ standard the library is built with (11 or newer).")
+set_property(CACHE DATAPATH_CXX_STANDARD PROPERTY STRINGS 11 14 17 20 23 26)
+if(DATAPATH_CXX_STANDARD LESS 11 OR DATAPATH_CXX_STANDARD EQUAL 98)
+	message(FATAL_ERROR "DataPath: DATAPATH_CXX_STANDARD must be 11 or newer, got ${DATAPATH_CXX_STANDARD}")
+endif()
+if(DATAPATH_CXX_STANDARD LESS 17)
+	set(CMAKE_CXX_STANDARD 17)
+else()
+	set(CMAKE_CXX_STANDARD ${DATAPATH_CXX_STANDARD})
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -137,6 +155,7 @@ target_include_directories(datapath_objects
 # Only symbols marked DATAPATH_API (include/datapath/export.h) are exported.
 target_compile_definitions(datapath_objects PRIVATE DATAPATH_BUILDING)
 set_target_properties(datapath_objects PROPERTIES
+	CXX_STANDARD ${DATAPATH_CXX_STANDARD}
 	CXX_VISIBILITY_PRESET hidden
 	VISIBILITY_INLINES_HIDDEN ON
 	POSITION_INDEPENDENT_CODE ON
@@ -168,6 +187,9 @@ else()
 	target_link_libraries(datapath PUBLIC ${DATAPATH_PLATFORM_LIBS})
 endif()
 add_library(datapath::datapath ALIAS datapath)
+set_target_properties(datapath PROPERTIES CXX_STANDARD ${DATAPATH_CXX_STANDARD})
+# The public C++ headers need C++11.
+target_compile_features(datapath INTERFACE cxx_std_11)
 target_sources(datapath PRIVATE ${DATAPATH_PUBLIC_HEADERS})
 
 target_include_directories(datapath

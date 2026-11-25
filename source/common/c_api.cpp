@@ -301,9 +301,7 @@ datapath_error datapath_socket_set_on_message(datapath_socket* s, datapath_messa
 			s->sock->on_message(nullptr);
 			return DATAPATH_SUCCESS;
 		}
-		s->sock->on_message([fn, user, s, owner = std::move(owner)](const uint8_t* data, size_t size) {
-			fn(user, s, data, size);
-		});
+		s->sock->on_message([fn, user, s, owner](const uint8_t* data, size_t size) { fn(user, s, data, size); });
 		return DATAPATH_SUCCESS;
 	});
 }
@@ -322,8 +320,7 @@ datapath_error datapath_socket_set_on_close(datapath_socket* s, datapath_close_f
 			s->sock->on_close(nullptr);
 			return DATAPATH_SUCCESS;
 		}
-		s->sock->on_close(
-			[fn, user, s, owner = std::move(owner)](datapath::error reason) { fn(user, s, to_c(reason)); });
+		s->sock->on_close([fn, user, s, owner](datapath::error reason) { fn(user, s, to_c(reason)); });
 		return DATAPATH_SUCCESS;
 	});
 }
@@ -400,16 +397,15 @@ datapath_error datapath_server_set_on_accept(datapath_server* srv, datapath_acce
 			srv->srv->on_accept(nullptr);
 			return DATAPATH_SUCCESS;
 		}
-		srv->srv->on_accept(
-			[fn, user, srv, owner = std::move(owner)](std::shared_ptr<datapath::socket> client) noexcept {
-				datapath_socket* handle = new (std::nothrow) datapath_socket{std::move(client)};
-				if (!handle)
-					return false;
-				if (fn(user, srv, handle))
-					return true;
-				delete handle;
+		srv->srv->on_accept([fn, user, srv, owner](std::shared_ptr<datapath::socket> client) noexcept {
+			datapath_socket* handle = new (std::nothrow) datapath_socket{std::move(client)};
+			if (!handle)
 				return false;
-			});
+			if (fn(user, srv, handle))
+				return true;
+			delete handle;
+			return false;
+		});
 		return DATAPATH_SUCCESS;
 	});
 }

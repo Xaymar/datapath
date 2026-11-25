@@ -31,7 +31,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <datapath/socket.hpp>
 #include "common/shm_ring.hpp"
 
-namespace datapath::posix {
+namespace datapath { namespace posix {
 	constexpr size_t shm_offer_size = datapath::detail::shm::offer_size;
 	constexpr int    shm_fd_count   = 5; // section, then data/space eventfds of ring 0 and ring 1
 
@@ -95,4 +95,4 @@ namespace datapath::posix {
 		// Reset an eventfd after it was reported readable.
 		static void clear(int efd) noexcept;
 	};
-} // namespace datapath::posix
+}} // namespace datapath::posix

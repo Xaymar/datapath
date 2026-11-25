@@ -15,7 +15,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include "common/detail.hpp"
 #include "win.hpp"
 
-namespace datapath::windows {
+namespace datapath { namespace windows {
 	class io_target;
 
 	// One outstanding overlapped operation. `keep` holds the target alive until
@@ -145,4 +145,4 @@ namespace datapath::windows {
 							   const datapath::options& options) override;
 		void            shutdown() override;
 	};
-} // namespace datapath::windows
+}} // namespace datapath::windows

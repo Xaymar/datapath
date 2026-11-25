@@ -1,7 +1,7 @@
 # DataPath
 **Fast, predictable message passing between processes on the same machine.**
 
-DataPath is a C++17 IPC library for programs that talk to each other locally and care about the worst case, not just the average. It moves whole, length-framed messages, from a few bytes to many megabytes, between one server and any number of clients, with any number of threads sending at once, over each OS's native transport (named pipes and I/O completion ports on Windows, Unix domain sockets with epoll or kqueue elsewhere) or an opt-in shared-memory transport. Over shared memory, small messages (64 B to 1 KiB) make a round trip in 1–3 µs p99.9 on an idle machine and 5–15 µs with every core busy, measured at worst-case placement.
+DataPath is a C++ IPC library (C++11 or newer) for programs that talk to each other locally and care about the worst case, not just the average. It moves whole, length-framed messages, from a few bytes to many megabytes, between one server and any number of clients, with any number of threads sending at once, over each OS's native transport (named pipes and I/O completion ports on Windows, Unix domain sockets with epoll or kqueue elsewhere) or an opt-in shared-memory transport. Over shared memory, small messages (64 B to 1 KiB) make a round trip in 1–3 µs p99.9 on an idle machine and 5–15 µs with every core busy, measured at worst-case placement.
 
 ![Round-trip p99.9 latency on Linux: DataPath over shared memory vs libuv and Chromium Mojo](docs/images/latency-p999-linux.svg)
 
@@ -90,7 +90,7 @@ Add the repository as a subdirectory and link the `datapath::datapath` target:
 add_subdirectory(datapath)
 target_link_libraries(my-app PRIVATE datapath::datapath)
 ```
-Requires CMake 3.16+ and a C++17 compiler (MSVC 2019+, GCC 9+, Clang 10+). To build the library, tests and benchmarks on their own, see [CONTRIBUTING.md](CONTRIBUTING.md).
+Requires CMake 3.16+ and a C++11 compiler; MSVC needs C++14, its lowest mode. The library builds with C++17 by default; set `DATAPATH_CXX_STANDARD` (11, 14, 17, 20, 23) to pick another. To build the library, tests and benchmarks on their own, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Python
 ```bash

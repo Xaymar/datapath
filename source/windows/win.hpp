@@ -17,7 +17,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <windows.h>
 #include <datapath/error.hpp>
 
-namespace datapath::windows {
+namespace datapath { namespace windows {
 	// Map a Win32 error from a pipe operation to a DataPath error.
 	inline datapath::error map_error(DWORD err) noexcept
 	{
@@ -42,4 +42,4 @@ namespace datapath::windows {
 			return datapath::error::Failure;
 		}
 	}
-} // namespace datapath::windows
+}} // namespace datapath::windows

@@ -2,7 +2,7 @@
 Thanks for helping out. This file covers building, testing and benchmarking DataPath. For what the library does and how to use it, see [README.md](README.md).
 
 ## Building
-Requires CMake 3.16+ and a C++17 compiler (MSVC 2019+, GCC 9+, Clang 10+).
+Requires CMake 3.16+ and a C++17 compiler (MSVC 2019+, GCC 9+, Clang 10+) for the tests and samples. The library itself builds with C++11 or newer (C++14 or newer on MSVC).
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -14,7 +14,9 @@ cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-Options: `DATAPATH_SHARED` (shared library, default `OFF`), `DATAPATH_BUILD_TESTS` and `DATAPATH_BUILD_SAMPLES` (default `ON` for top-level builds). The `datapath::datapath` target can be used through `add_subdirectory`.
+Options: `DATAPATH_SHARED` (shared library, default `OFF`), `DATAPATH_CXX_STANDARD` (standard the library is built with, default 17 or `CMAKE_CXX_STANDARD`; tests and samples use at least 17), `DATAPATH_BUILD_TESTS` and `DATAPATH_BUILD_SAMPLES` (default `ON` for top-level builds). The `datapath::datapath` target can be used through `add_subdirectory`.
+
+Library code (`include/`, `source/`) must build as C++11. When a newer standard library facility helps, use it through `source/common/compat.hpp`, which picks it by feature-test macro (`__cpp_lib_*`) and falls back to a local equivalent; CI builds the library as C++11, C++14 (MSVC) and C++23. Tests, samples and bindings may use C++17.
 
 The shared library exports only what public headers mark with `DATAPATH_API` (from the generated `datapath/export.h`); everything else stays hidden. Mark any new public function or class with it. Tests that reach into internals (`source/`) pass `INTERNAL` to `datapath_add_test` so they still link in a shared build.
 
