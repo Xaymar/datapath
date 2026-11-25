@@ -1,0 +1,12 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=@DATAPATH_PC_LIBDIR@
+includedir=@DATAPATH_PC_INCLUDEDIR@
+
+Name: datapath
+Description: @PROJECT_DESCRIPTION@
+URL: https://github.com/Xaymar/datapath
+Version: @PROJECT_VERSION@
+Cflags: -I${includedir}
+Libs: -L${libdir} -ldatapath
+Libs.private: @DATAPATH_PC_LIBS_PRIVATE@

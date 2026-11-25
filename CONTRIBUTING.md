@@ -67,12 +67,18 @@ pip install . pytest
 ```bash
 pytest python/tests
 ```
-For quicker iteration, configure CMake with `-DDATAPATH_BUILD_PYTHON=ON`; the build tree then has an importable package in `build/python/package`, so `PYTHONPATH=build/python/package pytest python/tests` tests it without installing. Release wheels are built by `.github/workflows/python.yml` with cibuildwheel (settings in `pyproject.toml`); it only uploads to PyPI when started by hand with `publish` set.
+For quicker iteration, configure CMake with `-DDATAPATH_BUILD_PYTHON=ON`; the build tree then has an importable package in `build/python/package`, so `PYTHONPATH=build/python/package pytest python/tests` tests it without installing. Release wheels are built by `.github/workflows/python.yml` with cibuildwheel (settings in `pyproject.toml`); uploads happen in `release.yml` (see Releasing).
 
 `python/benchmarks/pingpong.py local` measures Python round trips; add `--cpp-server build/samples/datapath-benchmark` to echo from the C++ server, and `--mode callback` to receive in callbacks instead of `recv()`.
 
 ## Versioning
 DataPath follows [Semantic Versioning](https://semver.org): MAJOR changes on any API- or ABI-incompatible change (the shared library's SOVERSION is MAJOR), MINOR on compatible additions, PATCH on compatible fixes. The version lives in `CMakeLists.txt` (`DATAPATH_VERSION_MAJOR/MINOR/PATCH`); the Python package reads it from there, and `bindings/node/package.json` and `bindings/rust/Cargo.toml` (plus the `=` dependency in `bindings/rust/datapath/Cargo.toml`) must carry the same number. Wire-protocol versions are separate and unrelated.
+
+## Releasing
+1. Bump the version (see Versioning) in a pull request and merge it.
+2. Tag the merge commit `vX.Y.Z` and push the tag. `.github/workflows/release.yml` checks that every package carries that version, builds everything, runs `npm publish --dry-run`, `cargo publish --dry-run` and `twine check`, and creates a draft GitHub Release with the source tarball and prebuilt C/C++ archives (static and shared, Release and Debug).
+3. Start `release.yml` by hand on the tag with target `test` to upload to TestPyPI first, then with target `release` to publish to PyPI, npm and crates.io. Each registry's GitHub environment (`testpypi`, `pypi`, `npm`, `crates-io`) can require approval.
+4. Publish the draft GitHub Release, then update the vcpkg port and Conan recipe in `packaging/` (see [packaging/README.md](packaging/README.md)).
 
 ## Pull requests
 * Keep a pull request to one change, and say in the description what you measured before and after if it touches the data path.

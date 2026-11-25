@@ -20,6 +20,7 @@ keywords = ["ipc", "low-latency", "named-pipes", "unix-sockets", "messaging"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "Operating System :: MacOS",
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: C++",
@@ -76,9 +77,9 @@ testpaths = ["python/tests"]
 [tool.cibuildwheel]
 # CPython 3.10/3.11 get version-specific wheels, 3.12+ shares one abi3 wheel
 # (cibuildwheel tests it on newer versions), and free-threaded 3.14t/3.15t
-# get their own. macOS isn't supported by the library yet.
+# get their own.
 build = ["cp310-*", "cp311-*", "cp312-*", "cp314t-*", "cp315t-*"]
-skip = ["*-win32", "*_i686", "*-macosx_*"]
+skip = ["*-win32", "*_i686"]
 test-groups = ["test"]
 test-sources = ["python/tests", "pyproject.toml"]
 test-command = "pytest -q python/tests"
@@ -86,3 +87,9 @@ build-verbosity = 1
 
 [tool.cibuildwheel.linux]
 archs = ["native"]
+
+[tool.cibuildwheel.macos]
+# Separate arm64 and x86_64 wheels (smaller than universal2); x86_64 is tested
+# under Rosetta on the arm64 runner.
+archs = ["arm64", "x86_64"]
+environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }

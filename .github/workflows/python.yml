@@ -1,6 +1,6 @@
-# Builds and tests the Python wheels and sdist. Publishing to PyPI only happens
-# when this workflow is started by hand with "publish" set, and needs PyPI
-# trusted publishing configured for the `pypi` environment first.
+# Builds and tests the Python wheels (artifacts `wheels-*`) and the sdist
+# (artifact `sdist`). Publishing to TestPyPI/PyPI happens in release.yml, which
+# calls this workflow.
 
 name: Python
 
@@ -23,17 +23,15 @@ on:
       - "python/**"
       - "source/**"
   workflow_dispatch:
-    inputs:
-      publish:
-        description: "Upload the built wheels and sdist to PyPI"
-        type: boolean
-        default: false
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: python-${{ github.ref }}
+  # github.workflow is the caller's name when called, so a release run does not
+  # cancel (or get cancelled by) a plain CI run on the same ref.
+  group: python-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -44,7 +42,8 @@ jobs:
       fail-fast: false
       matrix:
         # Native runners only: no emulation, so tests run on the real platform.
-        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, windows-11-arm]
+        # macos-14 is arm64 and also builds the x86_64 wheels, tested under Rosetta.
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, windows-11-arm, macos-14]
     steps:
       - uses: actions/checkout@v7
       - uses: pypa/cibuildwheel@v4.3.5
@@ -72,19 +71,3 @@ jobs:
           name: sdist
           path: dist/*.tar.gz
 
-  publish:
-    name: Publish to PyPI
-    if: github.event_name == 'workflow_dispatch' && inputs.publish
-    needs: [wheels, sdist]
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/project/com.xaymar.datapath/
-    permissions:
-      id-token: write # trusted publishing
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          path: dist
-          merge-multiple: true
-      - uses: pypa/gh-action-pypi-publish@release/v1

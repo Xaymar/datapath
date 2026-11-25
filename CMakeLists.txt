@@ -225,7 +225,54 @@ install(FILES
 	"${PROJECT_BINARY_DIR}/generated/include/datapath/version.hpp"
 	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/datapath
 )
-install(EXPORT datapath-targets NAMESPACE datapath:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/datapath)
+set(DATAPATH_CMAKE_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/datapath")
+install(EXPORT datapath-targets NAMESPACE datapath:: DESTINATION ${DATAPATH_CMAKE_DIR})
+
+# find_package(datapath) support: config + version file. SameMajorVersion is
+# SemVer: any 1.x satisfies a request for 1.y with x >= y.
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+	"${PROJECT_SOURCE_DIR}/cmake/datapath-config.cmake.in"
+	"${PROJECT_BINARY_DIR}/datapath-config.cmake"
+	INSTALL_DESTINATION ${DATAPATH_CMAKE_DIR}
+)
+write_basic_package_version_file(
+	"${PROJECT_BINARY_DIR}/datapath-config-version.cmake"
+	VERSION ${PROJECT_VERSION}
+	COMPATIBILITY SameMajorVersion
+)
+install(FILES
+	"${PROJECT_BINARY_DIR}/datapath-config.cmake"
+	"${PROJECT_BINARY_DIR}/datapath-config-version.cmake"
+	DESTINATION ${DATAPATH_CMAKE_DIR}
+)
+
+# pkg-config, for non-CMake builds. A static library also needs the C++
+# runtime and threads when it is linked into a C program.
+if(IS_ABSOLUTE "${CMAKE_INSTALL_LIBDIR}")
+	set(DATAPATH_PC_LIBDIR "${CMAKE_INSTALL_LIBDIR}")
+else()
+	set(DATAPATH_PC_LIBDIR "\${exec_prefix}/${CMAKE_INSTALL_LIBDIR}")
+endif()
+if(IS_ABSOLUTE "${CMAKE_INSTALL_INCLUDEDIR}")
+	set(DATAPATH_PC_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}")
+else()
+	set(DATAPATH_PC_INCLUDEDIR "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}")
+endif()
+set(DATAPATH_PC_LIBS_PRIVATE "")
+if(WIN32)
+	set(DATAPATH_PC_LIBS_PRIVATE "-ladvapi32 -lkernel32")
+else()
+	if(APPLE OR CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND "c++" IN_LIST CMAKE_CXX_IMPLICIT_LINK_LIBRARIES)
+		set(DATAPATH_PC_LIBS_PRIVATE "-lc++")
+	else()
+		set(DATAPATH_PC_LIBS_PRIVATE "-lstdc++")
+	endif()
+	string(APPEND DATAPATH_PC_LIBS_PRIVATE " -pthread")
+endif()
+configure_file("${PROJECT_SOURCE_DIR}/cmake/datapath.pc.in" "${PROJECT_BINARY_DIR}/datapath.pc" @ONLY)
+install(FILES "${PROJECT_BINARY_DIR}/datapath.pc" DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/datapath)
 
 if(DATAPATH_BUILD_TESTS)
 	enable_testing()

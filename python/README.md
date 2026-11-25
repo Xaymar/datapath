@@ -6,7 +6,7 @@ Python bindings for [DataPath](https://github.com/Xaymar/datapath), a C++ IPC li
 ```bash
 pip install com.xaymar.datapath
 ```
-The distribution is called `com.xaymar.datapath` (PyPI has no namespaces); the import name is `datapath`. Wheels are built for CPython 3.10 and newer (one abi3 wheel covers 3.12+, and free-threaded 3.14t/3.15t builds run without the GIL) on Windows and Linux, x86-64 and ARM64. macOS isn't supported yet.
+The distribution is called `com.xaymar.datapath` (PyPI has no namespaces); the import name is `datapath`. Wheels are built for CPython 3.10 and newer (one abi3 wheel covers 3.12+, and free-threaded 3.14t/3.15t builds run without the GIL) on Windows, Linux and macOS, x86-64 and ARM64.
 
 ## Usage
 ```python

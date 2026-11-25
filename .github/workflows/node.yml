@@ -4,7 +4,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 # Builds and tests the Node.js bindings, collects prebuilt binaries per target and
-# packs a publish-ready npm tarball. Publishing itself is not part of this workflow.
+# packs a publish-ready npm tarball (artifact `npm-package`). Publishing happens in
+# release.yml, which calls this workflow.
 name: Node.js bindings
 
 on:
@@ -25,6 +26,7 @@ on:
       - 'CMakeLists.txt'
       - '.github/workflows/node.yml'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -39,7 +41,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2022]
+        os: [ubuntu-24.04, windows-2022, macos-14]
         node: [18, 20, 22, 24]
     runs-on: ${{ matrix.os }}
     steps:
@@ -63,6 +65,8 @@ jobs:
           - { target: linux-arm64, os: ubuntu-22.04-arm }
           - { target: win32-x64, os: windows-2022 }
           - { target: win32-arm64, os: windows-11-arm }
+          # One universal (arm64 + x86_64) binary, copied to both darwin targets.
+          - { target: darwin-universal, os: macos-14 }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -70,8 +74,20 @@ jobs:
         with:
           node-version: 22
       - run: npm install
+      - name: Rebuild as a universal binary (macOS)
+        if: runner.os == 'macOS'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: '11.0'
+        run: npx cmake-js rebuild --CDCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
       - run: npm test
       - run: npm run package-prebuild
+        if: runner.os != 'macOS'
+      - name: Package prebuilds (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          lipo -info build/Release/datapath.node
+          npm_config_arch=arm64 node scripts/prebuild.js
+          npm_config_arch=x64 node scripts/prebuild.js
       - uses: actions/upload-artifact@v4
         with:
           name: prebuild-${{ matrix.target }}
