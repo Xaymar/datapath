@@ -1,6 +1,6 @@
 {
   "name": "xaymar-datapath",
-  "version-semver": "1.0.0",
+  "version-semver": "1.0.1",
   "description": "High performance, low latency IPC library over named pipes, Unix domain sockets and shared memory.",
   "homepage": "https://github.com/Xaymar/datapath",
   "license": "BSD-3-Clause",

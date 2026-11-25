@@ -23,14 +23,14 @@ dependencies = [
 
 [[package]]
 name = "com-xaymar-datapath"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "com-xaymar-datapath-sys",
 ]
 
 [[package]]
 name = "com-xaymar-datapath-sys"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "cmake",
 ]

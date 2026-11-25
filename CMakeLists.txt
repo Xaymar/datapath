@@ -10,7 +10,7 @@ cmake_minimum_required(VERSION 3.16)
 # fixes. Every binding and package uses this same version.
 set(DATAPATH_VERSION_MAJOR 1)
 set(DATAPATH_VERSION_MINOR 0)
-set(DATAPATH_VERSION_PATCH 0)
+set(DATAPATH_VERSION_PATCH 1)
 if(DATAPATH_VERSION_MAJOR GREATER 255 OR DATAPATH_VERSION_MINOR GREATER 65535 OR DATAPATH_VERSION_PATCH GREATER 255)
 	message(FATAL_ERROR "DataPath: version parts must fit (major << 24) | (minor << 8) | patch")
 endif()
