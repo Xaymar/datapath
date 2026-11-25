@@ -64,7 +64,7 @@ npm run bench      # round-trip latency vs node:net
 The package is publish-ready, but not published yet. The plan for a release:
 
 1. **Prebuilds.** The `Node.js bindings` workflow (`.github/workflows/node.yml`) builds the addon on every target and runs the tests on Node.js 18, 20, 22 and 24. Each job runs `npm run package-prebuild`, which copies `build/Release/datapath.node` to `prebuilds/<platform>-<arch>/datapath.napi.node`, the layout `node-gyp-build` loads from, and uploads it as an artifact. Targets: `win32-x64`, `win32-arm64`, `linux-x64`, `linux-arm64` (glibc), `linux-x64` with musl (Alpine, tagged `.musl`), and `darwin-x64`/`darwin-arm64` (one universal binary). Android has no prebuild: it builds from source, since its Node.js builds are rare and vary.
-2. **Pack.** A final job downloads every artifact into `prebuilds/` and runs `npm pack`. `release.yml` attaches that tarball to the draft GitHub Release; it is published to npm by hand. `prepack` copies the C++ sources into `deps/datapath`, so the tarball can also build from source.
+2. **Pack.** A final job downloads every artifact into `prebuilds/` and runs `npm pack`. `release.yml` attaches that tarball to the draft GitHub Release and publishes it to npm through trusted publishing. `prepack` copies the C++ sources into `deps/datapath`, so the tarball can also build from source.
 3. **Publish.** Run `npm publish --access public` from that job with an `NPM_TOKEN` secret (and `--provenance` for npm provenance), once the workflow has been triggered for a version tag. That step is not wired up yet; it needs the token and the `@xaymar` npm scope.
 
 Since the addon uses Node-API only, a new Node.js release needs no new prebuilds.
