@@ -38,6 +38,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -46,9 +49,15 @@ jobs:
           cache: pip
           cache-dependency-path: website/requirements.txt
       - run: pip install -r website/requirements.txt
+      - name: Setup Pages
+        # Needs Pages enabled with "GitHub Actions" as the source; pull requests only build.
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
       - run: python website/build.py --out _site
-      - uses: actions/upload-pages-artifact@v3
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
+          # The built site, not the repository: build.py renders README and docs into _site.
           path: _site
 
   deploy:
@@ -62,5 +71,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
