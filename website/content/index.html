@@ -1,0 +1,128 @@
+<section class="hero">
+	<div class="hero-text">
+		<p class="eyebrow">Local IPC for C++, C, Rust, Python and Node.js</p>
+		<h1>Message passing with a <em>predictable</em> worst case.</h1>
+		<p class="lead">DataPath moves whole messages between processes on the same machine, from a few bytes to many megabytes. It is built for the one round trip in a thousand that other libraries leave to chance: measured at p99.9, at the worst CPU placement, with every core busy.</p>
+		<div class="cta">
+			<a class="button primary" href="start/">Get started</a>
+			<a class="button" href="benchmarks/">See the benchmarks</a>
+		</div>
+		<pre class="install"><code><span class="prompt">$</span> pip install com.xaymar.datapath   <span class="dim"># or npm, cargo, CMake</span></code></pre>
+	</div>
+	<dl class="stats">
+		<div><dt>64 B round trip, idle</dt><dd>1.4<small> µs</small></dd><p>p99.9 over shared memory, client and server on different CCDs</p></div>
+		<div><dt>Every core busy</dt><dd>10<small> µs</small></dd><p>p99.9 at 64 B, where socket-based stacks wait milliseconds for a timeslice</p></div>
+		<div><dt>vs. Chromium Mojo under load</dt><dd>780<small>× lower</small></dd><p>p99.9 at 64 B on the same Linux machine</p></div>
+	</dl>
+</section>
+
+<section class="band" id="benchmarks">
+	<div class="section-head">
+		<h2>Tail latency, not averages</h2>
+		<p>Round-trip p99.9 from 16 B to 1 MiB, idle and under full CPU load. Lower is better; the scale is logarithmic. Hover a mark for its value.</p>
+	</div>
+	<div class="graph-card">
+		<div class="tabs" role="tablist" aria-label="Platform">{{graph_tabs}}</div>
+		{{graph_panels}}
+	</div>
+	<details class="compare">
+		<summary>The numbers behind the graphs</summary>
+		<div class="compare-body">{{compare}}</div>
+	</details>
+</section>
+
+<section class="features">
+	<div class="section-head">
+		<h2>Small library, sharp edges filed off</h2>
+		<p>No dependencies beyond the C++ standard library and the operating system. One API on every platform.</p>
+	</div>
+	<div class="grid">
+		<article>
+			<h3>No timers on the data path</h3>
+			<p>I/O threads busy-poll for 50 µs after the last event, then sleep in the kernel at raised priority. Zero-copy receive, several small messages per system call.</p>
+		</article>
+		<article>
+			<h3>Shared memory, opt-in</h3>
+			<p><code>options::shared_memory</code> moves messages through two rings mapped only by the two processes. The pipe or socket then carries just the handshake.</p>
+		</article>
+		<article>
+			<h3>Whole messages</h3>
+			<p>Each <code>send()</code> arrives as one <code>on_message</code> call. Messages from different threads never interleave. One server, any number of clients.</p>
+		</article>
+		<article>
+			<h3>Explicit backpressure</h3>
+			<p><code>send()</code> never blocks and never grows without limit: it returns <code>TooLarge</code> or <code>WouldBlock</code>, and a message is queued whole or not at all.</p>
+		</article>
+		<article>
+			<h3>Safe setup and teardown</h3>
+			<p>User, group or world access control, a version handshake and peer validation before <code>on_accept</code>. Destroying a handle waits for running handlers.</p>
+		</article>
+		<article>
+			<h3>Native transports</h3>
+			<p>Named pipes with I/O completion ports on Windows, Unix domain sockets with epoll on Linux and kqueue on macOS. A peer without shared memory still connects.</p>
+		</article>
+	</div>
+</section>
+
+<section class="code-section">
+	<div class="section-head">
+		<h2>An echo server in a dozen lines</h2>
+		<p>Host a server, accept clients, reply from the handler. <code>send()</code> is thread-safe and safe to call from handlers.</p>
+	</div>
+<pre><code class="language-cpp">#include &lt;datapath/datapath.hpp&gt;
+
+// Server
+std::shared_ptr&lt;datapath::server&gt; server;
+datapath::host(server, "my-service");          // a named pipe or abstract socket
+server-&gt;on_accept([&amp;](std::shared_ptr&lt;datapath::socket&gt; client) {
+    datapath::socket* raw = client.get();      // don't capture the shared_ptr in its own handler
+    client-&gt;on_message([raw](const uint8_t* data, size_t size) {
+        raw-&gt;send(data, size);                 // echo
+    });
+    clients.push_back(client);                 // keep it, or the connection closes
+    return true;                               // false rejects the client
+});
+
+// Client
+std::shared_ptr&lt;datapath::socket&gt; sock;
+if (datapath::connect(sock, "my-service") == datapath::error::Success) {
+    sock-&gt;on_message([](const uint8_t* data, size_t size) { /* data valid during the call */ });
+    sock-&gt;send("hello", 5);
+}</code></pre>
+	<p class="more"><a href="start/">The same in C, Rust, Python and Node.js →</a></p>
+</section>
+
+<section class="platforms">
+	<div class="section-head">
+		<h2>Platforms and bindings</h2>
+	</div>
+	<div class="split">
+		<div class="table-wrap">
+			<table>
+				<thead><tr><th>Platform</th><th>Transport</th><th>Status</th></tr></thead>
+				<tbody>
+					<tr><td>Windows 10 / 11</td><td>Named pipes, IOCP; shared memory</td><td><span class="pill ok">Supported</span></td></tr>
+					<tr><td>Linux</td><td>Unix domain sockets, epoll; shared memory</td><td><span class="pill ok">Supported</span></td></tr>
+					<tr><td>macOS</td><td>Unix domain sockets, kqueue</td><td><span class="pill ok">Supported</span></td></tr>
+					<tr><td>Android, iOS</td><td>as Linux / macOS</td><td><span class="pill">Planned</span></td></tr>
+				</tbody>
+			</table>
+		</div>
+		<ul class="bindings">
+			<li><a href="start/#cpp"><strong>C++</strong><span>CMake target <code>datapath::datapath</code></span></a></li>
+			<li><a href="start/#c"><strong>C</strong><span>Stable C ABI for FFI, Java and C#</span></a></li>
+			<li><a href="start/#rust"><strong>Rust</strong><span><code>com-xaymar-datapath</code></span></a></li>
+			<li><a href="start/#python"><strong>Python</strong><span><code>com.xaymar.datapath</code></span></a></li>
+			<li><a href="start/#node"><strong>Node.js</strong><span><code>@xaymar/datapath</code></span></a></li>
+		</ul>
+	</div>
+</section>
+
+<section class="closing">
+	<h2>Try it on your own machine.</h2>
+	<p>The benchmark harness ships with the library. Run it at your own worst-case placement and see what your current IPC does at p99.9.</p>
+	<div class="cta">
+		<a class="button primary" href="start/">Get started</a>
+		<a class="button" href="benchmarks/methodology/">How we measure</a>
+	</div>
+</section>
