@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import json
 import posixpath
 import re
 import shutil
@@ -248,8 +249,11 @@ def build_home(readme: str, mapping: dict[str, str]) -> Page:
 	# Inline the SVGs: hover titles work, and the theme toggle can recolour them.
 	panels = "".join(
 		f'<figure role="tabpanel" class="graph" id="graph-{i}" aria-labelledby="graph-tab-{i}"{"" if i == 0 else " hidden"}>'
-		f'{inline_svg(ROOT / "docs/images" / posixpath.basename(src))}'
-		f'<figcaption><a href="{src}">Open the graph on its own</a></figcaption></figure>'
+		f'<div class="chart" data-chart="graph-data-{i}"></div>'
+		f'<script type="application/json" id="graph-data-{i}">{chart_json(src)}</script>'
+		f'<div class="static">{inline_svg(ROOT / "docs/images" / posixpath.basename(src))}</div>'
+		f'<figcaption>{"<br>".join(html.escape(n) for n in graph_data((ROOT / "docs/images" / posixpath.basename(src)).read_text(encoding="utf-8"))["notes"])}'
+		f'<br><a href="{src}">Static version of this graph</a></figcaption></figure>'
 		for i, (_, alt, src) in enumerate(figures)
 	)
 	compare_html = render_markdown(compare)
@@ -263,11 +267,81 @@ def build_home(readme: str, mapping: dict[str, str]) -> Page:
 	            wide=True)
 
 
+def chart_json(src: str) -> str:
+	data = graph_data((ROOT / "docs/images" / posixpath.basename(src)).read_text(encoding="utf-8"))
+	return json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+
+
 def inline_svg(path: Path) -> str:
 	svg = path.read_text(encoding="utf-8")
 	svg = re.sub(r"^<\?xml[^>]*>\s*", "", svg)
 	# Drop the fixed size so it scales with the card; the viewBox keeps the aspect ratio.
 	return re.sub(r'(<svg\b[^>]*?)\s(?:width|height)="[^"]*"', r"\1", re.sub(r'(<svg\b[^>]*?)\s(?:width|height)="[^"]*"', r"\1", svg, count=1), count=1)
+
+
+_UNITS = {"B": 1, "KiB": 1024, "MiB": 1024 * 1024}
+
+
+def _shape(el: str) -> str:
+	if el.startswith("<circle"):
+		return "circle"
+	if el.startswith("<rect"):
+		return "square"
+	if "l6,10" in el:
+		return "triangle"
+	if "l6,6" in el:
+		return "diamond"
+	return "circle"
+
+
+def _palette(style: str) -> dict[str, dict[str, str]]:
+	"""Series colours of a README graph, light and dark, keyed by marker class."""
+	blocks = re.findall(r"svg\{([^}]*)\}", style)
+	out = {}
+	for name, block in zip(("light", "dark"), blocks):
+		out[name] = dict(re.findall(r"--(\w+):(#[0-9a-fA-F]+)", block))
+	return out
+
+
+def graph_data(svg: str) -> dict:
+	"""Pull the values of a README graph out of its hover titles.
+
+	The README graphs (docs/images/latency_chart.py) carry every value in a
+	<title>, and every series as a marker class with its own colour. Reading
+	them back means any library added to the README graph shows up on the
+	site without touching this script.
+	"""
+	style = re.search(r"<style>(.*?)</style>", svg, flags=re.S).group(1)
+	title = re.search(r'<text class="t1"[^>]*>([^<]*)</text>', svg).group(1)
+	marker_re = r'(<(?:circle|rect|path) class="(\w+) m"[^>]*>)(?:<title>([^<]*)</title>)?</(?:circle|rect|path)>'
+	series, panels = [], {}
+	known = set()
+	for m in re.finditer(marker_re + r'(?:<text class="t3"[^>]*>([^<]*)</text>)?', svg):
+		el, cls, tip, label = m.group(1), m.group(2), m.group(3), m.group(4)
+		if tip is None:
+			if label and cls not in known:
+				known.add(cls)
+				series.append({"id": cls, "label": html.unescape(label), "shape": _shape(el)})
+			continue
+		tm = re.match(r"(.*), ([\d.]+ (?:B|KiB|MiB)), (.*): ([\d.]+) µs \(runs ([\d.]+) to ([\d.]+)\)", html.unescape(tip))
+		if not tm:
+			continue
+		panel, size = tm.group(1), tm.group(2)
+		rows = panels.setdefault(panel, {})
+		rows.setdefault(size, {})[cls] = [float(tm.group(4)), float(tm.group(5)), float(tm.group(6))]
+	size_key = lambda s: float(s.split()[0]) * _UNITS[s.split()[1]]
+	notes = [html.unescape(t) for t in re.findall(r'<text class="t4" x="16"[^>]*>([^<]*)</text>', svg)]
+	return {
+		"title": html.unescape(title),
+		"machine": html.unescape(title.split(":")[0]),
+		"colors": _palette(style),
+		"series": series,
+		"panels": [
+			{"name": name, "rows": [{"size": sz, "values": rows[sz]} for sz in sorted(rows, key=size_key)]}
+			for name, rows in panels.items()
+		],
+		"notes": notes,
+	}
 
 
 def build_start() -> Page:

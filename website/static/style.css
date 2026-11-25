@@ -330,12 +330,50 @@ pre:hover[data-lang]::before { opacity: 0; }
 
 /* Graphs are inlined from docs/images; they carry their own light/dark palette
    keyed to the OS. These rules make them follow the theme toggle as well. */
-.graph svg { display: block; width: 100%; height: auto; border-radius: 6px; }
+.graph .static svg { display: block; width: 100%; height: auto; border-radius: 6px; }
 .graph figcaption { font-size: 13px; padding: 8px 4px 0; text-align: right; }
 .graph figcaption a { color: var(--text-3); }
 :root[data-theme="light"] .graph svg { --bg:#fcfcfb;--t1:#0b0b0b;--t2:#52514e;--grid:#e6e5e1;--dp:#2a78d6;--uv:#eb6834;--up:#1baf7a;--mj:#8a5cc7; }
 :root[data-theme="dark"] .graph svg { --bg:#1a1a19;--t1:#f0efec;--t2:#c3c2b7;--grid:#34332f;--dp:#3987e5;--uv:#d95926;--up:#199e70;--mj:#a37ae0; }
+/* Interactive graphs (chart.js); the static SVG stays for no-JS and print. */
+.graph .chart { display: none; }
+.graph.live .chart { display: block; }
+.graph.live .static { display: none; }
+.graph figcaption { text-align: left; color: var(--text-3); line-height: 1.5; font-size: 12.5px; }
+.graph.live figcaption { padding: 4px 4px 0; }
+.chart { padding: 8px 8px 0; }
+.chart-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px 16px; margin-bottom: 4px; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.chart-legend button, .chart-zoom button {
+	display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px;
+	border: 1px solid var(--border); background: var(--surface); color: var(--text);
+	font: 500 13px var(--font); cursor: pointer;
+}
+.chart-legend svg { flex: none; width: 14px; height: 14px; }
+.chart-legend .sw { fill: var(--c); }
+.chart-legend button[aria-pressed="false"] { color: var(--text-3); text-decoration: line-through; }
+.chart-legend button[aria-pressed="false"] .sw { fill: var(--border); }
+.chart-zoom { display: flex; gap: 4px; }
+.chart-zoom button { min-width: 32px; justify-content: center; font-weight: 600; }
+.chart-legend button:hover, .chart-zoom button:hover { border-color: var(--accent); }
+.chart-plot { position: relative; }
+.chart-plot svg { display: block; width: 100%; height: auto; touch-action: pan-y; cursor: grab; user-select: none; -webkit-user-select: none; }
+.chart-plot svg:active { cursor: grabbing; }
+.chart-plot text { font-family: var(--font); }
+.c-panel { font-size: 13px; font-weight: 600; fill: var(--text); }
+.c-size { font-size: 12px; fill: var(--text-2); font-variant-numeric: tabular-nums; }
+.c-tick { font-size: 11px; fill: var(--text-3); font-variant-numeric: tabular-nums; }
+.c-grid { stroke: var(--border); stroke-width: 1; }
+.c-grid.minor { opacity: .5; }
+.c-mark { stroke: var(--surface); stroke-width: 1.5; }
+.chart-tip {
+	position: absolute; z-index: 3; pointer-events: none; padding: 7px 10px; border-radius: 8px;
+	background: var(--text); color: var(--bg); font-size: 12.5px; line-height: 1.45; box-shadow: var(--shadow); white-space: nowrap;
+}
+.chart-tip span { opacity: .7; }
+.chart-hint { margin: 4px 0 0; font-size: 12px; color: var(--text-3); }
 @media (max-width: 640px) {
-	.graph { overflow-x: auto; }
-	.graph svg { min-width: 680px; }
+	.graph-card { padding: 8px; }
+	.chart { padding: 4px 0 0; }
+	.chart-legend button { font-size: 12px; padding: 3px 8px; }
 }
