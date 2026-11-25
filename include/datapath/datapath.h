@@ -87,7 +87,7 @@ DATAPATH_C_API const char* datapath_error_string(datapath_error error);
 
 /* Version ------------------------------------------------------------------ */
 
-/* Version of the loaded library as (major << 22) | (minor << 12) | patch, the
+/* Version of the loaded library as (major << 24) | (minor << 8) | patch, the
  * same encoding as DATAPATH_VERSION in <datapath/version.hpp>. */
 DATAPATH_C_API uint32_t datapath_version(void);
 /* DATAPATH_C_ABI_VERSION of the library that is actually loaded. */

@@ -52,7 +52,7 @@ pub use sys;
 /// Version of the loaded library as `(major, minor, patch)`.
 pub fn version() -> (u16, u16, u16) {
     let v = unsafe { sys::datapath_version() };
-    ((v >> 22) as u16, ((v >> 12) & 0x3ff) as u16, (v & 0xfff) as u16)
+    ((v >> 24) as u16, ((v >> 8) & 0xffff) as u16, (v & 0xff) as u16)
 }
 
 /// Connect to `path` with default options on the default context.

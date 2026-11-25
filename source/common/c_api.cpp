@@ -184,9 +184,9 @@ uint32_t datapath_version(void)
 {
 #ifdef DP_HAS_VERSION_INFO
 	auto v = datapath::version();
-	return (uint32_t(v.major) << 22) | (uint32_t(v.minor) << 12) | uint32_t(v.patch);
+	return (uint32_t(v.major) << 24) | (uint32_t(v.minor) << 8) | uint32_t(v.patch);
 #else
-	return (uint32_t(PROJECT_VERSION_MAJOR) << 22) | (uint32_t(PROJECT_VERSION_MINOR) << 12)
+	return (uint32_t(PROJECT_VERSION_MAJOR) << 24) | (uint32_t(PROJECT_VERSION_MINOR) << 8)
 		   | uint32_t(PROJECT_VERSION_PATCH);
 #endif
 }

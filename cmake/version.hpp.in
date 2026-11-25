@@ -16,9 +16,10 @@ SPDX-License-Identifier: BSD-3-Clause
 #define DATAPATH_VERSION_MAJOR @DATAPATH_VERSION_MAJOR@
 #define DATAPATH_VERSION_MINOR @DATAPATH_VERSION_MINOR@
 #define DATAPATH_VERSION_PATCH @DATAPATH_VERSION_PATCH@
-// All three in one integer: (major << 22) | (minor << 12) | patch.
+// All three in one integer: (major << 24) | (minor << 8) | patch, so major and
+// patch go up to 255 and minor up to 65535.
 #define DATAPATH_MAKE_VERSION(major, minor, patch) \
-	((uint32_t(major) << 22) | (uint32_t(minor) << 12) | uint32_t(patch))
+	((uint32_t(major) << 24) | (uint32_t(minor) << 8) | uint32_t(patch))
 #define DATAPATH_VERSION \
 	DATAPATH_MAKE_VERSION(DATAPATH_VERSION_MAJOR, DATAPATH_VERSION_MINOR, DATAPATH_VERSION_PATCH)
 #define DATAPATH_VERSION_STRING "@DATAPATH_VERSION_MAJOR@.@DATAPATH_VERSION_MINOR@.@DATAPATH_VERSION_PATCH@"
