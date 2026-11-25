@@ -266,7 +266,18 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: npm-package
-      - run: npm publish xaymar-datapath-*.tgz --access public --dry-run
+      # A dry run also fails when the version is already on npm, so check that
+      # separately and only warn: publish-npm skips existing versions.
+      - name: Publish (dry run)
+        shell: bash
+        run: |
+          version="${{ needs.version.outputs.version }}"
+          if npm view "@xaymar/datapath@$version" version > /dev/null 2>&1; then
+            echo "::warning::@xaymar/datapath@$version is already on npm; release.yml will not publish it again"
+            tar -tzf xaymar-datapath-*.tgz
+          else
+            npm publish xaymar-datapath-*.tgz --access public --dry-run
+          fi
 
   publish-npm:
     name: Publish to npm
