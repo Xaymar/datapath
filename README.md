@@ -3,7 +3,7 @@
 
 DataPath is a C++17 IPC library for programs that talk to each other locally and care about the worst case, not just the average. It moves whole, length-framed messages, from a few bytes to many megabytes, between one server and any number of clients, with any number of threads sending at once, over each OS's native transport (named pipes and I/O completion ports on Windows, Unix domain sockets with epoll or kqueue elsewhere) or an opt-in shared-memory transport. Over shared memory, small messages (64 B to 1 KiB) make a round trip in 1–3 µs p99.9 on an idle machine and 5–15 µs with every core busy, measured at worst-case placement.
 
-![Round-trip p99.9 latency on Linux: DataPath over shared memory vs libuv](docs/images/latency-p999-linux.svg)
+![Round-trip p99.9 latency on Linux: DataPath over shared memory vs libuv and Chromium Mojo](docs/images/latency-p999-linux.svg)
 
 ![Round-trip p99.9 latency on Windows: DataPath over shared memory vs libuv](docs/images/latency-p999-windows.svg)
 
