@@ -17,4 +17,4 @@ include = ["/src", "/examples", "/tests", "/README.md", "/LICENSE"]
 name = "datapath"
 
 [dependencies]
-sys = { package = "com-xaymar-datapath-sys", version = "=2.0.0", path = "../datapath-sys" }
+sys = { package = "com-xaymar-datapath-sys", version = "=1.0.0", path = "../datapath-sys" }

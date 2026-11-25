@@ -10,7 +10,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 datapath::version_info datapath::version() noexcept
 {
-	return {DATAPATH_VERSION_ABI, DATAPATH_VERSION_PATCH};
+	return {DATAPATH_VERSION_MAJOR, DATAPATH_VERSION_MINOR, DATAPATH_VERSION_PATCH};
 }
 
 const char* datapath::to_string(datapath::error e) noexcept

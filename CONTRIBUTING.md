@@ -71,6 +71,9 @@ For quicker iteration, configure CMake with `-DDATAPATH_BUILD_PYTHON=ON`; the bu
 
 `python/benchmarks/pingpong.py local` measures Python round trips; add `--cpp-server build/samples/datapath-benchmark` to echo from the C++ server, and `--mode callback` to receive in callbacks instead of `recv()`.
 
+## Versioning
+DataPath follows [Semantic Versioning](https://semver.org): MAJOR changes on any API- or ABI-incompatible change (the shared library's SOVERSION is MAJOR), MINOR on compatible additions, PATCH on compatible fixes. The version lives in `CMakeLists.txt` (`DATAPATH_VERSION_MAJOR/MINOR/PATCH`); the Python package reads it from there, and `bindings/node/package.json` and `bindings/rust/Cargo.toml` (plus the `=` dependency in `bindings/rust/datapath/Cargo.toml`) must carry the same number. Wire-protocol versions are separate and unrelated.
+
 ## Pull requests
 * Keep a pull request to one change, and say in the description what you measured before and after if it touches the data path.
 * Format C++ changes with the repository's `.clang-format`.

@@ -5,13 +5,18 @@
 
 cmake_minimum_required(VERSION 3.16)
 
-# Versioning: ABI version (bump on any binary-incompatible change, and reset
-# the patch version to 0) and patch version (bump on compatible changes).
-set(DATAPATH_VERSION_ABI 2)
+# Semantic Versioning (https://semver.org): bump MAJOR on any API- or
+# ABI-incompatible change, MINOR on compatible additions, PATCH on compatible
+# fixes. Every binding and package uses this same version.
+set(DATAPATH_VERSION_MAJOR 1)
+set(DATAPATH_VERSION_MINOR 0)
 set(DATAPATH_VERSION_PATCH 0)
+if(DATAPATH_VERSION_MAJOR GREATER 255 OR DATAPATH_VERSION_MINOR GREATER 65535 OR DATAPATH_VERSION_PATCH GREATER 255)
+	message(FATAL_ERROR "DataPath: version parts must fit (major << 24) | (minor << 8) | patch")
+endif()
 
 project(datapath
-	VERSION ${DATAPATH_VERSION_ABI}.${DATAPATH_VERSION_PATCH}
+	VERSION ${DATAPATH_VERSION_MAJOR}.${DATAPATH_VERSION_MINOR}.${DATAPATH_VERSION_PATCH}
 	DESCRIPTION "High performance, low latency IPC library"
 	LANGUAGES C CXX
 )
@@ -199,8 +204,8 @@ target_include_directories(datapath
 		"$<INSTALL_INTERFACE:include>"
 )
 set_target_properties(datapath PROPERTIES
-	VERSION ${DATAPATH_VERSION_ABI}.${DATAPATH_VERSION_PATCH}
-	SOVERSION ${DATAPATH_VERSION_ABI}
+	VERSION ${DATAPATH_VERSION_MAJOR}.${DATAPATH_VERSION_MINOR}.${DATAPATH_VERSION_PATCH}
+	SOVERSION ${DATAPATH_VERSION_MAJOR}
 )
 
 if(MINGW)
