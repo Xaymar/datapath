@@ -89,4 +89,13 @@ if(DATAPATH_BUILD_COMPARE)
 	if(UNIX AND NOT APPLE)
 		target_link_libraries(boost-benchmark PRIVATE rt pthread)
 	endif()
+	if(WIN32)
+		# On Windows Boost.Interprocess defaults to its generic (spin/yield based)
+		# mutex and condition emulation; this variant uses the native Windows
+		# primitives instead. Shared memory stays file-backed either way.
+		add_executable(boost-native-benchmark ${BENCH_HARNESS} benchmark/transport_boost.cpp)
+		target_link_libraries(boost-native-benchmark PRIVATE ${DATAPATH_BOOST_TARGET} datapath)
+		target_include_directories(boost-native-benchmark PRIVATE "${PROJECT_SOURCE_DIR}/source")
+		target_compile_definitions(boost-native-benchmark PRIVATE BOOST_INTERPROCESS_FORCE_NATIVE_EMULATION)
+	endif()
 endif()

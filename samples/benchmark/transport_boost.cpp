@@ -217,7 +217,11 @@ namespace {
 		const char* name() const override
 		{
 			static const std::string n = "Boost.Interprocess " + std::to_string(BOOST_VERSION / 100000) + "." +
-										 std::to_string(BOOST_VERSION / 100 % 1000) + " message_queue";
+										 std::to_string(BOOST_VERSION / 100 % 1000) + " message_queue"
+#if defined(BOOST_INTERPROCESS_FORCE_NATIVE_EMULATION)
+										 + " (native sync)"
+#endif
+				;
 			return n.c_str();
 		}
 

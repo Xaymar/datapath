@@ -77,7 +77,7 @@ if exist "%LIBUV%" (
 	)
 )
 rem The shared-memory competitors, if they were built: as shipped and with DataPath's policy.
-for %%O in (cppipc boost) do (
+for %%O in (cppipc boost boost-native) do (
 	for %%D in ("%BENCH%") do set "OTHER=%%~dpD%%O-benchmark.exe"
 	call :other %%O
 )
