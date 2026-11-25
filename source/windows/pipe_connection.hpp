@@ -8,14 +8,14 @@ SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 #include <atomic>
 #include <memory>
-#include <shared_mutex>
 #include <vector>
+#include "common/compat.hpp"
 #include "common/connection_base.hpp"
 #include "common/handshake.hpp"
 #include "iocp_context.hpp"
 #include "shm.hpp"
 
-namespace datapath::windows {
+namespace datapath { namespace windows {
 	class pipe_listener;
 
 	class pipe_connection : public datapath::detail::connection_base, public io_target, public poll_target {
@@ -23,7 +23,7 @@ namespace datapath::windows {
 		enum class io_result { done, pending, failed };
 
 		std::shared_ptr<iocp_context> _ctx;
-		mutable std::shared_mutex     _handle_lock;
+		mutable datapath::detail::shared_mutex _handle_lock;
 		HANDLE                        _h;
 		bool                          _skip_on_success;
 
@@ -131,4 +131,4 @@ namespace datapath::windows {
 
 		void on_io(io_op* op, DWORD bytes, DWORD err) override;
 	};
-} // namespace datapath::windows
+}} // namespace datapath::windows

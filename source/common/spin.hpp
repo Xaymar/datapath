@@ -19,7 +19,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #define DATAPATH_CPU_RELAX() ((void)0)
 #endif
 
-namespace datapath::detail {
+namespace datapath { namespace detail {
 	struct cpu_relax {
 		void operator()() const noexcept
 		{
@@ -48,4 +48,4 @@ namespace datapath::detail {
 		}
 		block();
 	}
-} // namespace datapath::detail
+}} // namespace datapath::detail

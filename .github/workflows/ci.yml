@@ -87,6 +87,38 @@ jobs:
             os: macos-latest
             build_type: Release
 
+          # Older and newer C++ standards for the library (tests stay on C++17+).
+          # The -Werror flags catch C++14/17 language extensions GCC accepts in C++11 mode.
+          - name: Ubuntu 26.04 / GCC / C++11
+            os: ubuntu-latest
+            container: ubuntu:26.04
+            cxx: g++
+            build_type: Release
+            cxx_std: 11
+            cxxflags: -Werror=c++14-extensions -Werror=c++17-extensions
+
+          - name: Ubuntu 26.04 / Clang / C++23
+            os: ubuntu-latest
+            container: ubuntu:26.04
+            cxx: clang++
+            build_type: Release
+            cxx_std: 23
+
+          - name: Windows / MSVC / C++14
+            os: windows-latest
+            build_type: Release
+            cxx_std: 14
+
+          - name: Windows / MSVC / C++latest
+            os: windows-latest
+            build_type: Release
+            cxx_std: 23
+
+          - name: macOS / AppleClang / C++11
+            os: macos-latest
+            build_type: Release
+            cxx_std: 11
+
           - name: macOS / AppleClang / Coverage
             os: macos-latest
             build_type: Debug
@@ -140,6 +172,7 @@ jobs:
             -DDATAPATH_BUILD_TESTS=ON
             -DDATAPATH_BUILD_SAMPLES=${{ matrix.samples || 'ON' }})
           if [ "$RUNNER_OS" != "Windows" ]; then args+=(-G Ninja); fi
+          if [ -n "${{ matrix.cxx_std }}" ]; then args+=("-DDATAPATH_CXX_STANDARD=${{ matrix.cxx_std }}"); fi
           if [ -n "${{ matrix.cxxflags }}" ]; then args+=("-DCMAKE_CXX_FLAGS=${{ matrix.cxxflags }}"); fi
           if [ -n "${{ matrix.ldflags }}" ]; then args+=("-DCMAKE_EXE_LINKER_FLAGS=${{ matrix.ldflags }}"); fi
           cmake "${args[@]}"

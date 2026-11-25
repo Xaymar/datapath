@@ -79,7 +79,7 @@ bool datapath::posix::uds_connection::start(bool handshake, std::weak_ptr<uds_li
 
 void datapath::posix::uds_connection::update_mask(uint32_t add, uint32_t remove)
 {
-	std::shared_lock<std::shared_mutex> fl(_fd_lock);
+	datapath::detail::shared_lock<datapath::detail::shared_mutex> fl(_fd_lock);
 	if (_fd < 0)
 		return;
 	std::lock_guard<std::mutex> l(_mask_lock);
@@ -101,7 +101,7 @@ void datapath::posix::uds_connection::read_loop()
 		ssize_t n;
 		int     err = 0;
 		{
-			std::shared_lock<std::shared_mutex> fl(_fd_lock);
+			datapath::detail::shared_lock<datapath::detail::shared_mutex> fl(_fd_lock);
 			if (_fd < 0) {
 				n   = -1;
 				err = EBADF;
@@ -149,7 +149,7 @@ void datapath::posix::uds_connection::write_loop()
 		ssize_t n;
 		int     err = 0;
 		{
-			std::shared_lock<std::shared_mutex> fl(_fd_lock);
+			datapath::detail::shared_lock<datapath::detail::shared_mutex> fl(_fd_lock);
 			if (_fd < 0)
 				return;
 			n   = ::send(_fd, _wbatch.data() + _woff, _wbatch.size() - _woff, send_flags);
@@ -179,7 +179,7 @@ void datapath::posix::uds_connection::hello_read()
 		ssize_t n;
 		int     err = 0;
 		{
-			std::shared_lock<std::shared_mutex> fl(_fd_lock);
+			datapath::detail::shared_lock<datapath::detail::shared_mutex> fl(_fd_lock);
 			if (_fd < 0)
 				return;
 			n   = ::recv(_fd, _hello + _hello_got, _hello_need - _hello_got, MSG_DONTWAIT);
@@ -219,7 +219,7 @@ void datapath::posix::uds_connection::hello_read()
 					// Decided before the connection is offered, so that its read
 					// chain already knows which path to read. Without it, or if the
 					// objects can't be made, the connection stays on the socket.
-					std::shared_lock<std::shared_mutex> fl(_fd_lock);
+					datapath::detail::shared_lock<datapath::detail::shared_mutex> fl(_fd_lock);
 					if (_fd >= 0
 						&& shm_link::create(_shm, _fd, _shm_size, limit, _max_queued, _offer, _offer_fds)
 							   == datapath::error::Success)
@@ -287,7 +287,7 @@ bool datapath::posix::uds_connection::send_reply_with_fds()
 		ssize_t r;
 		int     err = 0;
 		{
-			std::shared_lock<std::shared_mutex> fl(_fd_lock);
+			datapath::detail::shared_lock<datapath::detail::shared_mutex> fl(_fd_lock);
 			if (_fd < 0)
 				return false;
 			r   = ::sendmsg(_fd, &msg, send_flags);
@@ -308,7 +308,7 @@ bool datapath::posix::uds_connection::send_reply_with_fds()
 void datapath::posix::uds_connection::platform_close()
 {
 	{
-		std::unique_lock<std::shared_mutex> fl(_fd_lock);
+		std::unique_lock<datapath::detail::shared_mutex> fl(_fd_lock);
 		if (_data_waker)
 			_loop.remove_fd(_data_waker->fd);
 		if (_space_waker)
@@ -374,7 +374,7 @@ size_t datapath::posix::uds_connection::platform_write_direct(const uint8_t* hea
 		ssize_t r;
 		int     err = 0;
 		{
-			std::shared_lock<std::shared_mutex> fl(_fd_lock);
+			datapath::detail::shared_lock<datapath::detail::shared_mutex> fl(_fd_lock);
 			if (_fd < 0)
 				return sent;
 			r   = ::sendmsg(_fd, &msg, send_flags);
@@ -439,7 +439,7 @@ void datapath::posix::uds_connection::on_post(int kind)
 			_loop.remove_poller(this);
 		finish_close();
 		{
-			std::shared_lock<std::shared_mutex> fl(_fd_lock);
+			datapath::detail::shared_lock<datapath::detail::shared_mutex> fl(_fd_lock);
 			if (_data_waker)
 				_loop.unregister(_data_waker.get());
 			if (_space_waker)
@@ -528,7 +528,7 @@ void datapath::posix::uds_connection::start_shm_reading()
 	char    probe;
 	ssize_t r;
 	{
-		std::shared_lock<std::shared_mutex> fl(_fd_lock);
+		datapath::detail::shared_lock<datapath::detail::shared_mutex> fl(_fd_lock);
 		r = _fd < 0 ? 0 : ::recv(_fd, &probe, 1, MSG_PEEK | MSG_DONTWAIT);
 	}
 	if (r == 0 || (r < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR))
@@ -555,7 +555,7 @@ bool datapath::posix::uds_connection::add_waker(bool space)
 	// it from the loop, or ran before and nothing is registered.
 	auto                                w = std::make_shared<waker>(self(), space,
 																	space ? _shm->tx_space_fd() : _shm->rx_data_fd());
-	std::unique_lock<std::shared_mutex> fl(_fd_lock);
+	std::unique_lock<datapath::detail::shared_mutex> fl(_fd_lock);
 	if (_fd < 0)
 		return true; // closed: k_closed follows
 	if (!_loop.add(w->fd, ev::in, w))

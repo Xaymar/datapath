@@ -23,7 +23,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include "framing.hpp"
 #include "send_queue.hpp"
 
-namespace datapath::detail {
+namespace datapath { namespace detail {
 	class connection_base : public connection, public std::enable_shared_from_this<connection_base> {
 		std::mutex                       _handler_lock;
 		// Held while user callbacks run; release() takes it to wait them out.
@@ -230,4 +230,4 @@ namespace datapath::detail {
 			return _queue.limit();
 		}
 	};
-} // namespace datapath::detail
+}} // namespace datapath::detail

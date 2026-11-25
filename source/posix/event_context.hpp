@@ -15,7 +15,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <vector>
 #include "common/detail.hpp"
 
-namespace datapath::posix {
+namespace datapath { namespace posix {
 	// Anything registered with an event loop.
 	class fd_target {
 		public:
@@ -143,4 +143,4 @@ namespace datapath::posix {
 							   const datapath::options& options) override;
 		void            shutdown() override;
 	};
-} // namespace datapath::posix
+}} // namespace datapath::posix

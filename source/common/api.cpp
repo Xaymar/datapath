@@ -134,7 +134,7 @@ void datapath::server::on_accept(accept_handler handler)
 		_impl->set_accept_handler(nullptr);
 		return;
 	}
-	_impl->set_accept_handler([handler = std::move(handler)](std::shared_ptr<detail::connection> conn) {
+	_impl->set_accept_handler([handler](std::shared_ptr<detail::connection> conn) {
 		return handler(std::make_shared<datapath::socket>(std::move(conn)));
 	});
 }

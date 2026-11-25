@@ -81,6 +81,8 @@ struct datapath::detail::shm::ring_pair::cursor {
 	size_t             i   = 0;
 	size_t             off = 0;
 
+	cursor(const buffer_view* p, size_t n) noexcept : parts(p), count(n) {}
+
 	const uint8_t* ptr()
 	{
 		while (i < count && off == parts[i].size)

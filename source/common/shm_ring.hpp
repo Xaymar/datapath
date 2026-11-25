@@ -37,8 +37,9 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <type_traits>
 #include <vector>
 #include <datapath/socket.hpp>
+#include "compat.hpp"
 
-namespace datapath::detail::shm {
+namespace datapath { namespace detail { namespace shm {
 	constexpr uint32_t magic       = 0x4d535044; // "DPSM"
 	constexpr uint32_t version     = 1;
 	constexpr uint64_t min_ring    = uint64_t(64) << 10;
@@ -63,8 +64,8 @@ namespace datapath::detail::shm {
 		uint32_t flags;
 		ring_ctl ring[2]; // [0] server -> client, [1] client -> server
 	};
-	static_assert(std::atomic<uint64_t>::is_always_lock_free, "shared atomics must be lock-free");
-	static_assert(std::atomic<uint32_t>::is_always_lock_free, "shared atomics must be lock-free");
+	static_assert(DATAPATH_ATOMIC_ALWAYS_LOCK_FREE(uint64_t), "shared atomics must be lock-free");
+	static_assert(DATAPATH_ATOMIC_ALWAYS_LOCK_FREE(uint32_t), "shared atomics must be lock-free");
 	static_assert(sizeof(section_header) <= data_offset, "header must fit before the rings");
 
 	// Ring size for a requested size: a power of two in [min_ring, max_ring].
@@ -160,11 +161,11 @@ namespace datapath::detail::shm {
 		template<typename F>
 		int poll(F&& deliver)
 		{
-			using fn = std::remove_reference_t<F>;
+			using fn = typename std::remove_reference<F>::type;
 			return poll_impl([](void* c, const uint8_t* d, size_t n) -> bool { return (*static_cast<fn*>(c))(d, n); },
 							 const_cast<void*>(static_cast<const void*>(&deliver)));
 		}
 		// Before blocking: set reader_waiting and recheck. True = may block.
 		bool prepare_block();
 	};
-} // namespace datapath::detail::shm
+}}} // namespace datapath::detail::shm

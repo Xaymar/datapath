@@ -102,11 +102,12 @@ bool datapath::posix::event_loop::start()
 		return false;
 	// The thread keeps its context alive, so the context is never destroyed on
 	// one of its own I/O threads.
-	_thread = std::thread([this, keep = _ctx->shared_from_this()] {
-		tl_context = keep.get();
+	auto keep = _ctx->shared_from_this();
+	_thread   = std::thread([this, keep] {
+        tl_context = keep.get();
 		apply_thread_priority(keep->priority());
 		run();
-	});
+    });
 	return true;
 }
 
@@ -251,7 +252,7 @@ datapath::posix::event_context::~event_context()
 bool datapath::posix::event_context::start()
 {
 	for (size_t i = 0; i < _opts.io_threads; i++) {
-		_loops.push_back(std::make_unique<event_loop>(this));
+		_loops.push_back(datapath::detail::make_unique<event_loop>(this));
 		if (!_loops.back()->start())
 			return false;
 	}
@@ -267,7 +268,8 @@ void datapath::posix::event_context::add_member(std::weak_ptr<datapath::detail::
 {
 	std::lock_guard<std::mutex> l(_members_lock);
 	if (_connections.size() >= 64 && (_connections.size() & (_connections.size() - 1)) == 0)
-		_connections.erase(std::remove_if(_connections.begin(), _connections.end(), [](auto& w) { return w.expired(); }),
+		_connections.erase(std::remove_if(_connections.begin(), _connections.end(),
+										  [](const decltype(_connections)::value_type& w) { return w.expired(); }),
 						   _connections.end());
 	_connections.push_back(std::move(c));
 }
@@ -275,7 +277,8 @@ void datapath::posix::event_context::add_member(std::weak_ptr<datapath::detail::
 void datapath::posix::event_context::add_member(std::weak_ptr<datapath::detail::listener> l)
 {
 	std::lock_guard<std::mutex> g(_members_lock);
-	_listeners.erase(std::remove_if(_listeners.begin(), _listeners.end(), [](auto& w) { return w.expired(); }),
+	_listeners.erase(std::remove_if(_listeners.begin(), _listeners.end(),
+									[](const decltype(_listeners)::value_type& w) { return w.expired(); }),
 					 _listeners.end());
 	_listeners.push_back(std::move(l));
 }
@@ -292,7 +295,8 @@ void datapath::posix::event_context::shutdown()
 	if (on_io_thread()) {
 		// An I/O thread cannot join itself, and its caller's stack still uses
 		// objects the teardown would free: finish on a separate thread.
-		std::thread([self = shared_from_this()] { self->shutdown_now(); }).detach();
+		auto self = shared_from_this();
+		std::thread([self] { self->shutdown_now(); }).detach();
 		return;
 	}
 	shutdown_now();
@@ -505,7 +509,7 @@ datapath::error datapath::posix::event_context::listen(std::shared_ptr<datapath:
 	socket_address addr;
 	if (!make_socket_address(path, addr))
 		return datapath::error::InvalidPath;
-	auto lst = std::make_shared<uds_listener>(shared_from_this(), pick_loop(), std::move(addr), opts);
+	auto lst = datapath::detail::make_shared_self<uds_listener>(shared_from_this(), pick_loop(), std::move(addr), opts);
 	auto ec  = lst->create();
 	if (ec != datapath::error::Success) {
 		lst->close();

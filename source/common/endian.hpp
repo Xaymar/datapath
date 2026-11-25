@@ -8,7 +8,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 #include <cstdint>
 
-namespace datapath::detail {
+namespace datapath { namespace detail {
 	inline void store_le64(uint8_t* p, uint64_t v) noexcept
 	{
 		for (int i = 0; i < 8; i++)
@@ -33,4 +33,4 @@ namespace datapath::detail {
 			v |= uint32_t(p[i]) << (8 * i);
 		return v;
 	}
-} // namespace datapath::detail
+}} // namespace datapath::detail

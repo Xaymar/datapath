@@ -19,7 +19,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <vector>
 #include "endian.hpp"
 
-namespace datapath::detail {
+namespace datapath { namespace detail {
 	constexpr size_t frame_header_size = 8;
 
 	inline void encode_frame_header(uint8_t* out, uint64_t length) noexcept
@@ -75,15 +75,22 @@ namespace datapath::detail {
 			_wpos = n;
 		}
 
+		// A deliver callback may return bool (false stops parsing) or nothing.
+		template<typename F>
+		static bool call_as(F& deliver, const uint8_t* data, size_t size, std::true_type)
+		{
+			return deliver(data, size);
+		}
+		template<typename F>
+		static bool call_as(F& deliver, const uint8_t* data, size_t size, std::false_type)
+		{
+			deliver(data, size);
+			return true;
+		}
 		template<typename F>
 		static bool call(F& deliver, const uint8_t* data, size_t size)
 		{
-			if constexpr (std::is_same_v<decltype(deliver(data, size)), bool>) {
-				return deliver(data, size);
-			} else {
-				deliver(data, size);
-				return true;
-			}
+			return call_as(deliver, data, size, std::is_same<decltype(deliver(data, size)), bool>());
 		}
 
 		public:
@@ -184,4 +191,4 @@ namespace datapath::detail {
 			return datapath::error::Success;
 		}
 	};
-} // namespace datapath::detail
+}} // namespace datapath::detail

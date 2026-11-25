@@ -278,8 +278,9 @@ bool datapath::windows::iocp_context::start()
 				_restore_mask = process & ~DWORD_PTR(avoid);
 		}
 	}
+	auto keep = shared_from_this();
 	for (size_t i = 0; i < _opts.io_threads; i++)
-		_threads.emplace_back([this, i, cores, avoid, keep = shared_from_this()] {
+		_threads.emplace_back([this, i, cores, avoid, keep] {
 			tl_context = keep.get();
 			tl_index   = int(i);
 			apply_ideal_core(_opts, cores, avoid, i);
@@ -465,7 +466,8 @@ void datapath::windows::iocp_context::add_member(std::weak_ptr<datapath::detail:
 {
 	std::lock_guard<std::mutex> l(_members_lock);
 	if (_connections.size() >= 64 && (_connections.size() & (_connections.size() - 1)) == 0)
-		_connections.erase(std::remove_if(_connections.begin(), _connections.end(), [](auto& w) { return w.expired(); }),
+		_connections.erase(std::remove_if(_connections.begin(), _connections.end(),
+										  [](const decltype(_connections)::value_type& w) { return w.expired(); }),
 						   _connections.end());
 	_connections.push_back(std::move(c));
 }
@@ -473,7 +475,8 @@ void datapath::windows::iocp_context::add_member(std::weak_ptr<datapath::detail:
 void datapath::windows::iocp_context::add_member(std::weak_ptr<datapath::detail::listener> l)
 {
 	std::lock_guard<std::mutex> g(_members_lock);
-	_listeners.erase(std::remove_if(_listeners.begin(), _listeners.end(), [](auto& w) { return w.expired(); }),
+	_listeners.erase(std::remove_if(_listeners.begin(), _listeners.end(),
+									[](const decltype(_listeners)::value_type& w) { return w.expired(); }),
 					 _listeners.end());
 	_listeners.push_back(std::move(l));
 }
@@ -493,7 +496,8 @@ void datapath::windows::iocp_context::add_poller(std::shared_ptr<poll_target> t)
 void datapath::windows::iocp_context::remove_poller(poll_target* t)
 {
 	std::lock_guard<std::mutex> l(_poll_lock);
-	_pollers.erase(std::remove_if(_pollers.begin(), _pollers.end(), [t](auto& p) { return p.get() == t; }),
+	_pollers.erase(std::remove_if(_pollers.begin(), _pollers.end(),
+								  [t](const decltype(_pollers)::value_type& p) { return p.get() == t; }),
 				   _pollers.end());
 	_poll_version.fetch_add(1, std::memory_order_release);
 }
@@ -522,7 +526,8 @@ void datapath::windows::iocp_context::shutdown()
 	if (on_io_thread()) {
 		// An I/O thread cannot drain completions it is supposed to process, nor
 		// join itself: finish on a separate thread.
-		std::thread([self = shared_from_this()] { self->shutdown_now(); }).detach();
+		auto self = shared_from_this();
+		std::thread([self] { self->shutdown_now(); }).detach();
 		return;
 	}
 	shutdown_now();
@@ -722,7 +727,7 @@ datapath::error datapath::windows::iocp_context::listen(std::shared_ptr<datapath
 	std::wstring wpath;
 	if (!make_pipe_path(path, wpath))
 		return datapath::error::InvalidPath;
-	auto lst = std::make_shared<pipe_listener>(shared_from_this(), std::move(wpath), opts);
+	auto lst = datapath::detail::make_shared_self<pipe_listener>(shared_from_this(), std::move(wpath), opts);
 	auto ec  = lst->create();
 	if (ec != datapath::error::Success) {
 		lst->close();

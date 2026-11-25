@@ -10,16 +10,17 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <memory>
 #include <mutex>
 #include <vector>
+#include "common/compat.hpp"
 #include "common/detail.hpp"
 #include "event_context.hpp"
 #include "path.hpp"
 
-namespace datapath::posix {
+namespace datapath { namespace posix {
 	class uds_connection;
 
 	class uds_listener : public datapath::detail::listener,
 						 public fd_target,
-						 public std::enable_shared_from_this<uds_listener> {
+						 public datapath::detail::enable_weak_from_this<uds_listener> {
 		enum post_kind : int { k_offer = 1 };
 
 		std::shared_ptr<event_context> _ctx;
@@ -57,4 +58,4 @@ namespace datapath::posix {
 		void on_event(uint32_t events) override;
 		void on_post(int kind) override;
 	};
-} // namespace datapath::posix
+}} // namespace datapath::posix

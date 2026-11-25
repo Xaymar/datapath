@@ -13,7 +13,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <memory>
 #include <string>
 
-namespace datapath::detail {
+namespace datapath { namespace detail {
 	class connection {
 		public:
 		virtual ~connection() = default;
@@ -56,4 +56,4 @@ namespace datapath::detail {
 	};
 
 	std::shared_ptr<context_impl> make_platform_context(const datapath::context_options& options);
-} // namespace datapath::detail
+}} // namespace datapath::detail

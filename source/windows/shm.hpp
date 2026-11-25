@@ -32,7 +32,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include "common/shm_ring.hpp"
 #include "win.hpp"
 
-namespace datapath::windows {
+namespace datapath { namespace windows {
 	constexpr size_t shm_offer_size = datapath::detail::shm::offer_size;
 
 	// Arm a wait completion packet: `ov` is queued to `port` once `event` is
@@ -95,4 +95,4 @@ namespace datapath::windows {
 		// Signal both events this side waits on, so armed packets fire (close).
 		void wake_self() noexcept;
 	};
-} // namespace datapath::windows
+}} // namespace datapath::windows
