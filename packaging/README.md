@@ -26,7 +26,9 @@ For a new version:
    `vcpkg format-manifest ports/xaymar-datapath/vcpkg.json`, commit, run
    `vcpkg x-add-version xaymar-datapath`, commit again, and open the PR.
 
-## Conan Center: `conan/recipes/com.xaymar.datapath`
+## Conan Center: `conan/recipes/xaymar-datapath`
+
+Same name as the vcpkg port.
 
 Laid out as in conan-center-index (`config.yml`, `all/conanfile.py`,
 `all/conandata.yml`, `all/test_package`). The release workflow runs
@@ -37,6 +39,6 @@ For a new version:
 1. Add the version to `config.yml` and to `all/conandata.yml`, with the
    SHA-256 of `https://github.com/Xaymar/datapath/archive/refs/tags/vX.Y.Z.tar.gz`
    (`curl -L <url> | sha256sum`).
-2. `conan create packaging/conan/recipes/com.xaymar.datapath/all --version X.Y.Z --build=missing`
+2. `conan create packaging/conan/recipes/xaymar-datapath/all --version X.Y.Z --build=missing`
 3. In a fork of conan-io/conan-center-index: copy the recipe folder to
-   `recipes/com.xaymar.datapath` and open the PR.
+   `recipes/xaymar-datapath` and open the PR.

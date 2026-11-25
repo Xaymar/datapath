@@ -10,7 +10,7 @@ required_conan_version = ">=2.0.9"
 
 
 class DataPathConan(ConanFile):
-    name = "com.xaymar.datapath"
+    name = "xaymar-datapath"
     description = "High performance, low latency IPC library (named pipes, Unix domain sockets, shared memory)"
     license = "BSD-3-Clause"
     url = "https://github.com/conan-io/conan-center-index"

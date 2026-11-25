@@ -169,7 +169,7 @@ jobs:
           pipx install conan
           conan profile detect
           # Point the recipe at this run's source tarball instead of the tag archive.
-          recipe=packaging/conan/recipes/com.xaymar.datapath/all
+          recipe=packaging/conan/recipes/xaymar-datapath/all
           tarball=$(ls "$PWD"/dist/*.tar.gz)
           sha=$(sha256sum "$tarball" | cut -d' ' -f1)
           version="${{ needs.version.outputs.version }}"
