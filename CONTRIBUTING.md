@@ -78,7 +78,7 @@ DataPath follows [Semantic Versioning](https://semver.org): MAJOR changes on any
 1. Bump the version (see Versioning) in a pull request and merge it.
 2. Tag the merge commit `vX.Y.Z` and push the tag. `.github/workflows/release.yml` checks that every package carries that version, builds everything, runs `npm publish --dry-run`, `cargo publish --dry-run` and `twine check`, and creates a draft GitHub Release with the source tarball and prebuilt C/C++ archives (static and shared, Release and Debug).
 3. Start `release.yml` by hand on the tag with target `test` to upload to TestPyPI first, then with target `release` to publish to PyPI, npm and crates.io. Each registry's GitHub environment (`testpypi`, `pypi`, `npm`, `crates-io`) can require approval.
-4. Publish the draft GitHub Release, then update the vcpkg port and Conan recipe in `packaging/` (see [packaging/README.md](packaging/README.md)).
+4. Publish the draft GitHub Release. C/C++ users consume the release archives (CMake `find_package(datapath)` or pkg-config) or the tag through FetchContent; there are no vcpkg, Conan or distribution packages.
 
 ## Pull requests
 * Keep a pull request to one change, and say in the description what you measured before and after if it touches the data path.

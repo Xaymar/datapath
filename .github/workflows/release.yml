@@ -87,8 +87,6 @@ jobs:
             echo '```'
             cat "$name.tar.gz.sha256"
             echo '```'
-            echo "vcpkg and Conan Center download GitHub's own tag archive"
-            echo "(archive/refs/tags/v${{ needs.version.outputs.version }}.tar.gz), whose hash differs; see packaging/README.md."
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
@@ -150,32 +148,6 @@ jobs:
           name: cpp-${{ matrix.platform }}
           path: dist/*
           if-no-files-found: error
-
-  conan:
-    name: Conan recipe
-    needs: [version, source]
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: cpp-source
-          path: dist
-      - name: conan create (static, shared, C++11)
-        shell: bash
-        run: |
-          set -euo pipefail
-          pipx install conan
-          conan profile detect
-          # Point the recipe at this run's source tarball instead of the tag archive.
-          recipe=packaging/conan/recipes/xaymar-datapath/all
-          tarball=$(ls "$PWD"/dist/*.tar.gz)
-          sha=$(sha256sum "$tarball" | cut -d' ' -f1)
-          version="${{ needs.version.outputs.version }}"
-          printf 'sources:\n  "%s":\n    url: "file://%s"\n    sha256: "%s"\n' "$version" "$tarball" "$sha" > "$recipe/conandata.yml"
-          conan create "$recipe" --version "$version" --build=missing
-          conan create "$recipe" --version "$version" --build=missing -o '*:shared=True'
-          conan create "$recipe" --version "$version" --build=missing -s compiler.cppstd=11
 
   # Python --------------------------------------------------------------------
 
@@ -365,7 +337,7 @@ jobs:
   github-release:
     name: Draft GitHub Release
     if: needs.version.outputs.is_tag == 'true'
-    needs: [version, source, cpp, conan, python-check, npm-dry-run, rust]
+    needs: [version, source, cpp, python-check, npm-dry-run, rust]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
