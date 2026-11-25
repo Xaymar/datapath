@@ -16,8 +16,9 @@ enable_testing()
 foreach(lang c cpp)
 	add_executable(consumer_${lang} main.${lang})
 	target_link_libraries(consumer_${lang} PRIVATE datapath::datapath)
-	if(WIN32)
-		# Put the DataPath DLL next to the program so it runs from the build tree.
+	if(WIN32 AND DATAPATH_SHARED_LIBRARY)
+		# Put the DataPath DLL next to the program so it runs from the build tree
+		# (a static build has no DLL, and copy_if_different fails on an empty list).
 		add_custom_command(TARGET consumer_${lang} POST_BUILD
 			COMMAND ${CMAKE_COMMAND} -E copy_if_different
 				$<TARGET_RUNTIME_DLLS:consumer_${lang}> $<TARGET_FILE_DIR:consumer_${lang}>
