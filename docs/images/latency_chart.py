@@ -11,17 +11,24 @@ import os
 
 SIZES = ["16 B", "64 B", "256 B", "1 KiB", "4 KiB", "16 KiB", "64 KiB", "256 KiB", "1 MiB"]
 
-# panel title -> one entry per size: ((median, lo, hi) for DataPath,
-# libuv as shipped, libuv + policy[, Chromium Mojo bindings]). median = median p99.9 of the runs,
+# panel title -> one entry per size: one (median, lo, hi) per series, in the
+# order of the chart's "series" list (keys of SERIES below); None where a series
+# has no result for that size. median = median p99.9 of the runs,
 # lo/hi = lowest/highest p99.9 of any run (the benchmark's "p99.9 lo/hi").
 def _rows(*series):
     # each series is (medians, lows, highs), one value per size
     return [tuple(tuple(s[k][i] for k in range(3)) for s in series) for i in range(len(series[0][0]))]
 
 
+def _missing():
+    # a series that has no result at any size (did not finish)
+    return ([None] * len(SIZES), [None] * len(SIZES), [None] * len(SIZES))
+
+
 CHARTS = {
     "latency-p999-windows.svg": {
         "label": "Windows (Irkela)",
+        "series": ["dp", "uv", "up", "ci", "bi"],
         "panels": {
             "idle, --pin 8,12": _rows(
                 ([8.2, 2.2, 2.1, 2.6, 4.1, 8.6, 18.9, 42.3, 130.1],
@@ -33,6 +40,13 @@ CHARTS = {
                 ([15.7, 15.2, 15.1, 15.2, 22.2, 34.6, 73.5, 278.9, 9659.3],
                  [15.2, 14.9, 14.9, 14.7, 21.9, 33.2, 54.5, 271.6, 5033.4],
                  [16.1, 15.9, 15.8, 17.4, 23.3, 34.8, 76.4, 357.6, 15599.3]),
+                # cpp-ipc and Boost.Interprocess as shipped: 2026-11-25, commit 31766bc
+                ([16.8, 18.0, 28.2, 27.5, 30.6, 42.5, 152.5, 104.4, 569.1],
+                 [9.6, 11.3, 26.4, 27.1, 28.7, 41.4, 68.4, 87.6, 446.3],
+                 [18.3, 19.6, 32.3, 31.9, 33.2, 47.7, 190.8, 344.7, 771.1]),
+                ([0.7, 1.1, 1.5, 1.1, 4.1, 28.9, 54.5, 207.9, 6310.1],
+                 [0.6, 0.9, 1.1, 0.9, 3.6, 13.9, 19.8, 94.8, 1182.2],
+                 [3.1, 3.2, 3.5, 1.5, 10.1, 33.2, 58.3, 43150.6, 44969.1]),
             ),
             # DataPath: three invocations of --runs 5; mark = median of the three
             # medians, whisker = lowest/highest p99.9 of all 15 runs.
@@ -46,17 +60,20 @@ CHARTS = {
                 ([104.7, 103.8, 113.9, 110.9, 187.2, 273.2, 652.9, 7468.7, 31434.5],
                  [103.6, 97.4, 106.4, 109.8, 179.7, 247.7, 529.5, 4939.1, 30686.2],
                  [123.9, 107.1, 123.2, 159.7, 193.4, 1155.7, 670.0, 10480.6, 31721.5]),
+                # cpp-ipc and Boost.Interprocess as shipped did not finish 16 B in 30 minutes
+                _missing(), _missing(),
             ),
         },
         "footnotes": [
             "Ping-pong between two processes, release builds, 2026-11-23, commit df30376, DataPath with options::shared_memory.",
             "Mark: median p99.9 of 5 runs (DataPath under stress: median of 3 x 5 runs); whisker: lowest to highest p99.9 of any run.",
+            "cpp-ipc 2e28547 and Boost.Interprocess 1.92 message_queue as shipped: 2026-11-25; neither finished 16 B under stress in 30 minutes.",
             "Irkela (client cpu8, server cpu12: different cores; one CCD): Ryzen 9 7940HS 8C/16T, Windows 10 22H2, Balanced.",
         ],
     },
     "latency-p999-linux.svg": {
         "label": "Linux (merenka-gpu0)",
-        "series": 4,
+        "series": ["dp", "uv", "up", "mj", "ci", "bi"],
         "panels": {
             "idle, --pin 1,5": _rows(
                 ([1.18, 1.43, 1.43, 1.83, 3.44, 8.93, 21.98, 76.59, 321.33],
@@ -70,6 +87,13 @@ CHARTS = {
                  [13.84, 13.74, 14.41, 15.65, 21.05, 28.17, 57.61, 143.68, 577.22]),
                 # Chromium Mojo bindings on the main thread: one invocation, no per-run spread
                 ([60.5, 61.7, 62.5, 63.1, 72.8, 86.6, 439, 2003, 8704], [60.5, 61.7, 62.5, 63.1, 72.8, 86.6, 439, 2003, 8704], [60.5, 61.7, 62.5, 63.1, 72.8, 86.6, 439, 2003, 8704]),
+                # cpp-ipc and Boost.Interprocess as shipped: 2026-11-25, commit a6a8085
+                ([4.74, 4.74, 6.98, 7.16, 8.22, 12.48, 28.72, 168.59, 340.55],
+                 [4.71, 4.71, 6.88, 6.93, 8.2, 12.34, 26.87, 92.76, 335.66],
+                 [4.84, 4.87, 7.12, 7.21, 8.59, 12.81, 31.64, 172.54, 354.74]),
+                ([31.84, 32.2, 31.37, 31.75, 40.88, 57.88, 128.32, 402.58, 1154.52],
+                 [31.08, 31.3, 31.17, 31.48, 37.58, 54.26, 127.91, 396.11, 1138.85],
+                 [40.86, 34.36, 34.94, 32.39, 55.43, 64.42, 128.79, 415.48, 1277.86]),
             ),
             # DataPath: three invocations of --runs 5; mark = median of the three
             # medians, whisker = lowest/highest p99.9 of all 15 runs.
@@ -84,22 +108,49 @@ CHARTS = {
                  [354.75, 2956.09, 626.38, 3266.77, 4569.23, 4711.27, 4381.94, 7285.19, 12568.06],
                  [4086.44, 3888.66, 3669.02, 3992.47, 5628.01, 5171.00, 4996.95, 7786.79, 14202.71]),
                 ([7579, 7852, 7867, 7853, 7997, 8127, 10082, 19179, 53033], [7579, 7852, 7867, 7853, 7997, 8127, 10082, 19179, 53033], [7579, 7852, 7867, 7853, 7997, 8127, 10082, 19179, 53033]),
+                # cpp-ipc as shipped: three invocations, none got past 4 KiB in 30 minutes
+                ([7920.64, 5758.12, 7995.38, 7999.01, 8014.86, None, None, None, None],
+                 [4040.38, 4074.47, 7960.06, 7966.73, 7995.62, None, None, None, None],
+                 [7979.94, 7957.7, 8014.29, 8016.63, 8023.89, None, None, None, None]),
+                # Boost.Interprocess as shipped: one invocation
+                ([385.22, 464.04, 369.4, 370.3, 312.51, 3007.89, 4687.67, 10829.08, 18060.99],
+                 [335.07, 256.82, 347.79, 324.94, 231.45, 825.91, 4523.17, 9928.26, 6689.31],
+                 [1676.73, 753.6, 527.79, 728.18, 854.45, 4052.85, 5289.63, 11775.37, 18921.57]),
             ),
         },
         "footnotes": [
             "Ping-pong between two processes, release builds, 2026-11-23, commit cdc663a, DataPath with options::shared_memory.",
             "Mark: median p99.9 of 5 runs (DataPath under stress: median of 3 x 5 runs); whisker: lowest to highest p99.9 of any run.",
             "Chromium Mojo (a57585d): mojom bindings on the main thread, as browser code uses them; one invocation of 5 runs, so no whisker.",
+            "cpp-ipc 2e28547 and Boost.Interprocess 1.92 message_queue as shipped: 2026-11-25; cpp-ipc under stress: median of 3 invocations,",
+            "none of which got past 4 KiB in 30 minutes.",
             "merenka-gpu0 (client cpu1, server cpu5: different cores and CCDs): EPYC 7313P container 8C/16T, Linux 6.12, GCC 15.2.",
         ],
     },
 }
 
-SERIES = [("dp", "DataPath (shared memory)"), ("uv", "libuv as shipped"), ("up", "libuv + DataPath's spin/priority"),
-          ("mj", "Chromium Mojo (bindings)")]
+SERIES = {
+    "dp": "DataPath (shared memory)",
+    "uv": "libuv as shipped",
+    "up": "libuv + DataPath's spin/priority",
+    "mj": "Chromium Mojo (bindings)",
+    "ci": "cpp-ipc as shipped",
+    "bi": "Boost.Interprocess as shipped",
+}
+NAMES = {"uv": "libuv", "mj": "Chromium Mojo", "ci": "cpp-ipc", "bi": "Boost.Interprocess"}
+COLOURS = {  # light, dark
+    "dp": ("#2a78d6", "#3987e5"),
+    "uv": ("#eb6834", "#d95926"),
+    "up": ("#1baf7a", "#199e70"),
+    "mj": ("#8a5cc7", "#a37ae0"),
+    "ci": ("#c93f8a", "#e0629f"),
+    "bi": ("#9c7a12", "#c9a227"),
+}
+# drawn back to front, so DataPath ends up on top
+DRAW_ORDER = ["mj", "bi", "ci", "uv", "up", "dp"]
 
 W, X0, X1 = 760, 80.0, 728.0
-ROW, HEAD = 26, 27
+HEAD = 27
 
 
 def ticks(lo, hi):
@@ -127,48 +178,69 @@ def fmt(v):
 
 
 def marker(kind, x, y, title):
-    t = f"<title>{title}</title>"
+    t = f"<title>{title}</title>" if title else ""
     if kind == "dp":
-        return f'<circle class="dp m" cx="{x:.1f}" cy="{y - 4:.1f}" r="5">{t}</circle>'
+        return f'<circle class="dp m" cx="{x:.1f}" cy="{y:.1f}" r="5">{t}</circle>'
     if kind == "uv":
         return f'<rect class="uv m" x="{x - 4.5:.1f}" y="{y - 4.5:.1f}" width="9" height="9" rx="1.5">{t}</rect>'
     if kind == "mj":
-        return f'<path class="mj m" d="M{x:.1f},{y - 10:.1f} l6,10 l-12,0 z">{t}</path>'
-    return f'<path class="up m" d="M{x:.1f},{y - 2:.1f} l6,6 l-6,6 l-6,-6 z">{t}</path>'
+        return f'<path class="mj m" d="M{x:.1f},{y - 6:.1f} l6,10 l-12,0 z">{t}</path>'
+    if kind == "ci":
+        return f'<path class="ci m" d="M{x:.1f},{y + 6:.1f} l6,-10 l-12,0 z">{t}</path>'
+    if kind == "bi":
+        return (f'<path class="bi m" d="M{x - 2:.1f},{y - 6:.1f} h4 v4 h4 v4 h-4 v4 h-4 v-4 h-4 v-4 h4 z">'
+                f'{t}</path>')
+    return f'<path class="up m" d="M{x:.1f},{y - 6:.1f} l6,6 l-6,6 l-6,-6 z">{t}</path>'
 
 
-def draw(fname, label, DATA, FOOTNOTES, nser=3):
-    allv = [v for rows in DATA.values() for r in rows for s in r for v in s]
+def legend(keys):
+    # one row of entries, wrapping before the right edge; returns svg parts and rows used
+    out, x, y, rows = [], 21.0, 47.0, 1
+    for k in keys:
+        width = 30 + 6.6 * len(SERIES[k])
+        if x + width > W - 16:
+            x, y, rows = 21.0, y + 20, rows + 1
+        out.append(marker(k, x, y, None))
+        out.append(f'<text class="t3" x="{x + 10:.1f}" y="{y + 4:.0f}">{SERIES[k]}</text>')
+        x += width + 14
+    return out, rows
+
+
+def draw(fname, label, DATA, FOOTNOTES, keys):
+    allv = [v for rows in DATA.values() for r in rows for s in r for v in s if v is not None]
     lo, hi, tk = axis(allv)
     scale = (X1 - X0) / math.log10(hi / lo)
 
     def X(v):
         return X0 + math.log10(v / lo) * scale
 
+    # one lane per series inside each size row, 5 px apart
+    lane = {k: (i - (len(keys) - 1) / 2) * 5 for i, k in enumerate(keys)}
+    ROW = 8 + 5 * len(keys)
+    leg, leg_rows = legend(keys)
+    top = 78 + 20 * (leg_rows - 1)
     block = 10 + len(SIZES) * ROW + 13  # panel title to its axis labels
-    last_axis = 78 + (len(DATA) - 1) * (block + HEAD) + block
+    last_axis = top + (len(DATA) - 1) * (block + HEAD) + block
     height = last_axis + 23 + 15 * (len(FOOTNOTES) - 1) + 13
+    others = [NAMES[k] for k in keys if k in NAMES]
+    vs = ", ".join(others[:-1]) + " and " + others[-1] if len(others) > 1 else others[0]
+    css_vars = ";".join(f"--{k}:{COLOURS[k][0]}" for k in keys)
+    css_dark = ";".join(f"--{k}:{COLOURS[k][1]}" for k in keys)
     o = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {height}" width="{W}" height="{height}" role="img" '
-        f'aria-label="Round-trip p99.9 latency on {label}, DataPath over shared memory versus libuv, idle and under stress, 16 B to 1 MiB"><style>\n'
-        "svg{--bg:#fcfcfb;--t1:#0b0b0b;--t2:#52514e;--grid:#e6e5e1;--dp:#2a78d6;--uv:#eb6834;--up:#1baf7a;--mj:#8a5cc7}\n"
-        "@media (prefers-color-scheme: dark){svg{--bg:#1a1a19;--t1:#f0efec;--t2:#c3c2b7;--grid:#34332f;--dp:#3987e5;--uv:#d95926;--up:#199e70;--mj:#a37ae0}}\n"
+        f'aria-label="Round-trip p99.9 latency on {label}, DataPath over shared memory versus {vs}, idle and under stress, 16 B to 1 MiB"><style>\n'
+        f"svg{{--bg:#fcfcfb;--t1:#0b0b0b;--t2:#52514e;--grid:#e6e5e1;{css_vars}}}\n"
+        f"@media (prefers-color-scheme: dark){{svg{{--bg:#1a1a19;--t1:#f0efec;--t2:#c3c2b7;--grid:#34332f;{css_dark}}}}}\n"
         '.bg{fill:var(--bg)} text{font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif}\n'
         ".t1{font-size:16px;font-weight:600;fill:var(--t1)} .t2{font-size:13px;font-weight:600;fill:var(--t1)}\n"
         ".t3{font-size:12px;fill:var(--t2)} .t4{font-size:11px;fill:var(--t2);font-variant-numeric:tabular-nums}\n"
         ".grid{stroke:var(--grid);stroke-width:1} .wk{stroke-width:1.5;stroke-linecap:round;opacity:.55}\n"
-        ".m{stroke:var(--bg);stroke-width:2} .dp{fill:var(--dp)} .uv{fill:var(--uv)} .up{fill:var(--up)} .mj{fill:var(--mj)}\n"
-        ".wk.dp{stroke:var(--dp)} .wk.uv{stroke:var(--uv)} .wk.up{stroke:var(--up)} .wk.mj{stroke:var(--mj)}\n"
+        ".m{stroke:var(--bg);stroke-width:2} " + " ".join(f".{k}{{fill:var(--{k})}}" for k in keys) + "\n"
+        + " ".join(f".wk.{k}{{stroke:var(--{k})}}" for k in keys) + "\n"
         f'</style><rect class="bg" width="{W}" height="{height}" rx="6"/>',
         f'<text class="t1" x="16" y="28">{label}: round-trip latency, p99.9 (µs, log scale, lower is better)</text>',
-        '<circle class="dp m" cx="21.0" cy="47.0" r="5"></circle><text class="t3" x="31" y="51">DataPath (shared memory)</text>',
-        '<rect class="uv m" x="206.3" y="42.5" width="9" height="9" rx="1.5"></rect><text class="t3" x="220.8" y="51">libuv as shipped</text>',
-        '<path class="up m" d="M353.4,41.0 l6,6 l-6,6 l-6,-6 z"></path><text class="t3" x="363.4" y="51">libuv + DataPath\'s spin/priority</text>',
-    ]
-    if nser > 3:
-        o.append('<path class="mj m" d="M567.0,41.0 l6,10 l-12,0 z"></path><text class="t3" x="579" y="51">Chromium Mojo (bindings)</text>')
-        o[0] = o[0].replace("versus libuv,", "versus libuv and Chromium Mojo,")
-    y = 78
+    ] + leg
+    y = top
     for name, rows in DATA.items():
         assert len(rows) == len(SIZES), name
         o.append(f'<text class="t2" x="16" y="{y}">{name}</text>')
@@ -176,20 +248,21 @@ def draw(fname, label, DATA, FOOTNOTES, nser=3):
         for v in tk:
             o.append(f'<line class="grid" x1="{X(v):.1f}" x2="{X(v):.1f}" y1="{g0}" y2="{g1}"/>')
         for i, (size, vals) in enumerate(zip(SIZES, rows)):
-            ry = y + 27 + i * ROW
-            my = ry - 4
-            o.append(f'<text class="t3" x="70" y="{ry}.0" text-anchor="end">{size}</text>')
-            # libuv first so DataPath sits on top; marks are dodged vertically
-            order = (3, 1, 2, 0)[4 - nser:]
+            assert len(vals) == len(keys), (name, size)
+            my = g0 + i * ROW + ROW / 2
+            o.append(f'<text class="t3" x="70" y="{my + 4:.1f}" text-anchor="end">{size}</text>')
+            order = [k for k in DRAW_ORDER if k in keys]
             for k in order:
-                kind, slabel = SERIES[k]
-                med, lo_v, hi_v = vals[k]
-                wy = my + (-4, 0, 4, 0)[k]
-                o.append(f'<line class="wk {kind}" x1="{X(lo_v):.1f}" x2="{X(hi_v):.1f}" y1="{wy}" y2="{wy}"/>')
+                med, lo_v, hi_v = vals[keys.index(k)]
+                if med is None:
+                    continue
+                wy = my + lane[k]
+                o.append(f'<line class="wk {k}" x1="{X(lo_v):.1f}" x2="{X(hi_v):.1f}" y1="{wy:.1f}" y2="{wy:.1f}"/>')
             for k in order:
-                kind, slabel = SERIES[k]
-                med, lo_v, hi_v = vals[k]
-                o.append(marker(kind, X(med), my, f"{name}, {size}, {slabel}: {med:g} µs (runs {lo_v:g} to {hi_v:g})"))
+                med, lo_v, hi_v = vals[keys.index(k)]
+                if med is None:
+                    continue
+                o.append(marker(k, X(med), my + lane[k], f"{name}, {size}, {SERIES[k]}: {med:g} µs (runs {lo_v:g} to {hi_v:g})"))
         ay = g1 + 13
         for v in tk:
             o.append(f'<text class="t4" x="{X(v):.1f}" y="{ay}" text-anchor="middle">{fmt(v)}</text>')
@@ -206,7 +279,7 @@ def draw(fname, label, DATA, FOOTNOTES, nser=3):
 
 def main():
     for fname, c in CHARTS.items():
-        draw(fname, c["label"], c["panels"], c["footnotes"], c.get("series", 3))
+        draw(fname, c["label"], c["panels"], c["footnotes"], c["series"])
 
 
 if __name__ == "__main__":
