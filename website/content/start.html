@@ -12,7 +12,7 @@
 <section class="lang" data-lang="cpp">
 <h2>C++</h2>
 <h3>Install</h3>
-<p>DataPath is a small static library built with CMake 3.16+ and a C++17 compiler (MSVC 2019+, GCC 9+, Clang 10+). Pull it in with <code>FetchContent</code>:</p>
+<p>DataPath is a small static library built with CMake 3.16+ and any compiler from C++11 on (MSVC needs C++14, its lowest mode). It builds as C++17 by default; set <code>DATAPATH_CXX_STANDARD</code> (11, 14, 17, 20, 23) to pick another. Pull it in with <code>FetchContent</code>:</p>
 <pre><code class="language-cmake">include(FetchContent)
 FetchContent_Declare(datapath
     GIT_REPOSITORY https://github.com/Xaymar/datapath.git
