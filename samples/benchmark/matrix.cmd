@@ -76,4 +76,25 @@ if exist "%LIBUV%" (
 		"%LIBUV%" local --runs %RUNS% %%~A >> "%OUT%" 2>&1
 	)
 )
+rem The shared-memory competitors, if they were built: as shipped and with DataPath's policy.
+for %%O in (cppipc boost boost-native) do (
+	for %%D in ("%BENCH%") do set "OTHER=%%~dpD%%O-benchmark.exe"
+	call :other %%O
+)
 echo Results written to %OUT%
+goto :eof
+
+:other
+if not exist "%OTHER%" goto :eof
+for %%A in (
+	"--spin 0 --no-mmcss --priority 0"
+	"--priority 2"
+	"--stress 0 --spin 0 --no-mmcss --priority 0"
+	"--stress 0"
+) do (
+	echo.>> "%OUT%"
+	echo ==== %1 %%~A>> "%OUT%"
+	echo Running: %1 %%~A
+	"%OTHER%" local --runs %RUNS% %%~A >> "%OUT%" 2>&1
+)
+goto :eof

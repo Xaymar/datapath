@@ -33,4 +33,15 @@ if [ -x "$LIBUV" ]; then
 		"$LIBUV" local --runs "$RUNS" $opts >> "$OUT" 2>&1
 	done
 fi
+# Shared-memory competitors: as shipped and with DataPath's spin.
+for other in cppipc boost; do
+	EXE="$(dirname "$BENCH")/$other-benchmark"
+	[ -x "$EXE" ] || continue
+	for opts in "--spin 0 --no-mmcss --priority 0" "" "--stress 0 --spin 0 --no-mmcss --priority 0" "--stress 0"; do
+		printf '\n==== %s %s\n' "$other" "${opts:-defaults}" >> "$OUT"
+		echo "Running: $other ${opts:-defaults}"
+		# shellcheck disable=SC2086
+		"$EXE" local --runs "$RUNS" $opts >> "$OUT" 2>&1
+	done
+done
 echo "Results written to $OUT"

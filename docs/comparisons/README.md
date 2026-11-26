@@ -5,6 +5,8 @@ numbers line up:
 
 * [libuv](libuv.md): named pipes / Unix sockets through libuv 1.52.1, as shipped and with DataPath's scheduling policy.
 * [Chromium Mojo](mojo.md): raw message pipes, mojom bindings and BigBuffer.
+* [cpp-ipc](cpp-ipc.md): shared-memory channels (libipc), as shipped and with DataPath's spin.
+* [Boost.Interprocess](boost-interprocess.md): `message_queue`, as shipped and with DataPath's spin; on Windows also with native sync primitives.
 * [Memory bandwidth and placement](memory-bandwidth.md): why large messages cost what they cost, and how much CPU placement matters.
 
 ## Methodology
@@ -26,4 +28,4 @@ numbers line up:
 On Linux the container's `RLIMIT_NICE` is 0, so DataPath can't raise its I/O thread priority; the stress process is lowered instead. `std::thread::hardware_concurrency()` reports 32 there although the container has 16 CPUs, so `--stress 0` starts 32 threads; they keep about 14–15 CPUs busy (the harness warns "under half its CPU time", which is that artifact, not a light load).
 
 ## Reproducing
-`samples/benchmark` builds `datapath-benchmark` and, with `-DDATAPATH_BUILD_COMPARE=ON`, `libuv-benchmark`; [CONTRIBUTING.md](../../CONTRIBUTING.md#benchmarking) lists the options. The Mojo benchmark lives in a Chromium checkout; its source and build steps are in [mojo/](mojo/README.md). `membw.cpp` is the memcpy benchmark behind the memory-bandwidth note.
+`samples/benchmark` builds `datapath-benchmark` and, with `-DDATAPATH_BUILD_COMPARE=ON`, `libuv-benchmark`, `cppipc-benchmark` and `boost-benchmark` (plus `boost-native-benchmark` on Windows); [CONTRIBUTING.md](../../CONTRIBUTING.md#benchmarking) lists the options. The Mojo benchmark lives in a Chromium checkout; its source and build steps are in [mojo/](mojo/README.md). `membw.cpp` is the memcpy benchmark behind the memory-bandwidth note.
