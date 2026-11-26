@@ -1,0 +1,76 @@
+# Builds the website (website/build.py) and deploys it to GitHub Pages.
+# The site renders README.md and the Markdown under docs/, so changes there
+# redeploy it too. Needs Settings > Pages > Source set to "GitHub Actions".
+
+name: Pages
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/pages.yml"
+      - "website/**"
+      - "docs/**"
+      - "README.md"
+      - "CONTRIBUTING.md"
+      - "python/README.md"
+      - "bindings/node/README.md"
+      - "bindings/rust/datapath/README.md"
+  push:
+    branches: [root]
+    paths:
+      - ".github/workflows/pages.yml"
+      - "website/**"
+      - "docs/**"
+      - "README.md"
+      - "CONTRIBUTING.md"
+      - "python/README.md"
+      - "bindings/node/README.md"
+      - "bindings/rust/datapath/README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: website/requirements.txt
+      - run: pip install -r website/requirements.txt
+      - name: Setup Pages
+        # Needs Pages enabled with "GitHub Actions" as the source; pull requests only build.
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+      - run: python website/build.py --out _site
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # The built site, not the repository: build.py renders README and docs into _site.
+          path: _site
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/root'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
