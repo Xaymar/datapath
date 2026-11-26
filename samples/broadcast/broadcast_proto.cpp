@@ -586,8 +586,7 @@ int main(int argc, char** argv)
 		return c.mode == "unicast" ? run_unicast_client(c, role_client, name) : run_bcast_client(fd, ctl_fd, c, role_client);
 	}
 
-	pin(c.server_cpu);
-	std::vector<pid_t> stressors;
+	std::vector<pid_t> stressors; // started before pinning, so they may run anywhere
 	for (int i = 0; i < c.stress; i++) {
 		pid_t p = fork();
 		if (p == 0) {
@@ -599,6 +598,7 @@ int main(int argc, char** argv)
 		}
 		stressors.push_back(p);
 	}
+	pin(c.server_cpu);
 
 	bcast_writer                       w;
 	std::shared_ptr<datapath::server>  srv;
