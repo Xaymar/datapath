@@ -9,14 +9,14 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <atomic>
 #include <memory>
 #include <mutex>
-#include <shared_mutex>
 #include <vector>
+#include "common/compat.hpp"
 #include "common/connection_base.hpp"
 #include "common/handshake.hpp"
 #include "event_context.hpp"
 #include "shm.hpp"
 
-namespace datapath::posix {
+namespace datapath { namespace posix {
 	class uds_listener;
 
 	class uds_connection : public datapath::detail::connection_base, public fd_target, public poll_target {
@@ -24,7 +24,7 @@ namespace datapath::posix {
 
 		std::shared_ptr<event_context> _ctx;
 		event_loop&                    _loop;
-		mutable std::shared_mutex      _fd_lock;
+		mutable datapath::detail::shared_mutex _fd_lock;
 		int                            _fd;
 
 		std::mutex _mask_lock;
@@ -116,4 +116,4 @@ namespace datapath::posix {
 		void on_event(uint32_t events) override;
 		void on_post(int kind) override;
 	};
-} // namespace datapath::posix
+}} // namespace datapath::posix

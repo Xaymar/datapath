@@ -15,7 +15,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <mutex>
 #include <vector>
 
-namespace datapath::detail {
+namespace datapath { namespace detail {
 	class send_queue {
 		public:
 		// Small frames are packed together into blocks up to this size.
@@ -71,4 +71,4 @@ namespace datapath::detail {
 		void close();
 		bool closed() const;
 	};
-} // namespace datapath::detail
+}} // namespace datapath::detail

@@ -30,11 +30,15 @@ TEST(error_to_string)
 TEST(version_matches_headers)
 {
 	const auto v = datapath::version();
-	CHECK_EQ(v.abi, DATAPATH_VERSION_ABI);
+	CHECK_EQ(v.major, DATAPATH_VERSION_MAJOR);
+	CHECK_EQ(v.minor, DATAPATH_VERSION_MINOR);
 	CHECK_EQ(v.patch, DATAPATH_VERSION_PATCH);
-	CHECK_EQ(DATAPATH_VERSION, (DATAPATH_VERSION_ABI << 16) | DATAPATH_VERSION_PATCH);
+	CHECK_EQ(DATAPATH_VERSION,
+			 (uint32_t(DATAPATH_VERSION_MAJOR) << 24) | (uint32_t(DATAPATH_VERSION_MINOR) << 8)
+				 | uint32_t(DATAPATH_VERSION_PATCH));
 	CHECK_EQ(std::string(DATAPATH_VERSION_STRING),
-			 std::to_string(DATAPATH_VERSION_ABI) + "." + std::to_string(DATAPATH_VERSION_PATCH));
+			 std::to_string(DATAPATH_VERSION_MAJOR) + "." + std::to_string(DATAPATH_VERSION_MINOR) + "."
+				 + std::to_string(DATAPATH_VERSION_PATCH));
 }
 
 TEST(options_defaults)

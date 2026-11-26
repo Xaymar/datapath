@@ -27,8 +27,10 @@ namespace {
 	int filter_changes(struct kevent (&changes)[2], int fd, uint32_t old_events, uint32_t events, void* udata)
 	{
 		int n = 0;
-		for (auto [bit, filter] : {std::pair<uint32_t, short>{datapath::posix::ev::in, EVFILT_READ},
-								   std::pair<uint32_t, short>{datapath::posix::ev::out, EVFILT_WRITE}}) {
+		for (const auto& p : {std::pair<uint32_t, short>{datapath::posix::ev::in, EVFILT_READ},
+							  std::pair<uint32_t, short>{datapath::posix::ev::out, EVFILT_WRITE}}) {
+			uint32_t bit    = p.first;
+			short    filter = p.second;
 			bool was = (old_events & bit) != 0, is = (events & bit) != 0;
 			if (was != is)
 				EV_SET(&changes[n++], uintptr_t(fd), filter, is ? (EV_ADD | EV_CLEAR) : EV_DELETE, 0, 0, udata);

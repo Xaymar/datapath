@@ -218,7 +218,7 @@ datapath::windows::shm_channel::shm_channel(std::unique_ptr<objects> o, bool ser
 	s.max_queued = max_queued;
 	s.signal     = [](void* ctx, int index) { SetEvent(static_cast<objects*>(ctx)->events[index]); };
 	s.signal_ctx = _o.get();
-	_ring        = std::make_unique<ring_pair>(s);
+	_ring        = datapath::detail::make_unique<ring_pair>(s);
 }
 
 datapath::windows::shm_channel::~shm_channel() = default;
@@ -261,7 +261,7 @@ datapath::error datapath::windows::shm_channel::create(std::unique_ptr<shm_chann
 
 	uint64_t cap = ring_capacity(ring_size);
 
-	auto o  = std::make_unique<objects>();
+	auto o  = datapath::detail::make_unique<objects>();
 	o->cap  = cap;
 	o->copy = peer != own;
 
@@ -354,7 +354,7 @@ datapath::error datapath::windows::shm_channel::open(std::unique_ptr<shm_channel
 		|| (offer[24] != 'G' && offer[24] != 'L') || !is_hex_name(offer + 25, 32))
 		return datapath::error::VersionMismatch;
 
-	auto o = std::make_unique<objects>();
+	auto o = datapath::detail::make_unique<objects>();
 	o->cap = cap;
 	std::wstring base =
 		std::wstring(offer[24] == 'G' ? L"Global\\dpshm-" : L"Local\\dpshm-") + std::wstring(offer + 25, offer + 57);

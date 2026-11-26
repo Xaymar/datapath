@@ -58,8 +58,10 @@ fn defaults_round_trip() {
     let c = ContextOptions::default();
     assert_eq!(c.io_threads, 1);
     assert_eq!(c.spin, Duration::from_micros(50));
-    let (abi, _patch) = datapath::version();
-    let _ = abi;
+    let (major, minor, patch) = datapath::version();
+    assert_eq!(major.to_string(), env!("CARGO_PKG_VERSION_MAJOR"));
+    assert_eq!(minor.to_string(), env!("CARGO_PKG_VERSION_MINOR"));
+    assert_eq!(patch.to_string(), env!("CARGO_PKG_VERSION_PATCH"));
 }
 
 #[test]

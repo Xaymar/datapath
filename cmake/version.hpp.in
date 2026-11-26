@@ -11,22 +11,29 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <cstdint>
 #include <datapath/export.h>
 
-// ABI version: bumped on any change that breaks binary compatibility.
-#define DATAPATH_VERSION_ABI @DATAPATH_VERSION_ABI@
-// Patch version: bumped on compatible changes, reset to 0 when the ABI version changes.
+// Semantic Versioning: MAJOR changes on any API- or ABI-incompatible change,
+// MINOR on compatible additions, PATCH on compatible fixes.
+#define DATAPATH_VERSION_MAJOR @DATAPATH_VERSION_MAJOR@
+#define DATAPATH_VERSION_MINOR @DATAPATH_VERSION_MINOR@
 #define DATAPATH_VERSION_PATCH @DATAPATH_VERSION_PATCH@
-// Both in one integer: (ABI << 16) | patch.
-#define DATAPATH_VERSION ((DATAPATH_VERSION_ABI << 16) | DATAPATH_VERSION_PATCH)
-#define DATAPATH_VERSION_STRING "@DATAPATH_VERSION_ABI@.@DATAPATH_VERSION_PATCH@"
+// All three in one integer: (major << 24) | (minor << 8) | patch, so major and
+// patch go up to 255 and minor up to 65535.
+#define DATAPATH_MAKE_VERSION(major, minor, patch) \
+	((uint32_t(major) << 24) | (uint32_t(minor) << 8) | uint32_t(patch))
+#define DATAPATH_VERSION \
+	DATAPATH_MAKE_VERSION(DATAPATH_VERSION_MAJOR, DATAPATH_VERSION_MINOR, DATAPATH_VERSION_PATCH)
+#define DATAPATH_VERSION_STRING "@DATAPATH_VERSION_MAJOR@.@DATAPATH_VERSION_MINOR@.@DATAPATH_VERSION_PATCH@"
 
 namespace datapath {
 	struct version_info {
-		uint16_t abi;
+		uint16_t major;
+		uint16_t minor;
 		uint16_t patch;
 	};
 
 	// Version of the library actually linked, which can differ from the
 	// DATAPATH_VERSION_* macros a program was compiled against. A program is
-	// compatible with the linked library when the ABI versions match.
+	// compatible with the linked library when the major versions match and
+	// the linked minor version is at least the one it was compiled against.
 	DATAPATH_API version_info version() noexcept;
 } // namespace datapath

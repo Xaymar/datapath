@@ -75,7 +75,7 @@ datapath::windows::pipe_connection::io_result datapath::windows::pipe_connection
 																					   size_t size, io_op& op,
 																					   DWORD& bytes, DWORD& err)
 {
-	std::shared_lock<std::shared_mutex> lock(_handle_lock);
+	datapath::detail::shared_lock<datapath::detail::shared_mutex> lock(_handle_lock);
 	if (_h == INVALID_HANDLE_VALUE) {
 		err = ERROR_INVALID_HANDLE;
 		return io_result::failed;
@@ -207,7 +207,7 @@ void datapath::windows::pipe_connection::hello_done()
 		// Decided before the connection is offered, so that its read chain (armed
 		// from on_accept) already knows which path to read. Without it, or if the
 		// objects can't be made, the connection stays on the pipe.
-		std::shared_lock<std::shared_mutex> lock(_handle_lock);
+		datapath::detail::shared_lock<datapath::detail::shared_mutex> lock(_handle_lock);
 		if (_h != INVALID_HANDLE_VALUE
 			&& shm_channel::create(_shm, _h, _shm_size, limit, _max_queued, _offer) == datapath::error::Success)
 			_ext_accepted |= datapath::detail::ext_shared_memory;
@@ -266,7 +266,7 @@ void datapath::windows::pipe_connection::platform_close()
 {
 	if (_shm)
 		_shm->wake_self(); // armed wake-ups fire and see the connection closed
-	std::unique_lock<std::shared_mutex> lock(_handle_lock);
+	std::unique_lock<datapath::detail::shared_mutex> lock(_handle_lock);
 	if (_h != INVALID_HANDLE_VALUE) {
 		// Disconnect the server end so the pipe name is released even while the
 		// client still holds its handle (otherwise re-hosting fails). Skipped for
@@ -317,7 +317,7 @@ bool datapath::windows::pipe_connection::direct_write_wanted(uint64_t frame_size
 size_t datapath::windows::pipe_connection::platform_write_direct(const uint8_t* header, size_t header_size,
 																const buffer_view* parts, size_t count)
 {
-	std::shared_lock<std::shared_mutex> lock(_handle_lock);
+	datapath::detail::shared_lock<datapath::detail::shared_mutex> lock(_handle_lock);
 	if (_h == INVALID_HANDLE_VALUE)
 		return 0;
 	uint64_t total = header_size;

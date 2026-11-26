@@ -2,7 +2,7 @@
 Thanks for helping out. This file covers building, testing and benchmarking DataPath. For what the library does and how to use it, see [README.md](README.md).
 
 ## Building
-Requires CMake 3.16+ and a C++17 compiler (MSVC 2019+, GCC 9+, Clang 10+).
+Requires CMake 3.16+ and a C++17 compiler (MSVC 2019+, GCC 9+, Clang 10+) for the tests and samples. The library itself builds with C++11 or newer (C++14 or newer on MSVC).
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -14,7 +14,9 @@ cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-Options: `DATAPATH_SHARED` (shared library, default `OFF`), `DATAPATH_BUILD_TESTS` and `DATAPATH_BUILD_SAMPLES` (default `ON` for top-level builds). The `datapath::datapath` target can be used through `add_subdirectory`.
+Options: `DATAPATH_SHARED` (shared library, default `OFF`), `DATAPATH_CXX_STANDARD` (standard the library is built with, default 17 or `CMAKE_CXX_STANDARD`; tests and samples use at least 17), `DATAPATH_BUILD_TESTS` and `DATAPATH_BUILD_SAMPLES` (default `ON` for top-level builds). The `datapath::datapath` target can be used through `add_subdirectory`.
+
+Library code (`include/`, `source/`) must build as C++11. When a newer standard library facility helps, use it through `source/common/compat.hpp`, which picks it by feature-test macro (`__cpp_lib_*`) and falls back to a local equivalent; CI builds the library as C++11, C++14 (MSVC) and C++23. Tests, samples and bindings may use C++17.
 
 The shared library exports only what public headers mark with `DATAPATH_API` (from the generated `datapath/export.h`); everything else stays hidden. Mark any new public function or class with it. Tests that reach into internals (`source/`) pass `INTERNAL` to `datapath_add_test` so they still link in a shared build.
 
@@ -52,8 +54,10 @@ Single runs are noisy at microsecond resolution. `--runs 5` repeats every size f
 
 For stable numbers on Windows, use the High Performance power plan. Run from a foreground console and close CPU-heavy applications.
 
-### Comparing with libuv
+### Comparing with libuv, cpp-ipc and Boost.Interprocess
 Configure with `-DDATAPATH_BUILD_COMPARE=ON` to also build `libuv-benchmark`; CMake downloads libuv 1.52.1. It runs the same harness over libuv named pipes / Unix sockets: same framing, clock, sizes, `--runs`, `--stress`. It also uses the same `--spin`, `--priority` and `--mmcss` policy on its loop thread, so both libraries can be compared with identical settings. libuv itself has none of these, so use `--spin 0 --no-mmcss --priority 0` to measure libuv as it ships. The matrix scripts include libuv runs when the executable exists.
+
+The same option also builds `cppipc-benchmark` ([cpp-ipc](https://github.com/mutouyun/cpp-ipc), pinned commit) and `boost-benchmark` (Boost.Interprocess `message_queue`; an installed Boost 1.80+ is used if CMake finds one, otherwise Boost 1.92 is downloaded). On Windows, `boost-native-benchmark` is the same with `BOOST_INTERPROCESS_FORCE_NATIVE_EMULATION`, Windows kernel primitives instead of Boost's default spin-lock emulation. They take the same options; `--spin 0 --no-mmcss --priority 0` measures each library's own waiting, the defaults add DataPath's spin and priority to the receive thread. cpp-ipc and Boost keep named shared-memory objects (`/dev/shm` on Linux, `C:\ProgramData\boost_interprocess` for Boost on Windows); the benchmarks remove theirs on exit, but a killed run leaves them behind.
 
 When you report numbers, lead with p99.9, say which machine, OS and power plan they came from, and give the flags. A p50 improvement that costs tail latency is a regression for this project. Published numbers use worst-case placement: `--pin` the client and server to different physical cores, on different CCDs and NUMA nodes where the machine has them ([methodology](docs/comparisons/README.md#methodology)).
 
@@ -68,6 +72,9 @@ pytest python/tests
 For quicker iteration, configure CMake with `-DDATAPATH_BUILD_PYTHON=ON`; the build tree then has an importable package in `build/python/package`, so `PYTHONPATH=build/python/package pytest python/tests` tests it without installing. Release wheels are built by `.github/workflows/python.yml` with cibuildwheel (settings in `pyproject.toml`); it only uploads to PyPI when started by hand with `publish` set.
 
 `python/benchmarks/pingpong.py local` measures Python round trips; add `--cpp-server build/samples/datapath-benchmark` to echo from the C++ server, and `--mode callback` to receive in callbacks instead of `recv()`.
+
+## Versioning
+DataPath follows [Semantic Versioning](https://semver.org): MAJOR changes on any API- or ABI-incompatible change (the shared library's SOVERSION is MAJOR), MINOR on compatible additions, PATCH on compatible fixes. The version lives in `CMakeLists.txt` (`DATAPATH_VERSION_MAJOR/MINOR/PATCH`); the Python package reads it from there, and `bindings/node/package.json` and `bindings/rust/Cargo.toml` (plus the `=` dependency in `bindings/rust/datapath/Cargo.toml`) must carry the same number. Wire-protocol versions are separate and unrelated.
 
 ## Pull requests
 * Keep a pull request to one change, and say in the description what you measured before and after if it touches the data path.

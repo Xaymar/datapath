@@ -72,7 +72,7 @@ datapath::error datapath::windows::pipe_listener::spawn_locked(bool first)
 			return map_error(err);
 		}
 
-		auto inst  = std::make_unique<instance>();
+		auto inst     = datapath::detail::make_unique<instance>();
 		inst->h    = h;
 		inst->skip = _ctx->associate(h);
 		inst->op.kind = k_connect;
@@ -137,7 +137,8 @@ void datapath::windows::pipe_listener::on_io(io_op* op, DWORD, DWORD err)
 	std::shared_ptr<pipe_connection> conn;
 	{
 		std::lock_guard<std::mutex> l(_lock);
-		auto it = std::find_if(_pending.begin(), _pending.end(), [op](auto& i) { return &i->op == op; });
+		auto                        it = std::find_if(_pending.begin(), _pending.end(),
+													  [op](const decltype(_pending)::value_type& i) { return &i->op == op; });
 		if (it == _pending.end())
 			return;
 		std::unique_ptr<instance> inst = std::move(*it);
@@ -151,7 +152,9 @@ void datapath::windows::pipe_listener::on_io(io_op* op, DWORD, DWORD err)
 		_connected++;
 		conn = std::make_shared<pipe_connection>(_ctx, inst->h, inst->skip, _opts, _opts.max_message_size);
 		inst->h = INVALID_HANDLE_VALUE;
-		_conns.erase(std::remove_if(_conns.begin(), _conns.end(), [](auto& w) { return w.expired(); }), _conns.end());
+		_conns.erase(std::remove_if(_conns.begin(), _conns.end(),
+									[](const decltype(_conns)::value_type& w) { return w.expired(); }),
+					 _conns.end());
 		_conns.push_back(conn);
 		refill_locked();
 	}

@@ -162,7 +162,7 @@ datapath::posix::shm_link::shm_link(std::unique_ptr<objects> o, bool server, boo
 		s.sync_key[0] = &tsan_keys[st.st_ino % 256][0];
 		s.sync_key[1] = &tsan_keys[st.st_ino % 256][1];
 	}
-	_ring = std::make_unique<ring_pair>(s);
+	_ring = datapath::detail::make_unique<ring_pair>(s);
 }
 
 datapath::posix::shm_link::~shm_link() = default;
@@ -193,7 +193,7 @@ datapath::error datapath::posix::shm_link::create(std::unique_ptr<shm_link>& out
 	gid_t gid = 0;
 	if (!peer_credentials(sock, uid, gid))
 		return datapath::error::AccessDenied;
-	auto o   = std::make_unique<objects>();
+	auto o   = datapath::detail::make_unique<objects>();
 	o->cap   = ring_capacity(ring_size);
 	int  mfd = int(::syscall(SYS_memfd_create, "datapath-shm", MFD_CLOEXEC | MFD_ALLOW_SEALING));
 	if (mfd < 0)
@@ -229,7 +229,7 @@ datapath::error datapath::posix::shm_link::open(std::unique_ptr<shm_link>& out, 
 												const uint8_t (&offer)[shm_offer_size], int (&fds)[shm_fd_count],
 												uint64_t limit, uint64_t max_queued)
 {
-	auto o = std::make_unique<objects>();
+	auto o = datapath::detail::make_unique<objects>();
 	for (int i = 0; i < shm_fd_count; i++) {
 		o->fds[i] = fds[i];
 		fds[i]    = -1;

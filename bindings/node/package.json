@@ -1,6 +1,6 @@
 {
   "name": "@xaymar/datapath",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "Node.js bindings for DataPath, a high performance, low latency IPC library (Windows named pipes, Unix domain sockets).",
   "license": "BSD-3-Clause",
   "author": "Narta Xaymar Dirks <info@xaymar.com>",

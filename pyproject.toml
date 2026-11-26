@@ -64,10 +64,11 @@ DATAPATH_SHARED = "OFF"
 provider = "scikit_build_core.metadata.regex"
 input = "CMakeLists.txt"
 regex = '''(?sx)
-    set\(DATAPATH_VERSION_ABI\s+(?P<abi>\d+)\).*?
+    set\(DATAPATH_VERSION_MAJOR\s+(?P<major>\d+)\).*?
+    set\(DATAPATH_VERSION_MINOR\s+(?P<minor>\d+)\).*?
     set\(DATAPATH_VERSION_PATCH\s+(?P<patch>\d+)\)
 '''
-result = "{abi}.{patch}"
+result = "{major}.{minor}.{patch}"
 
 [tool.pytest.ini_options]
 testpaths = ["python/tests"]

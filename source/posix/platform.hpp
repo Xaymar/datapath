@@ -14,7 +14,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 // The parts of the POSIX backend that differ between operating systems. Each
 // OS implements these in its own platform_<os>.cpp.
-namespace datapath::posix {
+namespace datapath { namespace posix {
 	// Readiness bits passed to fd_target::on_event() and to event_loop
 	// registrations, independent of the poller (epoll or kqueue).
 	namespace ev {
@@ -52,4 +52,4 @@ namespace datapath::posix {
 	void apply_thread_priority(int level);
 	// Physical cores available to this process, 0 if unknown.
 	size_t physical_core_count();
-} // namespace datapath::posix
+}} // namespace datapath::posix

@@ -139,7 +139,8 @@ void datapath::posix::uds_listener::on_event(uint32_t)
 			_connected++;
 			tune_socket_buffers(fd, _opts);
 			conn = std::make_shared<uds_connection>(_ctx, _ctx->pick_loop(), fd, _opts, _opts.max_message_size);
-			_conns.erase(std::remove_if(_conns.begin(), _conns.end(), [](auto& w) { return w.expired(); }),
+			_conns.erase(std::remove_if(_conns.begin(), _conns.end(),
+										[](const decltype(_conns)::value_type& w) { return w.expired(); }),
 						 _conns.end());
 			_conns.push_back(conn);
 		}

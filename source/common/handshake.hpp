@@ -29,7 +29,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <cstring>
 #include "endian.hpp"
 
-namespace datapath::detail {
+namespace datapath { namespace detail {
 	constexpr uint32_t protocol_version      = 1;
 	constexpr uint32_t protocol_version_pair = 2;
 	constexpr size_t   hello_size            = 16;
@@ -109,4 +109,4 @@ namespace datapath::detail {
 	{
 		return int32_t(load_le32(in));
 	}
-} // namespace datapath::detail
+}} // namespace datapath::detail

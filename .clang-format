@@ -90,7 +90,7 @@ SpacesInSquareBrackets: false
  
 # Other
 CommentPragmas: '^(!FIXME!|!TODO!|ToDo:)'
-CompactNamespaces: false
+CompactNamespaces: true
 DisableFormat: false
 FixNamespaceComments: true
 #ForEachMacros: ''

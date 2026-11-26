@@ -10,7 +10,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 datapath::version_info datapath::version() noexcept
 {
-	return {DATAPATH_VERSION_ABI, DATAPATH_VERSION_PATCH};
+	return {DATAPATH_VERSION_MAJOR, DATAPATH_VERSION_MINOR, DATAPATH_VERSION_PATCH};
 }
 
 const char* datapath::to_string(datapath::error e) noexcept
@@ -134,7 +134,7 @@ void datapath::server::on_accept(accept_handler handler)
 		_impl->set_accept_handler(nullptr);
 		return;
 	}
-	_impl->set_accept_handler([handler = std::move(handler)](std::shared_ptr<detail::connection> conn) {
+	_impl->set_accept_handler([handler](std::shared_ptr<detail::connection> conn) {
 		return handler(std::make_shared<datapath::socket>(std::move(conn)));
 	});
 }
