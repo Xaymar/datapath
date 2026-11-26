@@ -28,6 +28,13 @@ if(WIN32)
 	target_include_directories(datapath-shm-benchmark PRIVATE "${PROJECT_SOURCE_DIR}/source")
 endif()
 
+# PROTOTYPE: one-to-many broadcast over one shared-memory ring (Linux only),
+# measured against N unicast sends through the library's shared memory.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+	add_executable(datapath-broadcast-proto broadcast/broadcast_proto.cpp)
+	target_link_libraries(datapath-broadcast-proto PRIVATE datapath)
+endif()
+
 add_executable(datapath-echo echo/main.cpp)
 target_link_libraries(datapath-echo PRIVATE datapath)
 
