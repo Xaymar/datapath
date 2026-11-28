@@ -201,6 +201,8 @@ void datapath::posix::uds_connection::hello_read()
 				continue;
 			}
 			_handshaking = false;
+			if (!handshake_finished())
+				return; // too late: handshake_timeout is closing the connection
 			update_mask(0, ev::in); // data waits in the kernel until reads are armed
 			if (!known) {
 				// Answer with our own hello so the client can report

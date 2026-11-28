@@ -139,18 +139,20 @@ socket.send(b"hello")?;</code></pre>
 <h3>Send a message</h3>
 <pre><code class="language-python">import datapath
 
-# Server
-with datapath.host("my-service") as server:
-    client = server.accept()          # waits for the next client
-    while True:
-        client.send(client.recv())    # recv() raises ClosedError when the client leaves
+# Server: echo every message.
+clients = []
+def on_accept(sock):
+    clients.append(sock)                           # keep it, or the connection closes
+    sock.on_message(lambda data: sock.send(data))  # runs on an I/O thread
+
+server = datapath.host("my-service", on_accept=on_accept)
 
 # Client, in another process
-with datapath.connect("my-service") as sock:
-    sock.send(b"hello")
-    print(sock.recv(timeout=1.0))</code></pre>
-<p>Callbacks (<code>on_message</code>, <code>on_accept</code>) skip a thread hop and come closest to the C++ latency. Shared memory is on by default; pass <code>shared_memory=False</code> to <code>connect()</code> or <code>host()</code> to turn it off.</p>
-<p class="next">Next: <a href="../docs/python/">the Python guide</a>, including the two ways to receive and their latency.</p>
+sock = datapath.connect("my-service")
+sock.on_message(lambda data: print(data))          # b'hello'
+sock.send(b"hello")</code></pre>
+<p>The blocking <code>accept()</code>, <code>recv()</code> and <code>recv_into()</code> are deprecated since 1.1 and go away in 2.0. Shared memory is on by default; pass <code>shared_memory=False</code> to <code>connect()</code> or <code>host()</code> to turn it off.</p>
+<p class="next">Next: <a href="../docs/python/">the Python guide</a>.</p>
 </section>
 
 <section class="lang" data-lang="node">

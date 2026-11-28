@@ -535,6 +535,8 @@ void datapath::windows::iocp_context::shutdown()
 
 void datapath::windows::iocp_context::shutdown_now()
 {
+	// No deadline may close a connection behind the teardown's back.
+	_watchdog.stop();
 
 	std::vector<std::weak_ptr<datapath::detail::connection>> conns;
 	std::vector<std::weak_ptr<datapath::detail::listener>>   lsts;
