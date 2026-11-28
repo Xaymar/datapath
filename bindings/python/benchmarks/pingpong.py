@@ -13,7 +13,7 @@ so either side can be the C++ `datapath-benchmark server`:
     python pingpong.py server NAME [--mode recv|callback]
     python pingpong.py client NAME [--mode recv|callback]
 
---mode recv     : the client thread waits in recv() (spins with the GIL released, then sleeps)
+--mode recv     : the client thread waits in recv() (deprecated since 1.1, removed in 2.0)
 --mode callback : the next ping is sent from the on_message callback on the I/O thread
 """
 

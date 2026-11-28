@@ -22,6 +22,11 @@ import datapath
 
 T = 5.0  # generous timeout for CI machines
 
+# Most tests still drive the deprecated accept()/recv() API until 2.0 removes it.
+pytestmark = pytest.mark.filterwarnings(
+    "ignore:.*is deprecated and will be removed in DataPath 2.0:DeprecationWarning"
+)
+
 
 def name() -> str:
     return f"pytest-{os.getpid()}-{uuid.uuid4().hex[:12]}"
@@ -453,3 +458,44 @@ def test_drop_last_reference_inside_callbacks():
         c3.close()
         assert done.wait(T)
         s3.close()
+
+
+def test_blocking_api_is_deprecated():
+    path = name()
+    server = datapath.host(path)
+    client = datapath.connect(path, connect_timeout=T)
+    with pytest.warns(DeprecationWarning, match=r"Server\.accept\(\) is deprecated"):
+        peer = server.accept(timeout=T)
+    client.send(b"ab")
+    client.send(b"cd")
+    with pytest.warns(DeprecationWarning, match=r"Socket\.recv\(\) is deprecated"):
+        assert peer.recv(timeout=T) == b"ab"
+    buf = bytearray(2)
+    with pytest.warns(DeprecationWarning, match=r"Socket\.recv_into\(\) is deprecated"):
+        assert peer.recv_into(buf, timeout=T) == 2
+    assert buf == b"cd"
+    client.close()
+    peer.close()
+    server.close()
+
+
+def test_callbacks_do_not_warn():
+    import warnings
+
+    path = name()
+    got = threading.Event()
+    clients = []
+
+    def on_accept(sock):
+        clients.append(sock)
+        sock.on_message(lambda data: sock.send(data))
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        server = datapath.host(path, on_accept=on_accept)
+        client = datapath.connect(path, connect_timeout=T)
+        client.on_message(lambda data: got.set())
+        client.send(b"hello")
+        assert got.wait(T)
+        client.close()
+        server.close()
