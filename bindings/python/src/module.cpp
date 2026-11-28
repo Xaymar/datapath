@@ -12,7 +12,12 @@ SPDX-License-Identifier: BSD-3-Clause
 //   never touches the interpreter. The Python thread spins briefly with the GIL
 //   released, then sleeps on a condition variable. This keeps the GIL off the
 //   I/O thread, so a busy Python thread can't stall the I/O thread (and with it
-//   every other connection on the context).
+//   every other connection on the context). The queue is bounded: once it holds
+//   recv_high_water_mark bytes (each message counts its size plus 64), the
+//   socket stops reading from the peer, whose sends then back up and fail with
+//   WouldBlockError; recv() starts reading again once it took the queue below
+//   the mark. A peer that sends faster than Python reads can't grow it without
+//   bound.
 // - Callbacks (on_message()/on_accept()): the I/O thread takes the GIL and calls
 //   the Python function directly. One thread hop less, but taking the GIL can
 //   wait up to sys.getswitchinterval() while another Python thread runs.
@@ -282,10 +287,14 @@ namespace {
 		std::deque<std::vector<uint8_t>>  items;
 		std::vector<std::vector<uint8_t>> spare; // recycled buffers
 		std::atomic<size_t>               count{0};
+		// Bytes queued (size + message_overhead each); compared to high_water.
+		std::atomic<size_t>               bytes{0};
 		std::atomic<bool>                 closed_atomic{false};
 		int                               waiters = 0;
 		bool                              closed  = false;
 		datapath::error                   reason  = datapath::error::Closed;
+
+		static constexpr size_t message_overhead = 64;
 
 		bool closed_flag() const noexcept
 		{
@@ -302,8 +311,19 @@ namespace {
 			}
 			buf.assign(data, data + size);
 			items.push_back(std::move(buf));
+			bytes.fetch_add(size + message_overhead, std::memory_order_acq_rel);
 			count.fetch_add(1, std::memory_order_release);
 			return waiters > 0;
+		}
+
+		// Lock held: take the front item.
+		std::vector<uint8_t> pop_locked()
+		{
+			auto msg = std::move(items.front());
+			items.pop_front();
+			bytes.fetch_sub(msg.size() + message_overhead, std::memory_order_acq_rel);
+			count.fetch_sub(1, std::memory_order_relaxed);
+			return msg;
 		}
 
 		void wake()
@@ -344,6 +364,43 @@ namespace {
 		std::atomic<bool>                 armed{false};
 		std::chrono::microseconds         recv_spin{50};
 		message_queue                     queue;
+		std::atomic<size_t>               high_water{size_t(1) << 20};
+
+		// Flow state; flow_lock orders pause()/resume() calls on the native socket.
+		std::mutex        flow_lock;
+		bool              user_paused = false; // pause()
+		std::atomic<bool> native_paused{false};
+
+		// Pause the native socket while the user paused or the recv() queue is at
+		// the high-water mark, resume it otherwise. Never with queue.lock held.
+		void update_flow()
+		{
+			std::lock_guard<std::mutex> l(flow_lock);
+			bool want = user_paused || queue.bytes.load(std::memory_order_acquire) >= high_water.load(std::memory_order_relaxed);
+			if (want == native_paused.load(std::memory_order_relaxed) || !sock)
+				return;
+			native_paused.store(want, std::memory_order_relaxed);
+			if (want)
+				sock->pause();
+			else
+				sock->resume();
+		}
+
+		// After taking from the queue: resume reading if it went below the mark.
+		void after_take()
+		{
+			if (native_paused.load(std::memory_order_relaxed))
+				update_flow();
+		}
+
+		void set_paused(bool on)
+		{
+			{
+				std::lock_guard<std::mutex> l(flow_lock);
+				user_paused = on;
+			}
+			update_flow();
+		}
 
 		py_socket(std::shared_ptr<datapath::socket> s, nb::handle ctx) : sock(std::move(s)), context(nb::borrow(ctx))
 		{
@@ -411,8 +468,11 @@ namespace {
 				}
 				if (notify)
 					queue.wake();
-				if (queued)
+				if (queued) {
+					if (queue.bytes.load(std::memory_order_acquire) >= high_water.load(std::memory_order_relaxed))
+						update_flow(); // stop reading until recv() caught up
 					return;
+				}
 			}
 			{
 				python_entry entry;
@@ -441,6 +501,8 @@ namespace {
 			}
 			if (notify)
 				queue.wake();
+			if (queue.bytes.load(std::memory_order_acquire) >= high_water.load(std::memory_order_relaxed))
+				update_flow();
 		}
 
 		void set_on_message(nb::object cb)
@@ -468,12 +530,11 @@ namespace {
 						has_message_cb.store(true, std::memory_order_release);
 						break;
 					}
-					msg = std::move(queue.items.front());
-					queue.items.pop_front();
-					queue.count.fetch_sub(1, std::memory_order_relaxed);
+					msg = queue.pop_locked();
 				}
 				cb(nb::bytes(msg.data(), msg.size()));
 			}
+			after_take();
 			arm();
 		}
 
@@ -559,9 +620,7 @@ namespace {
 			auto                 take = [&] {
                 if (queue.items.empty())
                     return false;
-                msg = std::move(queue.items.front());
-                queue.items.pop_front();
-                queue.count.fetch_sub(1, std::memory_order_relaxed);
+                msg = queue.pop_locked();
                 return true;
 			};
 			// Fast path: a message is already waiting.
@@ -572,6 +631,7 @@ namespace {
 			}
 			if (!got && !wait_queue(queue, deadline, recv_spin, take))
 				raise_error(queue.reason, "connection closed");
+			after_take();
 			nb::bytes out(msg.data(), msg.size());
 			{
 				std::lock_guard<std::mutex> l(queue.lock);
@@ -609,9 +669,8 @@ namespace {
                 }
                 n = front.size();
                 std::memcpy(view.buf, front.data(), n);
-                queue.recycle(std::move(front));
-                queue.items.pop_front();
-                queue.count.fetch_sub(1, std::memory_order_relaxed);
+                auto msg = queue.pop_locked();
+                queue.recycle(std::move(msg));
                 return true;
 			};
 			bool got;
@@ -621,6 +680,7 @@ namespace {
 			}
 			if (!got && !wait_queue(queue, deadline, recv_spin, take))
 				raise_error(queue.reason, "connection closed");
+			after_take();
 			if (small)
 				throw nb::value_error(
 					("buffer too small: next message is " + std::to_string(n) + " bytes; it stays queued").c_str());
@@ -1015,6 +1075,26 @@ NB_MODULE(_core, m)
 			"max_message_size", [](py_socket& s) { return s.get().max_message_size(); },
 			"Negotiated message size limit of this connection.")
 		.def_prop_ro("pending", &py_socket::pending, "Messages received and waiting for recv().")
+		.def_prop_ro(
+			"pending_bytes", [](py_socket& s) { return s.queue.bytes.load(std::memory_order_acquire); },
+			"Bytes waiting for recv(): each message counts its size plus 64.")
+		.def_prop_rw(
+			"recv_high_water_mark", [](py_socket& s) { return s.high_water.load(std::memory_order_relaxed); },
+			[](py_socket& s, size_t v) {
+				if (v < 1)
+					throw nb::value_error("recv_high_water_mark must be at least 1");
+				s.high_water.store(v, std::memory_order_relaxed);
+				s.update_flow();
+			},
+			"Bytes that may wait for recv() before the socket stops reading from the peer\n"
+			"(each message counts its size plus 64). The peer's sends then back up and\n"
+			"fail with WouldBlockError. Default 1 MiB.")
+		.def(
+			"pause", [](py_socket& s) { s.set_paused(true); },
+			"Stop reading from the peer; its sends back up. Messages already received\n"
+			"can still be taken with recv(), and callbacks stop after the current one.")
+		.def(
+			"resume", [](py_socket& s) { s.set_paused(false); }, "Read from the peer again after pause().")
 		.def_prop_rw(
 			"recv_spin_us", [](py_socket& s) { return int64_t(s.recv_spin.count()); },
 			[](py_socket& s, int64_t us) { s.recv_spin = spin_from(us); },
