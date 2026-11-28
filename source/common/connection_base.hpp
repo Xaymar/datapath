@@ -201,6 +201,13 @@ namespace datapath { namespace detail {
 		bool consume(size_t n)
 		{
 			std::lock_guard<std::recursive_mutex> cb(_callback_lock);
+			if (_paused.load(std::memory_order_acquire)) {
+				// Paused while this read was in flight (always the case for the
+				// read Windows keeps pending): keep the bytes, deliver on resume.
+				_parser.store(n);
+				_unparsed = true;
+				return true;
+			}
 			return parsed(_parser.commit(n, [this](const uint8_t* d, size_t s) { return deliver(d, s); }));
 		}
 

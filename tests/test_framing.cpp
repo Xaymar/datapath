@@ -313,4 +313,40 @@ TEST(parser_tiny_buffer_is_clamped)
 	CHECK(feed(stream, {7}, 1) == msgs);
 }
 
+// Paused reads: store() keeps bytes without delivering; resume() delivers
+// them later, including a large frame that completed while stored.
+TEST(store_then_resume)
+{
+	bytes stream;
+	std::vector<bytes> expect = {pattern(10, 1), pattern(300, 2), pattern(5000, 3), pattern(20, 4)};
+	for (auto& m : expect) {
+		auto f = frame(m);
+		stream.insert(stream.end(), f.begin(), f.end());
+	}
+	datapath::detail::frame_parser p(1ull << 30, 512); // 5000 B goes to the large buffer
+	std::vector<bytes>             out;
+	auto take = [&](const uint8_t* d, size_t s) { out.emplace_back(d, d + s); };
+	size_t pos = 0;
+	bool   paused = true;
+	while (pos < stream.size()) {
+		auto   area = p.prepare();
+		CHECK(area.second > 0);
+		size_t n = std::min<size_t>(area.second, std::min<size_t>(97, stream.size() - pos));
+		std::memcpy(area.first, stream.data() + pos, n);
+		pos += n;
+		if (paused) {
+			p.store(n);
+			// Resume now and then; a stored large frame must not leave prepare() empty.
+			CHECK_EQ(p.resume(take), error::Success);
+		} else {
+			CHECK_EQ(p.commit(n, take), error::Success);
+		}
+		paused = !paused;
+	}
+	CHECK_EQ(p.resume(take), error::Success);
+	CHECK_EQ(out.size(), expect.size());
+	for (size_t i = 0; i < expect.size(); i++)
+		CHECK(out[i] == expect[i]);
+}
+
 TEST_MAIN()
