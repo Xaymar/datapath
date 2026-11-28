@@ -544,8 +544,8 @@ TEST(close_while_paused)
 	echo_server srv;
 	auto        name = unique_name();
 	CHECK_EQ(srv.start(name), error::Success);
+	collector col; // outlives the socket whose handlers use it
 	sock_ptr  c;
-	collector col;
 	CHECK_EQ(datapath::connect(c, name), error::Success);
 	col.attach(*c);
 	CHECK_EQ(c->send("x", 1), error::Success);
@@ -568,8 +568,8 @@ TEST(pause_resume_churn)
 	echo_server srv;
 	auto        name = unique_name();
 	CHECK_EQ(srv.start(name), error::Success);
+	collector col; // outlives the socket whose handlers use it
 	sock_ptr  c;
-	collector col;
 	CHECK_EQ(datapath::connect(c, name), error::Success);
 	col.attach(*c);
 	constexpr uint32_t n = 20000;
@@ -589,6 +589,13 @@ TEST(pause_resume_churn)
 	stop    = true;
 	toggler.join();
 	c->resume();
+	if (!ok) {
+		// Tell a lost wake-up (stuck until more data arrives) from a slow run.
+		int before = col.received.value();
+		bool late  = col.received.wait(int(n), 5s);
+		std::printf("received %d of %u at the deadline, %d after resume (%s)\n", before, n,
+					col.received.value(), late ? "slow" : "stuck");
+	}
 	CHECK(ok);
 	std::lock_guard<std::mutex> l(col.lock);
 	for (uint32_t i = 0; i < n; i++) {
