@@ -12,13 +12,15 @@
 #
 # Targets:
 #   dry-run  build and check everything; `npm publish --dry-run`,
-#            `cargo publish --dry-run`, `twine check`. Uploads nothing. (default)
-#   test     dry-run plus an upload to TestPyPI.
+#            `cargo publish --dry-run`, `twine check`. Uploads nothing.
+#            (default for manual runs)
+#   test     dry-run plus an upload to TestPyPI. (what a tag push runs)
 #   release  upload to PyPI, npm and crates.io (tags only).
 #
-# Pushing a vX.Y.Z tag runs a dry run and creates a *draft* GitHub Release with
-# the source tarball and the prebuilt C/C++ archives; publishing the draft is
-# done by hand.
+# Pushing a vX.Y.Z tag runs target "test" and creates a *draft* GitHub Release
+# with the source tarball and the prebuilt archives. Then start this workflow
+# by hand on the tag with target "release"; publishing the draft is done by
+# hand.
 name: Release
 
 on:
@@ -40,7 +42,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  TARGET: ${{ inputs.target || 'dry-run' }}
+  # A tag push has no inputs and runs "test"; a manual run defaults to dry-run.
+  TARGET: ${{ inputs.target || (github.event_name == 'push' && 'test') || 'dry-run' }}
 
 jobs:
   version:
@@ -174,7 +177,7 @@ jobs:
 
   publish-testpypi:
     name: Publish to TestPyPI
-    if: inputs.target == 'test' || inputs.target == 'release'
+    if: inputs.target == 'test' || inputs.target == 'release' || github.event_name == 'push'
     needs: python-check
     runs-on: ubuntu-24.04
     environment:
@@ -195,6 +198,9 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+          # The tag push already uploaded this version; a later "release" run
+          # must not fail here, or it never reaches PyPI.
+          skip-existing: true
           skip-existing: true
 
   publish-pypi:
