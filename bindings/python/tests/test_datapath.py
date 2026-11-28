@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import array
+import errno
 import gc
 import os
 import subprocess
@@ -272,8 +273,9 @@ def test_silent_client_is_dropped():
         start = time.monotonic()
         try:
             assert raw.read(1) == b""  # the server closes the pipe instead of answering
-        except BrokenPipeError:
-            pass
+        except OSError as e:
+            # A pipe the server disconnected reads as ERROR_PIPE_NOT_CONNECTED (EINVAL).
+            assert isinstance(e, BrokenPipeError) or e.errno == errno.EINVAL
     else:
         import socket
 
