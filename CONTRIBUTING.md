@@ -54,8 +54,10 @@ Single runs are noisy at microsecond resolution. `--runs 5` repeats every size f
 
 For stable numbers on Windows, use the High Performance power plan. Run from a foreground console and close CPU-heavy applications.
 
-### Comparing with libuv
+### Comparing with libuv, cpp-ipc and Boost.Interprocess
 Configure with `-DDATAPATH_BUILD_COMPARE=ON` to also build `libuv-benchmark`; CMake downloads libuv 1.52.1. It runs the same harness over libuv named pipes / Unix sockets: same framing, clock, sizes, `--runs`, `--stress`. It also uses the same `--spin`, `--priority` and `--mmcss` policy on its loop thread, so both libraries can be compared with identical settings. libuv itself has none of these, so use `--spin 0 --no-mmcss --priority 0` to measure libuv as it ships. The matrix scripts include libuv runs when the executable exists.
+
+The same option also builds `cppipc-benchmark` ([cpp-ipc](https://github.com/mutouyun/cpp-ipc), pinned commit) and `boost-benchmark` (Boost.Interprocess `message_queue`; an installed Boost 1.80+ is used if CMake finds one, otherwise Boost 1.92 is downloaded). On Windows, `boost-native-benchmark` is the same with `BOOST_INTERPROCESS_FORCE_NATIVE_EMULATION`, Windows kernel primitives instead of Boost's default spin-lock emulation. They take the same options; `--spin 0 --no-mmcss --priority 0` measures each library's own waiting, the defaults add DataPath's spin and priority to the receive thread. cpp-ipc and Boost keep named shared-memory objects (`/dev/shm` on Linux, `C:\ProgramData\boost_interprocess` for Boost on Windows); the benchmarks remove theirs on exit, but a killed run leaves them behind.
 
 When you report numbers, lead with p99.9, say which machine, OS and power plan they came from, and give the flags. A p50 improvement that costs tail latency is a regression for this project. Published numbers use worst-case placement: `--pin` the client and server to different physical cores, on different CCDs and NUMA nodes where the machine has them ([methodology](docs/comparisons/README.md#methodology)).
 
