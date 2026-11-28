@@ -279,6 +279,18 @@ namespace {
 	// Socket
 
 	struct py_socket;
+
+	// accept(), recv() and recv_into() are deprecated in 1.1.0 and go away in 2.0.0
+	// in favour of the callbacks, which every other binding uses.
+	void warn_deprecated(const char* what)
+	{
+		std::string msg =
+			std::string(what)
+			+ " is deprecated and will be removed in DataPath 2.0; use on_accept/on_message callbacks instead";
+		if (PyErr_WarnEx(PyExc_DeprecationWarning, msg.c_str(), 1) != 0)
+			throw nb::python_error();
+	}
+
 	nb::object wrap_socket(std::shared_ptr<datapath::socket> s, nb::handle context);
 
 	struct message_queue {
@@ -613,6 +625,7 @@ namespace {
 
 		nb::bytes recv(std::optional<double> timeout)
 		{
+			warn_deprecated("Socket.recv()");
 			reject_if_callback("recv()");
 			arm();
 			auto                 deadline = deadline_from(timeout);
@@ -642,6 +655,7 @@ namespace {
 
 		size_t recv_into(nb::handle buffer, std::optional<double> timeout)
 		{
+			warn_deprecated("Socket.recv_into()");
 			reject_if_callback("recv_into()");
 			Py_buffer view;
 			if (PyObject_GetBuffer(buffer.ptr(), &view, PyBUF_SIMPLE | PyBUF_WRITABLE) != 0)
@@ -894,6 +908,7 @@ namespace {
 
 		nb::object accept(std::optional<double> timeout)
 		{
+			warn_deprecated("Server.accept()");
 			if (has_accept_cb.load(std::memory_order_acquire))
 				throw std::runtime_error("accept() can't be used while an on_accept callback is set");
 			arm();
@@ -1049,11 +1064,13 @@ NB_MODULE(_core, m)
 			 nb::sig("def sendv(self, parts: collections.abc.Iterable[collections.abc.Buffer], /) -> None"),
 			 "Queue one message assembled from several bytes-like parts.")
 		.def("recv", &py_socket::recv, "timeout"_a = nb::none(),
+			 "Deprecated since 1.1, removed in 2.0: use on_message().\n\n"
 			 "Return the next message. Waits up to `timeout` seconds (None = forever).\n\n"
 			 "Raises TimedOutError on timeout and ClosedError once the connection is closed\n"
 			 "and every received message was returned.")
 		.def("recv_into", &py_socket::recv_into, "buffer"_a, "timeout"_a = nb::none(),
 			 nb::sig("def recv_into(self, buffer: collections.abc.Buffer, /, timeout: float | None = None) -> int"),
+			 "Deprecated since 1.1, removed in 2.0: use on_message().\n\n"
 			 "Copy the next message into a writable buffer and return its size.\n\n"
 			 "Raises ValueError (and keeps the message queued) if the buffer is too small.")
 		.def("on_message", &py_socket::set_on_message, "callback"_a.none(),
@@ -1107,6 +1124,7 @@ NB_MODULE(_core, m)
 						  "A hosted endpoint. Dropping the last reference closes it.")
 		.def("accept", &py_server::accept, "timeout"_a = nb::none(),
 			 nb::sig("def accept(self, timeout: float | None = None) -> Socket"),
+			 "Deprecated since 1.1, removed in 2.0: use on_accept().\n\n"
 			 "Return the next client that completed the handshake. Waits up to `timeout`\n"
 			 "seconds (None = forever). Raises TimedOutError or ClosedError.")
 		.def("on_accept", &py_server::set_on_accept, "callback"_a.none(),
@@ -1154,13 +1172,16 @@ NB_MODULE(_core, m)
 	m.def(
 		"host",
 		[](const std::string& path, datapath::permissions permissions, size_t backlog, size_t max_clients,
-		   std::optional<uint64_t> max_message_size, std::optional<uint64_t> max_queued_bytes,
-		   std::optional<size_t> receive_buffer, std::optional<size_t> pipe_buffer, nb::object context,
-		   nb::object on_accept) {
+		   double handshake_timeout, std::optional<uint64_t> max_message_size,
+		   std::optional<uint64_t> max_queued_bytes, std::optional<size_t> receive_buffer,
+		   std::optional<size_t> pipe_buffer, nb::object context, nb::object on_accept) {
+			if (!(handshake_timeout >= 0))
+				throw nb::value_error("handshake_timeout must be non-negative");
 			auto o        = make_options(max_message_size, max_queued_bytes, receive_buffer);
 			o.permissions = permissions;
 			o.backlog     = backlog;
 			o.max_clients = max_clients;
+			o.handshake_timeout = std::chrono::milliseconds(int64_t(handshake_timeout * 1000.0 + 0.5));
 			if (pipe_buffer)
 				o.pipe_buffer = *pipe_buffer;
 			auto                              ctx = context_of(context);
@@ -1182,18 +1203,19 @@ NB_MODULE(_core, m)
 			return out;
 		},
 		"path"_a, nb::kw_only(), "permissions"_a = datapath::permissions::User, "backlog"_a = 8, "max_clients"_a = 0,
-		"max_message_size"_a = nb::none(), "max_queued_bytes"_a = nb::none(), "receive_buffer"_a = nb::none(),
+		"handshake_timeout"_a = 5.0, "max_message_size"_a = nb::none(), "max_queued_bytes"_a = nb::none(), "receive_buffer"_a = nb::none(),
 		"pipe_buffer"_a = nb::none(), "context"_a = nb::none(), "on_accept"_a = nb::none(),
 		nb::sig("def host(path: str, *, permissions: Permissions = ..., backlog: int = 8, "
-				"max_clients: int = 0, max_message_size: int | None = None, max_queued_bytes: int | None = None, "
-				"receive_buffer: int | None = None, pipe_buffer: int | None = None, "
-				"context: Context | None = None, "
+				"max_clients: int = 0, handshake_timeout: float = 5.0, max_message_size: int | None = None, "
+				"max_queued_bytes: int | None = None, receive_buffer: int | None = None, "
+				"pipe_buffer: int | None = None, context: Context | None = None, "
 				"on_accept: collections.abc.Callable[[Socket], object] | None = None) -> Server"),
 		"Host a server at `path`. A bare name maps to \\\\.\\pipe\\<name> on Windows and to\n"
 		"the abstract socket datapath.<name> on Linux; on Linux a path starting with / is\n"
 		"a filesystem socket.\n\n"
 		"Clients are accepted at once and wait for accept(), unless `on_accept` is given\n"
-		"(see Server.on_accept()).");
+		"(see Server.on_accept()). A client that does not send its handshake within\n"
+		"`handshake_timeout` seconds is disconnected (0 = no limit).");
 
 	m.def("_shutdown", &shutdown, "Internal: called at interpreter exit.");
 }

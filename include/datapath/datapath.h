@@ -165,6 +165,11 @@ typedef struct datapath_options {
 	uint8_t  reserved[7];
 	/* Ring size per direction with shared_memory. Default 4 MiB. */
 	uint64_t shared_memory_size;
+	/* How long a connecting client may take to send its handshake before it is
+	 * disconnected, in milliseconds, 0 = no limit; host only. Default 5000.
+	 * Callers built against an older header, whose struct_size ends before
+	 * this field, get the default. */
+	int64_t  handshake_timeout_ms;
 } datapath_options;
 
 /* Fill with the library defaults and set struct_size. */

@@ -55,6 +55,7 @@ fn defaults_round_trip() {
     let o = Options::default();
     assert_eq!(o.max_message_size, 64 << 20);
     assert_eq!(o.connect_timeout, Duration::from_millis(1000));
+    assert_eq!(o.handshake_timeout, Duration::from_millis(5000));
     let c = ContextOptions::default();
     assert_eq!(c.io_threads, 1);
     assert_eq!(c.spin, Duration::from_micros(50));

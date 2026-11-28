@@ -145,7 +145,7 @@ namespace {
 		datapath_options o;
 		if (!read_options<datapath_options, datapath_options_init>(o, in))
 			return false;
-		if (o.permissions > DATAPATH_PERMISSIONS_WORLD || o.connect_timeout_ms < 0)
+		if (o.permissions > DATAPATH_PERMISSIONS_WORLD || o.connect_timeout_ms < 0 || o.handshake_timeout_ms < 0)
 			return false;
 		out.max_message_size = o.max_message_size;
 		out.max_queued_bytes = o.max_queued_bytes;
@@ -157,6 +157,7 @@ namespace {
 		out.pipe_buffer      = size_t(o.pipe_buffer);
 		out.shared_memory      = o.shared_memory != 0;
 		out.shared_memory_size = size_t(o.shared_memory_size);
+		out.handshake_timeout  = std::chrono::milliseconds(o.handshake_timeout_ms);
 		return true;
 	}
 
@@ -230,6 +231,7 @@ void datapath_options_init(datapath_options* o)
 	o->pipe_buffer        = uint64_t(d.pipe_buffer);
 	o->shared_memory      = d.shared_memory ? 1 : 0;
 	o->shared_memory_size = uint64_t(d.shared_memory_size);
+	o->handshake_timeout_ms = int64_t(d.handshake_timeout.count());
 }
 
 // context ----------------------------------------------------------------------

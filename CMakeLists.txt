@@ -93,6 +93,8 @@ set(DATAPATH_SOURCES
 	source/common/endian.hpp
 	source/common/framing.hpp
 	source/common/handshake.hpp
+	source/common/handshake_watchdog.cpp
+	source/common/handshake_watchdog.hpp
 	source/common/send_queue.cpp
 	source/common/send_queue.hpp
 	source/common/shm_ring.cpp

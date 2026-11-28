@@ -6,12 +6,14 @@
 from __future__ import annotations
 
 import array
+import errno
 import gc
 import os
 import subprocess
 import sys
 import textwrap
 import threading
+import time
 import uuid
 
 import pytest
@@ -19,6 +21,11 @@ import pytest
 import datapath
 
 T = 5.0  # generous timeout for CI machines
+
+# Most tests still drive the deprecated accept()/recv() API until 2.0 removes it.
+pytestmark = pytest.mark.filterwarnings(
+    "ignore:.*is deprecated and will be removed in DataPath 2.0:DeprecationWarning"
+)
 
 
 def name() -> str:
@@ -262,6 +269,40 @@ def test_address_in_use():
     server.close()
 
 
+@pytest.mark.skipif(sys.platform not in ("linux", "win32"), reason="raw client needs a known socket path")
+def test_silent_client_is_dropped():
+    path = name()
+    server = datapath.host(path, handshake_timeout=0.2)
+    if sys.platform == "win32":
+        raw = open(rf"\\.\pipe\{path}", "r+b", buffering=0)
+        start = time.monotonic()
+        try:
+            assert raw.read(1) == b""  # the server closes the pipe instead of answering
+        except OSError as e:
+            # A pipe the server disconnected reads as ERROR_PIPE_NOT_CONNECTED (EINVAL).
+            assert isinstance(e, BrokenPipeError) or e.errno == errno.EINVAL
+    else:
+        import socket
+
+        raw = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        raw.connect(f"\0datapath.{path}")
+        raw.settimeout(T)
+        start = time.monotonic()
+        assert raw.recv(1) == b""  # closed without a reply
+    assert time.monotonic() - start < T
+    raw.close()
+    # Well-behaved clients are still served.
+    client = datapath.connect(path, connect_timeout=T)
+    server.accept(timeout=T).close()
+    client.close()
+    server.close()
+
+
+def test_handshake_timeout_must_be_non_negative():
+    with pytest.raises(ValueError):
+        datapath.host(name(), handshake_timeout=-1)
+
+
 def test_not_found():
     with pytest.raises(datapath.NotFoundError) as info:
         datapath.connect(name(), connect_timeout=0.2)
@@ -471,3 +512,42 @@ def test_pause_resume(pair):
     assert peer.recv(timeout=T) == b"held"
     with pytest.raises(ValueError):
         peer.recv_high_water_mark = 0
+def test_blocking_api_is_deprecated():
+    path = name()
+    server = datapath.host(path)
+    client = datapath.connect(path, connect_timeout=T)
+    with pytest.warns(DeprecationWarning, match=r"Server\.accept\(\) is deprecated"):
+        peer = server.accept(timeout=T)
+    client.send(b"ab")
+    client.send(b"cd")
+    with pytest.warns(DeprecationWarning, match=r"Socket\.recv\(\) is deprecated"):
+        assert peer.recv(timeout=T) == b"ab"
+    buf = bytearray(2)
+    with pytest.warns(DeprecationWarning, match=r"Socket\.recv_into\(\) is deprecated"):
+        assert peer.recv_into(buf, timeout=T) == 2
+    assert buf == b"cd"
+    client.close()
+    peer.close()
+    server.close()
+
+
+def test_callbacks_do_not_warn():
+    import warnings
+
+    path = name()
+    got = threading.Event()
+    clients = []
+
+    def on_accept(sock):
+        clients.append(sock)
+        sock.on_message(lambda data: sock.send(data))
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        server = datapath.host(path, on_accept=on_accept)
+        client = datapath.connect(path, connect_timeout=T)
+        client.on_message(lambda data: got.set())
+        client.send(b"hello")
+        assert got.wait(T)
+        client.close()
+        server.close()

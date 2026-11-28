@@ -812,6 +812,8 @@ namespace {
 			opts.max_clients = size_t(to_u64(o.Get("maxClients")));
 		if (has(o, "connectTimeout"))
 			opts.connect_timeout = std::chrono::milliseconds(int64_t(to_u64(o.Get("connectTimeout"))));
+		if (has(o, "handshakeTimeout"))
+			opts.handshake_timeout = std::chrono::milliseconds(int64_t(to_u64(o.Get("handshakeTimeout"))));
 		if (has(o, "receiveBuffer"))
 			opts.receive_buffer = size_t(to_u64(o.Get("receiveBuffer")));
 		if (has(o, "pipeBuffer"))

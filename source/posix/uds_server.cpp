@@ -145,6 +145,14 @@ void datapath::posix::uds_listener::on_event(uint32_t)
 			_conns.push_back(conn);
 		}
 		_ctx->add_member(std::weak_ptr<datapath::detail::connection>(conn));
+		if (_opts.handshake_timeout.count() > 0) {
+			// Armed before the first read, so a hello can never beat its deadline.
+			conn->handshake_started();
+			if (!_ctx->watchdog().watch(conn, std::chrono::steady_clock::now() + _opts.handshake_timeout)) {
+				conn->close(); // without a deadline a silent client would keep the slot
+				continue;
+			}
+		}
 		if (!conn->start(true, weak_from_this(), _opts.max_message_size))
 			conn->close();
 	}

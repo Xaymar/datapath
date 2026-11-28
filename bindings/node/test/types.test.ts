@@ -10,7 +10,7 @@ import { connect, host, Context, DatapathError, codes, type Socket, type ErrorCo
 
 async function main(): Promise<void> {
 	const context = new Context({ ioThreads: 0, spin: 0, priority: 1 });
-	const server = host('typed', { permissions: 'group', maxClients: 4, context }, (sock: Socket) => {
+	const server = host('typed', { permissions: 'group', maxClients: 4, handshakeTimeout: 2000, context }, (sock: Socket) => {
 		sock.on('message', (data: Buffer) => {
 			sock.send(data);
 		});

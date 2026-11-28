@@ -90,6 +90,12 @@ namespace datapath {
 		size_t max_clients = 0;
 		// Time connect() waits for the server's handshake (connect() only).
 		std::chrono::milliseconds connect_timeout{1000};
+		// Time a connecting client has to send its handshake (host() only). A
+		// client that stays silent longer is disconnected, so it cannot hold a
+		// connection slot (max_clients) or a handle forever. The clock starts when
+		// the connection arrives and stops once the client's hello is in; waiting
+		// for on_accept afterwards does not count. 0 = no limit.
+		std::chrono::milliseconds handshake_timeout{5000};
 		// Receive buffer per connection. Frames that fit are delivered straight from
 		// it; larger frames use a temporary buffer of their own.
 		// Reads adapt their size to the traffic, so a large buffer does not slow

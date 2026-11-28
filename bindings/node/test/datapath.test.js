@@ -149,6 +149,16 @@ test('server close emits close and refuses new clients', async () => {
 	await assert.rejects(dp.connect(name, { connectTimeout: 200 }), { name: 'DatapathError' });
 });
 
+test('handshakeTimeout is accepted and spares finished handshakes', async () => {
+	const { server, client } = await echoPair({ host: { handshakeTimeout: 50 } });
+	await new Promise((resolve) => setTimeout(resolve, 200));
+	const reply = nextMessage(client);
+	client.send('still here');
+	assert.equal((await reply).toString(), 'still here');
+	client.close();
+	server.close();
+});
+
 test('custom context', async () => {
 	const context = new dp.Context({ ioThreads: 2, spin: 0 });
 	const { server, client } = await echoPair({ host: { context }, connect: { context } });
