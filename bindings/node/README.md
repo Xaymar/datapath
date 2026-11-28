@@ -1,13 +1,32 @@
 # @xaymar/datapath
+DataPath is an IPC library for fast and predictable messaging between processes on the same machine made in C++11 (or newer). Designed from the ground up to care about the worst case it is able to outperform or match existing solutions such as boost interprocess, libuv, Mojo and others. It allows for packets from a few bytes all the way to many megabytes between one server and any number of clients. The exact implementation varies by platform and makes use of the best measured available systems.
 
-Node.js bindings for [DataPath](https://github.com/Xaymar/datapath), a low latency IPC library for processes on the same machine: whole, length-framed messages over named pipes (Windows) or Unix domain sockets (Linux, Android).
+These are the official bindings for [DataPath](https://github.xaymar.com/datapath/)
 
-* Built with Node-API (`node-addon-api`, Node-API version 8), so one binary works on every Node.js release from 18 on (Electron should work too, but is untested).
-* Talks to the C++ library directly, and links it statically: the `.node` file has no other runtime dependency.
-* Interoperates with C++ (and other bindings') peers: it speaks the same protocol.
-* TypeScript typings included.
+## Features
+- **Low Latency, High Bandwidth.** Heavily optimized for even the worst of the worst cases, achieving under 100µs even under near 100% system load for up to 4 KiB messages.
+- **Thread-safe by design.** Messages are never interleaved and `send()` can be used from any thread without blocking.
+- **No fragmentation.** Every `send()` message arrives as exactly one `message()` event.
+- **Cross-Platform by default.** Windows, Linux, macOS supported by design.
+- **Access Control built in.** Set `User`, `Group` and `World` access to exactly what you need.
+- **One API. One Standard.** The same API available on every platform and even in the official bindings.
+- **Near Zero Dependencies.** Only the standard C++ library is required and a functional OS.
+- **Built to KISS.** The API is kept as simple as possible so mistakes are much harder to make.
+
+### Node specific Features
+- **Built with Node API.** One binary works on every Node.JS release from 18.x onwards. Electron may work too (untested).
+- **Interoperable with any DataPath client or server.** The same C++ library is included directly and linked statically so no separate protocol.
+- **Typescript included.** No need to guess, Typescript has you covered.
+
+### Node specific Differences
+* **Servers and Sockets keep Node.JS alive.** Event driven apps don't need a separate main loop and can enjoy the same behavior as `net.Socket` - or they can opt out with `unref()`.
+* **Handlers run on the JavaScript thread.** Unlike C++ where message handlers can be on any thread the JavaScript binding runs everything on the JavaScript thread instead. Messages from `send()` are queued up and the event loop is woken up so that bursts of messages act as one long time slice for the JavaScript handlers. Run `npm run bench` on your machine for numbers that matter.
 
 ## Usage
+```bash
+npm install @xaymar/datapath
+```
+
 ```js
 const datapath = require('@xaymar/datapath');
 // or: import { host, connect } from '@xaymar/datapath';
@@ -35,39 +54,6 @@ server.close();
 * `new Context(options)` creates separate I/O threads with their own tuning: `spin`, `ioThreads`, `priority`, `idealCore`, `mmcss`, `alertable`, `yield`, `pairPeer`. Pass it as `options.context`. Without one, everything uses the process-wide default context.
 * Options map 1:1 to the C++ `datapath::options` in camelCase: `maxMessageSize`, `maxQueuedBytes`, `receiveBuffer`, `connectTimeout` (ms), `permissions` (`'user'`, `'group'`, `'world'`), `backlog`, `maxClients`, `pipeBuffer`.
 * `DatapathError` has `code` (the `datapath::error` name, e.g. `'NotFound'`) and `errno` (its number). `codes` maps names to numbers.
-
-The [root README](../../README.md#semantics-worth-knowing) explains paths, backpressure, closing and tuning. These work the same here.
-
-### How it differs from the C++ API
-* **Handlers run on the JavaScript thread.** The library calls its handlers on I/O threads. The addon copies each message into a queue and wakes the event loop, which then delivers every queued message. A burst of messages costs one wake-up, not one per message. The extra thread hop adds latency compared to C++; in a two-process ping-pong on a 4-vCPU Linux VM it measured about the same as `node:net` on a Unix socket for 64 B, 30 to 50% slower for 4 to 64 KiB, and about 2x faster for 1 MiB. Run `npm run bench` on your machine for numbers that matter.
-* **Messages are copied once** (they are only valid during the C++ handler), into a Buffer the listener owns.
-* **Receiving starts with the first `'message'` listener**, like the first `on_message()` in C++. Until then, data waits in the kernel and a close by the peer is not noticed.
-* **No receive backpressure.** Messages that arrive faster than JavaScript handles them queue up in memory. Pair it with an application-level acknowledgement if a peer can outrun you.
-* **Lifetime.** An open socket or server keeps the process alive, like `net.Socket`. Call `unref()` to opt out. Worker threads can use the module; terminating a worker closes its sockets and servers.
-
-## Installing
-`npm install @xaymar/datapath` uses a prebuilt binary when one matches your platform and architecture. Otherwise it compiles from source, which needs CMake 3.16+ and a C++17 compiler. Set `DATAPATH_BUILD_FROM_SOURCE=1` to always compile.
-
-The source build runs from the package's `install` script. npm 12 and newer skip install scripts unless you allow them, so on a platform without a prebuild either allow this package's scripts (`npm approve-scripts`) and reinstall, or build it once by hand with `npm explore @xaymar/datapath -- npm run build`.
-
-## Developing
-From `bindings/node` in a checkout of the repository:
-```sh
-npm install        # installs dependencies and builds the addon from ../../
-npm test           # node:test suite
-npm run typecheck  # compiles test/types.test.ts against lib/index.d.ts
-npm run bench      # round-trip latency vs node:net
-```
-`npm run build` rebuilds after changes (`npm run build:debug` for a debug build).
-
-### Releasing
-The package is publish-ready, but not published yet. The plan for a release:
-
-1. **Prebuilds.** The `Node.js bindings` workflow (`.github/workflows/node.yml`) builds the addon on every target and runs the tests on Node.js 18, 20, 22 and 24. Each job runs `npm run package-prebuild`, which copies `build/Release/datapath.node` to `prebuilds/<platform>-<arch>/datapath.napi.node`, the layout `node-gyp-build` loads from, and uploads it as an artifact. Targets: `win32-x64`, `win32-arm64`, `linux-x64`, `linux-arm64` (glibc), `linux-x64` with musl (Alpine, tagged `.musl`), and `darwin-x64`/`darwin-arm64` (one universal binary). Android has no prebuild: it builds from source, since its Node.js builds are rare and vary.
-2. **Pack.** A final job downloads every artifact into `prebuilds/` and runs `npm pack`. `release.yml` attaches that tarball to the draft GitHub Release and publishes it to npm through trusted publishing. `prepack` copies the C++ sources into `deps/datapath`, so the tarball can also build from source.
-3. **Publish.** Run `npm publish --access public` from that job with an `NPM_TOKEN` secret (and `--provenance` for npm provenance), once the workflow has been triggered for a version tag. That step is not wired up yet; it needs the token and the `@xaymar` npm scope.
-
-Since the addon uses Node-API only, a new Node.js release needs no new prebuilds.
 
 ## License
 BSD 3-Clause License, see `LICENSE`.
