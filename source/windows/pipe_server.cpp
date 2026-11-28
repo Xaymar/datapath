@@ -7,6 +7,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 #include "pipe_server.hpp"
 #include <algorithm>
+#include <chrono>
 #include "pipe_connection.hpp"
 #include "security.hpp"
 
@@ -159,6 +160,14 @@ void datapath::windows::pipe_listener::on_io(io_op* op, DWORD, DWORD err)
 		refill_locked();
 	}
 	_ctx->add_member(std::weak_ptr<datapath::detail::connection>(conn));
+	if (_opts.handshake_timeout.count() > 0) {
+		// Armed before the first read, so a hello can never beat its deadline.
+		conn->handshake_started();
+		if (!_ctx->watchdog().watch(conn, std::chrono::steady_clock::now() + _opts.handshake_timeout)) {
+			conn->close(); // without a deadline a silent client would keep the slot
+			return;
+		}
+	}
 	conn->begin_server_handshake(weak_from_this(), _opts.max_message_size);
 }
 

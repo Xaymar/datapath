@@ -88,6 +88,7 @@ pub struct datapath_options {
     pub shared_memory: u8,
     pub reserved: [u8; 7],
     pub shared_memory_size: u64,
+    pub handshake_timeout_ms: i64,
 }
 
 #[repr(C)]

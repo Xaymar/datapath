@@ -6,12 +6,14 @@
 from __future__ import annotations
 
 import array
+import errno
 import gc
 import os
 import subprocess
 import sys
 import textwrap
 import threading
+import time
 import uuid
 
 import pytest
@@ -260,6 +262,40 @@ def test_address_in_use():
     with pytest.raises(datapath.AddressInUseError):
         datapath.host(path)
     server.close()
+
+
+@pytest.mark.skipif(sys.platform not in ("linux", "win32"), reason="raw client needs a known socket path")
+def test_silent_client_is_dropped():
+    path = name()
+    server = datapath.host(path, handshake_timeout=0.2)
+    if sys.platform == "win32":
+        raw = open(rf"\\.\pipe\{path}", "r+b", buffering=0)
+        start = time.monotonic()
+        try:
+            assert raw.read(1) == b""  # the server closes the pipe instead of answering
+        except OSError as e:
+            # A pipe the server disconnected reads as ERROR_PIPE_NOT_CONNECTED (EINVAL).
+            assert isinstance(e, BrokenPipeError) or e.errno == errno.EINVAL
+    else:
+        import socket
+
+        raw = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        raw.connect(f"\0datapath.{path}")
+        raw.settimeout(T)
+        start = time.monotonic()
+        assert raw.recv(1) == b""  # closed without a reply
+    assert time.monotonic() - start < T
+    raw.close()
+    # Well-behaved clients are still served.
+    client = datapath.connect(path, connect_timeout=T)
+    server.accept(timeout=T).close()
+    client.close()
+    server.close()
+
+
+def test_handshake_timeout_must_be_non_negative():
+    with pytest.raises(ValueError):
+        datapath.host(name(), handshake_timeout=-1)
 
 
 def test_not_found():

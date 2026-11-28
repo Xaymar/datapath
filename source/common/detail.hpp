@@ -12,6 +12,7 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <functional>
 #include <memory>
 #include <string>
+#include "handshake_watchdog.hpp"
 
 namespace datapath { namespace detail {
 	class connection {
@@ -52,7 +53,17 @@ namespace datapath { namespace detail {
 		virtual datapath::error listen(std::shared_ptr<listener>& out, const std::string& path,
 									   const datapath::options& options) = 0;
 		// Close every connection and listener, then join the I/O threads.
+		// Implementations stop the watchdog first.
 		virtual void shutdown() = 0;
+
+		// Server-side handshake deadlines of this context's listeners.
+		handshake_watchdog& watchdog() noexcept
+		{
+			return _watchdog;
+		}
+
+		protected:
+		handshake_watchdog _watchdog;
 	};
 
 	std::shared_ptr<context_impl> make_platform_context(const datapath::context_options& options);

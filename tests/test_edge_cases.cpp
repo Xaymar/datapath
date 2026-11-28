@@ -111,6 +111,32 @@ TEST(client_waits_for_late_accept_handler)
 	CHECK(r.second->good());
 }
 
+// handshake_timeout ends once the hello is in: waiting for on_accept does not count.
+TEST(late_accept_handler_outlasts_handshake_timeout)
+{
+	auto              name = unique_name();
+	srv_ptr           server;
+	datapath::options so;
+	so.handshake_timeout = 50ms;
+	CHECK_EQ(datapath::host(server, name, so), error::Success);
+	datapath::options o;
+	o.connect_timeout = 5000ms;
+	auto pending      = connect_async(name, o);
+	std::this_thread::sleep_for(300ms);
+	sock_ptr keep;
+	latch    accepted;
+	server->on_accept([&](sock_ptr s) {
+		keep = s;
+		accepted.notify();
+		return true;
+	});
+	auto r = pending.get();
+	CHECK_EQ(r.first, error::Success);
+	CHECK(accepted.wait(1));
+	CHECK(r.second->good());
+	CHECK(keep->good());
+}
+
 // Clearing the handler makes new clients wait again until a new one is set.
 TEST(cleared_accept_handler_holds_clients)
 {

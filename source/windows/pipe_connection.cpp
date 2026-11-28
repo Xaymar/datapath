@@ -181,18 +181,21 @@ void datapath::windows::pipe_connection::hello_loop()
 void datapath::windows::pipe_connection::hello_done()
 {
 	datapath::detail::hello h{};
-	if (datapath::detail::decode_hello_any(_hello, h) != datapath::error::Success) {
+	bool known = datapath::detail::decode_hello_any(_hello, h) == datapath::error::Success;
+	if (known && h.version == datapath::detail::protocol_version_ext && _hello_need == datapath::detail::hello_size) {
+		// Version 3: the request trailer follows.
+		_hello_need = sizeof(_hello);
+		hello_loop();
+		return;
+	}
+	if (!handshake_finished())
+		return; // too late: handshake_timeout is closing the connection
+	if (!known) {
 		// Answer with our own hello so the client can report VersionMismatch,
 		// then close once it is written.
 		_graceful           = true;
 		_close_when_flushed = true;
 		complete_accept();
-		return;
-	}
-	if (h.version == datapath::detail::protocol_version_ext && _hello_need == datapath::detail::hello_size) {
-		// Version 3: the request trailer follows.
-		_hello_need = sizeof(_hello);
-		hello_loop();
 		return;
 	}
 	uint32_t want = 0, reserved = 0;

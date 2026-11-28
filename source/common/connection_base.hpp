@@ -33,6 +33,8 @@ namespace datapath { namespace detail {
 		std::atomic<bool>                _armed{false};
 		std::atomic<bool>                _close_fired{false};
 		std::atomic<int32_t>             _reason{int32_t(datapath::error::Closed)};
+		// Server-side handshake deadline: 0 none, 1 waiting for the hello, 2 expired.
+		std::atomic<int>                 _handshake{0};
 
 		protected:
 		std::atomic<bool> _closed{false};
@@ -134,6 +136,30 @@ namespace datapath { namespace detail {
 		}
 
 		public:
+		// Server side, before the read for the client hello is issued: a
+		// handshake_watchdog may expire it from now on.
+		void handshake_started() noexcept
+		{
+			_handshake.store(1, std::memory_order_release);
+		}
+		// The client hello is complete. False if the deadline passed first (the
+		// connection is then closing and must not be offered).
+		bool handshake_finished() noexcept
+		{
+			int expected = 1;
+			if (_handshake.compare_exchange_strong(expected, 0, std::memory_order_acq_rel))
+				return true;
+			return expected != 2;
+		}
+
+		// From handshake_watchdog: close with TimedOut unless the hello is in.
+		void handshake_expired()
+		{
+			int expected = 1;
+			if (_handshake.compare_exchange_strong(expected, 2, std::memory_order_acq_rel))
+				close_with(datapath::error::TimedOut);
+		}
+
 		datapath::error close_with(datapath::error reason)
 		{
 			if (_closed.exchange(true, std::memory_order_acq_rel))

@@ -140,6 +140,9 @@ pub struct Options {
     pub max_clients: usize,
     /// How long connect waits for the server's handshake (connect only).
     pub connect_timeout: Duration,
+    /// Time a connecting client has to send its handshake before it is
+    /// disconnected, zero = no limit (host only).
+    pub handshake_timeout: Duration,
     /// Receive buffer per connection.
     pub receive_buffer: usize,
     /// Windows kernel pipe buffer, 0 = same as `receive_buffer` (host only).
@@ -169,6 +172,7 @@ impl Default for Options {
             backlog: raw.backlog as usize,
             max_clients: raw.max_clients as usize,
             connect_timeout: Duration::from_millis(raw.connect_timeout_ms.max(0) as u64),
+            handshake_timeout: Duration::from_millis(raw.handshake_timeout_ms.max(0) as u64),
             receive_buffer: raw.receive_buffer as usize,
             pipe_buffer: raw.pipe_buffer as usize,
             shared_memory: raw.shared_memory != 0,
@@ -195,6 +199,7 @@ impl Options {
         raw.backlog = self.backlog as u64;
         raw.max_clients = self.max_clients as u64;
         raw.connect_timeout_ms = i64::try_from(self.connect_timeout.as_millis()).unwrap_or(i64::MAX);
+        raw.handshake_timeout_ms = i64::try_from(self.handshake_timeout.as_millis()).unwrap_or(i64::MAX);
         raw.receive_buffer = self.receive_buffer as u64;
         raw.pipe_buffer = self.pipe_buffer as u64;
         raw.shared_memory = u8::from(self.shared_memory);
