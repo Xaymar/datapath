@@ -748,4 +748,137 @@ TEST(rehost_while_old_client_holds_handle)
 	CHECK_EQ(again.start(name), error::Success);
 }
 
+// ------------------------------------------------- server-side handshake timeout
+
+TEST(silent_client_times_out)
+{
+	auto              name = unique_name();
+	echo_server       srv;
+	datapath::options so;
+	so.handshake_timeout = 200ms;
+	CHECK_EQ(srv.start(name, so), error::Success);
+	auto p = raw::connect(name); // never sends its hello
+	CHECK(p != nullptr);
+	CHECK(!raw::wait_closed(*p, 50));
+	CHECK(raw::wait_closed(*p, 5000));
+	CHECK_EQ(srv.accepted.value(), 0);
+	// Others are still served.
+	sock_ptr c;
+	CHECK_EQ(datapath::connect(c, name), error::Success);
+	CHECK(srv.accepted.wait(1));
+}
+
+TEST(partial_hello_times_out)
+{
+	auto              name = unique_name();
+	echo_server       srv;
+	datapath::options so;
+	so.handshake_timeout = 200ms;
+	so.shared_memory     = true;
+	CHECK_EQ(srv.start(name, so), error::Success);
+	auto p = raw::connect(name);
+	CHECK(p != nullptr);
+	// A version 3 hello whose extension trailer never follows, then half of a
+	// version 1 hello on a second connection.
+	uint8_t hello[datapath::detail::hello_size];
+	datapath::detail::encode_hello(hello, {datapath::detail::protocol_version_ext, 1 << 20});
+	CHECK(raw::write(*p, hello, sizeof(hello)));
+	auto q = raw::connect(name);
+	CHECK(q != nullptr);
+	datapath::detail::encode_hello(hello, {datapath::detail::protocol_version, 1 << 20});
+	CHECK(raw::write(*q, hello, sizeof(hello) / 2));
+	CHECK(raw::wait_closed(*p, 5000));
+	CHECK(raw::wait_closed(*q, 5000));
+	CHECK_EQ(srv.accepted.value(), 0);
+}
+
+TEST(silent_client_frees_its_slot)
+{
+	auto              name = unique_name();
+	echo_server       srv;
+	datapath::options so;
+	so.max_clients       = 1;
+	so.handshake_timeout = 200ms;
+	CHECK_EQ(srv.start(name, so), error::Success);
+	auto p = raw::connect(name); // takes the only slot and stays silent
+	CHECK(p != nullptr);
+	CHECK(raw::wait_closed(*p, 5000));
+	datapath::options co;
+	co.connect_timeout = 500ms;
+	sock_ptr c;
+	error    ec = error::Unknown;
+	for (int i = 0; i < 50 && ec != error::Success; i++) {
+		ec = datapath::connect(c, name, co);
+		if (ec != error::Success)
+			std::this_thread::sleep_for(20ms);
+	}
+	CHECK_EQ(ec, error::Success);
+	CHECK(srv.accepted.wait(1));
+}
+
+TEST(handshake_timeout_spares_finished_handshakes)
+{
+	auto              name = unique_name();
+	echo_server       srv;
+	datapath::options so;
+	so.handshake_timeout = 50ms;
+	CHECK_EQ(srv.start(name, so), error::Success);
+	std::vector<sock_ptr> clients(8);
+	for (auto& c : clients)
+		CHECK_EQ(datapath::connect(c, name), error::Success);
+	CHECK(srv.accepted.wait(int(clients.size())));
+	// Well past every deadline: the connections must still work.
+	std::this_thread::sleep_for(300ms);
+	for (auto& c : clients) {
+		latch    got;
+		c->on_message([&](const uint8_t*, size_t) { got.notify(); });
+		CHECK_EQ(c->send("ping", 4), error::Success);
+		CHECK(got.wait(1));
+		c->on_message(nullptr);
+		CHECK(c->good());
+	}
+	CHECK_EQ(srv.closed.value(), 0);
+}
+
+TEST(handshake_timeout_zero_waits_forever)
+{
+	auto              name = unique_name();
+	echo_server       srv;
+	datapath::options so;
+	so.handshake_timeout = 0ms;
+	CHECK_EQ(srv.start(name, so), error::Success);
+	auto p = raw::connect(name);
+	CHECK(p != nullptr);
+	CHECK(!raw::wait_closed(*p, 500));
+	// It still completes once the hello arrives.
+	uint8_t hello[datapath::detail::hello_size];
+	datapath::detail::encode_hello(hello, {datapath::detail::protocol_version, 1 << 20});
+	CHECK(raw::write(*p, hello, sizeof(hello)));
+	uint8_t reply[datapath::detail::hello_size];
+	CHECK(raw::read(*p, reply, sizeof(reply), 5000));
+	CHECK(srv.accepted.wait(1));
+}
+
+TEST(silent_clients_on_shut_down_context)
+{
+	// Deadlines that are still pending when the context goes away.
+	auto ctx  = datapath::context::create({std::chrono::microseconds(0), 2});
+	auto name = unique_name();
+	datapath::options so;
+	so.handshake_timeout = 10s;
+	srv_ptr server;
+	CHECK_EQ(datapath::host(server, name, so, ctx), error::Success);
+	server->on_accept([](sock_ptr) { return true; });
+	std::vector<raw::peer_ptr> peers;
+	for (int i = 0; i < 4; i++) {
+		peers.push_back(raw::connect(name));
+		CHECK(peers.back() != nullptr);
+	}
+	std::this_thread::sleep_for(50ms);
+	server.reset();
+	ctx.reset(); // last reference: shuts the context down
+	for (auto& p : peers)
+		CHECK(raw::wait_closed(*p, 5000));
+}
+
 TEST_MAIN()

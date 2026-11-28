@@ -1074,13 +1074,16 @@ NB_MODULE(_core, m)
 	m.def(
 		"host",
 		[](const std::string& path, datapath::permissions permissions, size_t backlog, size_t max_clients,
-		   std::optional<uint64_t> max_message_size, std::optional<uint64_t> max_queued_bytes,
-		   std::optional<size_t> receive_buffer, std::optional<size_t> pipe_buffer, nb::object context,
-		   nb::object on_accept) {
+		   double handshake_timeout, std::optional<uint64_t> max_message_size,
+		   std::optional<uint64_t> max_queued_bytes, std::optional<size_t> receive_buffer,
+		   std::optional<size_t> pipe_buffer, nb::object context, nb::object on_accept) {
+			if (!(handshake_timeout >= 0))
+				throw nb::value_error("handshake_timeout must be non-negative");
 			auto o        = make_options(max_message_size, max_queued_bytes, receive_buffer);
 			o.permissions = permissions;
 			o.backlog     = backlog;
 			o.max_clients = max_clients;
+			o.handshake_timeout = std::chrono::milliseconds(int64_t(handshake_timeout * 1000.0 + 0.5));
 			if (pipe_buffer)
 				o.pipe_buffer = *pipe_buffer;
 			auto                              ctx = context_of(context);
@@ -1102,18 +1105,19 @@ NB_MODULE(_core, m)
 			return out;
 		},
 		"path"_a, nb::kw_only(), "permissions"_a = datapath::permissions::User, "backlog"_a = 8, "max_clients"_a = 0,
-		"max_message_size"_a = nb::none(), "max_queued_bytes"_a = nb::none(), "receive_buffer"_a = nb::none(),
+		"handshake_timeout"_a = 5.0, "max_message_size"_a = nb::none(), "max_queued_bytes"_a = nb::none(), "receive_buffer"_a = nb::none(),
 		"pipe_buffer"_a = nb::none(), "context"_a = nb::none(), "on_accept"_a = nb::none(),
 		nb::sig("def host(path: str, *, permissions: Permissions = ..., backlog: int = 8, "
-				"max_clients: int = 0, max_message_size: int | None = None, max_queued_bytes: int | None = None, "
-				"receive_buffer: int | None = None, pipe_buffer: int | None = None, "
-				"context: Context | None = None, "
+				"max_clients: int = 0, handshake_timeout: float = 5.0, max_message_size: int | None = None, "
+				"max_queued_bytes: int | None = None, receive_buffer: int | None = None, "
+				"pipe_buffer: int | None = None, context: Context | None = None, "
 				"on_accept: collections.abc.Callable[[Socket], object] | None = None) -> Server"),
 		"Host a server at `path`. A bare name maps to \\\\.\\pipe\\<name> on Windows and to\n"
 		"the abstract socket datapath.<name> on Linux; on Linux a path starting with / is\n"
 		"a filesystem socket.\n\n"
 		"Clients are accepted at once and wait for accept(), unless `on_accept` is given\n"
-		"(see Server.on_accept()).");
+		"(see Server.on_accept()). A client that does not send its handshake within\n"
+		"`handshake_timeout` seconds is disconnected (0 = no limit).");
 
 	m.def("_shutdown", &shutdown, "Internal: called at interpreter exit.");
 }

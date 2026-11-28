@@ -162,8 +162,5 @@ sock.on('message', (data) => console.log(data.toString()));  // 'hello'
 sock.send('hello');
 ```
 
-## Known issues (work in progress)
-* No server-side handshake timeout: a local client that connects and never sends its hello holds a connection slot.
-
 ## License
 BSD 3-Clause License, see [`LICENSE`](LICENSE).

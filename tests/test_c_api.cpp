@@ -182,6 +182,7 @@ TEST(options_defaults_match_cpp)
 	CHECK_EQ(o.connect_timeout_ms, int64_t(oo.connect_timeout.count()));
 	CHECK_EQ(o.receive_buffer, uint64_t(oo.receive_buffer));
 	CHECK_EQ(o.pipe_buffer, uint64_t(oo.pipe_buffer));
+	CHECK_EQ(o.handshake_timeout_ms, int64_t(oo.handshake_timeout.count()));
 
 	datapath_context_options_init(nullptr);
 	datapath_options_init(nullptr);
@@ -221,6 +222,9 @@ TEST(invalid_arguments)
 	datapath_options_init(&o);
 	o.permissions = 7;
 	CHECK_EQ(datapath_connect("x", &o, nullptr, &s), DATAPATH_ERROR_INVALID_ARGUMENT);
+	datapath_options_init(&o);
+	o.handshake_timeout_ms = -1;
+	CHECK_EQ(datapath_host("x", &o, nullptr, &v), DATAPATH_ERROR_INVALID_ARGUMENT);
 	datapath_options_init(&o);
 	o.struct_size = 0;
 	CHECK_EQ(datapath_host("x", &o, nullptr, &v), DATAPATH_ERROR_INVALID_ARGUMENT);

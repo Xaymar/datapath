@@ -94,6 +94,8 @@ export interface HostOptions extends Options {
 	backlog?: number;
 	/** Maximum simultaneously connected clients; 0 = unlimited. Default 0. */
 	maxClients?: number;
+	/** Milliseconds a connecting client has to send its handshake before it is disconnected; 0 = no limit. Default 5000. */
+	handshakeTimeout?: number;
 	/** Windows only: kernel pipe buffer in bytes; 0 = same as receiveBuffer. Default 1 MiB. */
 	pipeBuffer?: number;
 }
