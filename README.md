@@ -69,35 +69,98 @@ if (datapath::connect(sock, "my-service") == datapath::error::Success) {
 See `samples/echo/main.cpp` for a complete program.
 
 ### C
-`#include <datapath/datapath.h>` exposes the same features as a plain C ABI for C programs and other languages' FFI: opaque handles, `datapath_error` return codes, callbacks with a `void* user`. Built with `DATAPATH_SHARED=ON`, the library exports only the C API on Linux. The header documents threading and ownership rules.
+```c
+#include <datapath/datapath.h>
 
-### Python
+static void echo(void* user, datapath_socket* sock, const uint8_t* data, size_t size) {
+    datapath_socket_send(sock, data, size);                // safe from callbacks
+}
+static int on_accept(void* user, datapath_server* server, datapath_socket* client) {
+    datapath_socket_set_on_message(client, echo, NULL, NULL);
+    return 1;                                              // accepted: datapath_socket_release() it when done
+}
+static void on_reply(void* user, datapath_socket* sock, const uint8_t* data, size_t size) {
+    /* data valid during the call */
+}
+
+// Server
+datapath_server* server = NULL;
+datapath_host("my-service", NULL, NULL, &server);          // NULL: default options and context
+datapath_server_set_on_accept(server, on_accept, NULL, NULL);
+
+// Client
+datapath_socket* sock = NULL;
+if (datapath_connect("my-service", NULL, NULL, &sock) == DATAPATH_SUCCESS) {
+    datapath_socket_set_on_message(sock, on_reply, NULL, NULL);
+    datapath_socket_send(sock, "hello", 5);
+}
+```
+
+### [Rust](https://crates.io/crates/com-xaymar-datapath)
+```bash
+cargo add com-xaymar-datapath --rename datapath
+```
+
+```rust
+use datapath::Socket;
+use std::sync::{Arc, Mutex};
+
+// Server
+let server = datapath::host("my-service")?;            // same paths as the C++ API
+let clients = Arc::new(Mutex::new(Vec::<Socket>::new()));
+let keep = clients.clone();
+server.on_accept(move |client: Socket| {
+    client.on_message(|sock, data| { let _ = sock.send(data); }).ok();  // echo
+    keep.lock().unwrap().push(client);                 // keep it, or the connection closes
+})?;
+
+// Client
+let sock = datapath::connect("my-service")?;
+sock.on_message(|_, data| println!("got {} bytes", data.len()))?;  // data valid during the call
+sock.send(b"hello")?;
+```
+
+See `bindings/rust/datapath/examples/echo.rs` for a complete program.
+
+### [Python](https://pypi.org/project/com.xaymar.datapath/)
 ```bash
 pip install com.xaymar.datapath
 ```
 
 ```python
 import datapath
+
+# Server
+clients = []
+def on_accept(client):
+    clients.append(client)                             # keep it, or the connection closes
+    client.on_message(lambda data: client.send(data))  # echo; runs on an I/O thread
+
+server = datapath.host("my-service", on_accept=on_accept)
+
+# Client
 with datapath.connect("my-service") as sock:
     sock.send(b"hello")
-    print(sock.recv(timeout=1.0))
+    print(sock.recv(timeout=1.0))                      # b'hello'
 ```
 
-Wheels cover CPython 3.10+ (including free-threaded builds) on Windows and Linux. See [python/README.md](python/README.md) for the API, the two ways to receive and their latency.
-
-### Node.js
+### [Node.js](https://www.npmjs.com/package/@xaymar/datapath)
 ```bash
 npm install @xaymar/datapath
 ```
-
 ```js
 const datapath = require('@xaymar/datapath');
+
+// Server
+const server = datapath.host('my-service', (client) => {
+    client.on('message', (data) => client.send(data));  // echo
+});
+
+// Client
 const sock = await datapath.connect('my-service');
-sock.on('message', (data) => console.log(data.toString()));
+sock.on('message', (data) => console.log(data.toString()));  // 'hello'
 sock.send('hello');
 ```
-
-A Node-API addon built on the C++ API, with TypeScript typings and prebuilt binaries for Windows and Linux, for Node.js 18+. See [bindings/node/README.md](bindings/node/README.md) for the API and how it differs from C++.
 
 ## Known issues (work in progress)
 * No server-side handshake timeout: a local client that connects and never sends its hello holds a connection slot.
