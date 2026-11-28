@@ -6,10 +6,12 @@
 
 """Builds the DataPath website into a static folder for GitHub Pages.
 
-The site follows the repository: the landing page pulls its comparison table
-and graphs from README.md, and the documentation pages are the Markdown files
-under docs/ and the binding READMEs, rendered as they are. Only the landing
-page layout and the getting-started guide live in website/.
+The site follows the repository: the landing page draws the graphs in
+docs/images, and the documentation pages are the Markdown files under docs/
+and the binding READMEs, rendered as they are. The landing page layout, its
+comparison text (content/compare.md) and the getting-started guide live in
+website/. README.md is only for the GitHub repository page; nothing here
+reads it.
 
     python website/build.py [--out _site]
 
@@ -208,11 +210,6 @@ def first_heading(text: str) -> str:
 	return m.group(1).strip() if m else "DataPath"
 
 
-def readme_section(readme: str, heading: str) -> str:
-	m = re.search(rf"^## {re.escape(heading)}\s*$(.*?)(?=^## |\Z)", readme, flags=re.M | re.S)
-	return m.group(1).strip() if m else ""
-
-
 def wrap_tables(html_text: str) -> str:
 	return re.sub(r"(<table>.*?</table>)", r'<div class="table-wrap">\1</div>', html_text, flags=re.S)
 
@@ -231,16 +228,19 @@ def build_doc_pages(mapping_src: dict[str, tuple[str, str]]) -> list[Page]:
 	return pages
 
 
-def build_home(readme: str, mapping: dict[str, str]) -> Page:
+COMPARE_SRC = "website/content/compare.md"
+
+
+def build_home(mapping: dict[str, str]) -> Page:
 	body = (SITE / "content/index.html").read_text(encoding="utf-8")
-	# The comparison block follows the README: its graphs and tables.
-	compare = readme_section(readme, "How it compares")
-	images = re.findall(r"!\[([^\]]*)\]\(([^)]+)\)", readme)
+	# README.md is only for the GitHub page: the graphs come from docs/images and
+	# the comparison text from content/compare.md.
+	compare = re.sub(r"<!--.*?-->", "", (ROOT / COMPARE_SRC).read_text(encoding="utf-8"), flags=re.S).strip()
 	figures = []
-	for i, (alt, src) in enumerate(images):
-		name = posixpath.basename(src)
-		platform = "Linux" if "linux" in name else ("Windows" if "windows" in name else name)
-		figures.append((platform, alt, "img/" + name))
+	for path in sorted((ROOT / "docs/images").glob("latency-p999-*.svg")):
+		name = path.name
+		platform = "Linux" if "linux" in name else ("Windows" if "windows" in name else path.stem)
+		figures.append((platform, "", "img/" + name))
 	tabs = "".join(
 		f'<button role="tab" class="tab" aria-selected="{"true" if i == 0 else "false"}" '
 		f'aria-controls="graph-{i}" id="graph-tab-{i}">{html.escape(p)}</button>'
@@ -257,7 +257,7 @@ def build_home(readme: str, mapping: dict[str, str]) -> Page:
 		for i, (_, alt, src) in enumerate(figures)
 	)
 	compare_html = render_markdown(compare)
-	compare_html = rewrite_links(compare_html, "README.md", "", mapping)
+	compare_html = rewrite_links(compare_html, COMPARE_SRC, "", mapping)
 	compare_html = wrap_tables(compare_html)
 	body = body.replace("{{graph_tabs}}", tabs).replace("{{graph_panels}}", panels)
 	body = body.replace("{{compare}}", compare_html)
@@ -430,7 +430,6 @@ def main() -> None:
 	mapping_src = collect_pages()
 	mapping = {src: dst for src, (dst, _) in mapping_src.items()}
 	mapping["README.md"] = ""
-	readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
 	docs = build_doc_pages(mapping_src)
 	by_path = {p.path: p for p in docs}
@@ -454,7 +453,7 @@ def main() -> None:
 		key=lambda p: p.path,
 	)
 
-	home = build_home(readme, mapping)
+	home = build_home(mapping)
 	start = build_start()
 	bench_index = build_index(
 		"benchmarks/", "Benchmarks",
