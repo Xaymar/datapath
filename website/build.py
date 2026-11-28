@@ -46,7 +46,7 @@ BRANCH = "root"
 DOC_PAGES = {
 	"docs/semantics.md": ("docs/semantics/", "docs"),
 	"CONTRIBUTING.md": ("docs/building/", "docs"),
-	"python/README.md": ("docs/python/", "docs"),
+	"bindings/python/README.md": ("docs/python/", "docs"),
 	"bindings/node/README.md": ("docs/node/", "docs"),
 	"bindings/rust/datapath/README.md": ("docs/rust/", "docs"),
 	"docs/comparisons/README.md": ("benchmarks/methodology/", "benchmarks"),

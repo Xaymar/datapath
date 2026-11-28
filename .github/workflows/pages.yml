@@ -12,7 +12,7 @@ on:
       - "docs/**"
       - "README.md"
       - "CONTRIBUTING.md"
-      - "python/README.md"
+      - "bindings/python/README.md"
       - "bindings/node/README.md"
       - "bindings/rust/datapath/README.md"
   push:
@@ -23,7 +23,7 @@ on:
       - "docs/**"
       - "README.md"
       - "CONTRIBUTING.md"
-      - "python/README.md"
+      - "bindings/python/README.md"
       - "bindings/node/README.md"
       - "bindings/rust/datapath/README.md"
   workflow_dispatch:

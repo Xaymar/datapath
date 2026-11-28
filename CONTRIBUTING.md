@@ -62,16 +62,16 @@ The same option also builds `cppipc-benchmark` ([cpp-ipc](https://github.com/mut
 When you report numbers, lead with p99.9, say which machine, OS and power plan they came from, and give the flags. A p50 improvement that costs tail latency is a regression for this project. Published numbers use worst-case placement: `--pin` the client and server to different physical cores, on different CCDs and NUMA nodes where the machine has them ([methodology](docs/comparisons/README.md#methodology)).
 
 ## Python bindings
-The bindings live in `python/` (nanobind, built by scikit-build-core from `pyproject.toml` in the repository root). Build and test them with:
+The bindings live in `bindings/python/` (nanobind, built by scikit-build-core from `pyproject.toml` in the repository root). Build and test them with:
 ```bash
 pip install . pytest
 ```
 ```bash
-pytest python/tests
+pytest bindings/python/tests
 ```
-For quicker iteration, configure CMake with `-DDATAPATH_BUILD_PYTHON=ON`; the build tree then has an importable package in `build/python/package`, so `PYTHONPATH=build/python/package pytest python/tests` tests it without installing. Release wheels are built by `.github/workflows/python.yml` with cibuildwheel (settings in `pyproject.toml`); uploads happen in `release.yml` (see Releasing).
+For quicker iteration, configure CMake with `-DDATAPATH_BUILD_PYTHON=ON`; the build tree then has an importable package in `build/bindings/python/package`, so `PYTHONPATH=build/bindings/python/package pytest bindings/python/tests` tests it without installing. Release wheels are built by `.github/workflows/python.yml` with cibuildwheel (settings in `pyproject.toml`); uploads happen in `release.yml` (see Releasing).
 
-`python/benchmarks/pingpong.py local` measures Python round trips; add `--cpp-server build/samples/datapath-benchmark` to echo from the C++ server, and `--mode callback` to receive in callbacks instead of `recv()`.
+`bindings/python/benchmarks/pingpong.py local` measures Python round trips; add `--cpp-server build/samples/datapath-benchmark` to echo from the C++ server, and `--mode callback` to receive in callbacks instead of `recv()`.
 
 ## Versioning
 DataPath follows [Semantic Versioning](https://semver.org): MAJOR changes on any API- or ABI-incompatible change (the shared library's SOVERSION is MAJOR), MINOR on compatible additions, PATCH on compatible fixes. The version lives in `CMakeLists.txt` (`DATAPATH_VERSION_MAJOR/MINOR/PATCH`); the Python package reads it from there, and `bindings/node/package.json` and `bindings/rust/Cargo.toml` (plus the `=` dependency in `bindings/rust/datapath/Cargo.toml`) must carry the same number. Wire-protocol versions are separate and unrelated.

@@ -11,7 +11,7 @@ build-backend = "scikit_build_core.build"
 name = "com.xaymar.datapath"
 dynamic = ["version"]
 description = "Fast, predictable message passing between processes on the same machine"
-readme = "python/README.md"
+readme = "bindings/python/README.md"
 requires-python = ">=3.10"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
@@ -46,10 +46,10 @@ build-dir = "build/python/{wheel_tag}"
 cmake.build-type = "Release"
 # abi3 wheel for CPython 3.12+; older and free-threaded interpreters get their own.
 wheel.py-api = "cp312"
-wheel.packages = ["python/datapath"]
+wheel.packages = ["bindings/python/datapath"]
 # Only the extension module; the C++ library's own install rules stay out.
 install.components = ["python"]
-sdist.include = ["include/**", "source/**", "cmake/**", "python/**"]
+sdist.include = ["include/**", "source/**", "cmake/**", "bindings/python/**"]
 sdist.exclude = [
     ".github/**", "build/**", "build-*/**", "docs/**", "samples/**", "tests/**",
     "**/__pycache__/**",
@@ -72,7 +72,7 @@ regex = '''(?sx)
 result = "{major}.{minor}.{patch}"
 
 [tool.pytest.ini_options]
-testpaths = ["python/tests"]
+testpaths = ["bindings/python/tests"]
 
 [tool.cibuildwheel]
 # CPython 3.10/3.11 get version-specific wheels, 3.12+ shares one abi3 wheel
@@ -81,8 +81,8 @@ testpaths = ["python/tests"]
 build = ["cp310-*", "cp311-*", "cp312-*", "cp314t-*", "cp315t-*"]
 skip = ["*-win32", "*_i686"]
 test-groups = ["test"]
-test-sources = ["python/tests", "pyproject.toml"]
-test-command = "pytest -q python/tests"
+test-sources = ["bindings/python/tests", "pyproject.toml"]
+test-command = "pytest -q bindings/python/tests"
 build-verbosity = 1
 
 [tool.cibuildwheel.linux]
