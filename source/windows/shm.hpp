@@ -59,10 +59,13 @@ namespace datapath { namespace windows {
 
 		// Server: create the objects for the client of `pipe` and fill `offer`.
 		static datapath::error create(std::unique_ptr<shm_channel>& out, HANDLE pipe, uint64_t ring_size,
-									  uint64_t limit, uint64_t max_queued, uint8_t (&offer)[shm_offer_size]);
+									  uint64_t limit, uint64_t max_queued, bool zero_copy,
+									  uint8_t (&offer)[shm_offer_size]);
 		// Client: open what the server offered.
+		// zero_copy (options::shared_memory_zero_copy): deliver messages straight
+		// from the ring when the peer is the same user; otherwise always copy.
 		static datapath::error open(std::unique_ptr<shm_channel>& out, const uint8_t (&offer)[shm_offer_size],
-									uint64_t limit, uint64_t max_queued);
+									uint64_t limit, uint64_t max_queued, bool zero_copy);
 
 		// See datapath::detail::shm::ring_pair.
 		datapath::error send(const buffer_view* parts, size_t count, bool& need_space)

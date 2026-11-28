@@ -99,8 +99,8 @@ namespace datapath {
 		// each connection on macOS (both ends; the OS default is 8 KiB). 0 = same
 		// as receive_buffer. Unused on Linux.
 		size_t pipe_buffer = size_t(1) << 20;
-		// Windows, Linux and Android, opt-in: move messages through shared memory
-		// instead of the pipe or socket when both ends set this. The pipe/socket
+		// Windows, Linux and Android, on by default: move messages through shared
+		// memory instead of the pipe or socket when both ends set this. The pipe/socket
 		// then only carries the handshake and tells each side when the other one
 		// is gone. Each direction gets a ring of shared_memory_size bytes that only
 		// the two processes can map; an idle receiver spins (context_options::spin)
@@ -109,11 +109,23 @@ namespace datapath {
 		// p99.9 under full CPU load 64 B 3 us vs 38 us, 16 KiB 77 vs 230 us, idle
 		// 64 B 1.1 vs 7.4 us. On Windows both processes must be in the same logon
 		// session, or the server must be allowed to create global objects
-		// (services are). A peer without this option, an older library, or a
-		// platform without support (macOS, iOS) connects as usual.
+		// (services are); a client that can't open the server's rings connects
+		// again over the pipe/socket. A peer without this option, an older
+		// library, or a platform without support (macOS, iOS) connects as usual.
+		// Each connection holds 2 x shared_memory_size of rings (on Windows
+		// committed up front, so 1000 clients at 4 MiB are ~8 GB of commit) and,
+		// on Linux, 5 more file descriptors.
 		// DATAPATH_SHARED_MEMORY=1 or 0 in the environment overrides this setting
-		// for every connection in the process.
-		bool shared_memory = false;
+		// for every connection in the process. Off by default before 1.1.0.
+		bool shared_memory = true;
+		// Deliver messages straight from the shared-memory ring, without copying
+		// them out first, when the peer runs as the same user. Off by default:
+		// the handler then always gets a private copy, as over a pipe or socket,
+		// so a hostile or broken peer can't change the bytes while the handler
+		// reads them. Turn it on only for peers you trust; it saves one memcpy
+		// per message (noticeable from about 64 KiB). Peers of another user are
+		// always copied. Each side decides for the messages it receives.
+		bool shared_memory_zero_copy = false;
 		// Ring size per direction with shared_memory, rounded up to a power of two
 		// (64 KiB .. 1 GiB). Messages larger than about the ring size are sent in
 		// pieces. The server's value is used.

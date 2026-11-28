@@ -78,6 +78,14 @@ export interface Options {
 	maxQueuedBytes?: number | bigint;
 	/** Receive buffer per connection, in bytes. Default 256 KiB. */
 	receiveBuffer?: number;
+	/**
+	 * Windows, Linux, Android: move messages through shared memory when both ends allow it.
+	 * Default true. A peer that doesn't (or macOS) connects over the pipe or socket.
+	 * `DATAPATH_SHARED_MEMORY=0` or `1` in the environment overrides it.
+	 */
+	sharedMemory?: boolean;
+	/** Ring size per direction with sharedMemory, in bytes (the server's value is used). Default 4 MiB. */
+	sharedMemorySize?: number;
 	/** Context to run on. Default: the process-wide default context. */
 	context?: Context;
 }

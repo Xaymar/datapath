@@ -518,7 +518,8 @@ namespace {
 					c.ideal_core == -2 ? "off" : c.ideal_core == -1 ? "auto" : std::to_string(c.ideal_core).c_str(), c.load ? "1MiB stream" : "off",
 					c.affinity < 0 && c.pin_server < 0 ? "off" : (std::to_string(c.affinity) + "," + std::to_string(c.pin_server)).c_str(),
 					c.pair ? "on" : "off",
-					// The library reads DATAPATH_SHARED_MEMORY=1/0 itself (Windows).
+					// The library reads DATAPATH_SHARED_MEMORY=1/0 itself; shared
+					// memory is on by default where it exists (Windows, Linux).
 					[] {
 						const char* v = std::getenv("DATAPATH_SHARED_MEMORY");
 						return !v || !*v ? "default" : v[0] == '0' ? "off" : "on";

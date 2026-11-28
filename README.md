@@ -3,6 +3,7 @@ DataPath is an IPC library for fast and predictable messaging between processes 
 
 ## Features
 - **Low Latency, High Bandwidth.** Heavily optimized for even the worst of the worst cases, achieving under 100µs even under near 100% system load for up to 4 KiB messages.
+- **Shared memory by default.** On Windows and Linux messages move through shared-memory rings that only the two processes can map, and each handler still gets a private copy a hostile peer can't change. Peers without it, and macOS, fall back to named pipes or Unix sockets.
 - **Thread-safe by design.** Messages are never interleaved and `send()` can be used from any thread without blocking.
 - **No fragmentation.** Every `send()` message arrives as exactly one `on_message()` call.
 - **Cross-Platform by default.** Windows, Linux, macOS supported by design, with Android and iOS following eventually.

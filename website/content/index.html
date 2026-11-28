@@ -42,8 +42,8 @@
 			<p>I/O threads busy-poll for 50 µs after the last event, then sleep in the kernel at raised priority. Zero-copy receive, several small messages per system call.</p>
 		</article>
 		<article>
-			<h3>Shared memory, opt-in</h3>
-			<p><code>options::shared_memory</code> moves messages through two rings mapped only by the two processes. The pipe or socket then carries just the handshake.</p>
+			<h3>Shared memory by default</h3>
+			<p>On Windows and Linux messages move through two rings mapped only by the two processes; the pipe or socket carries just the handshake. Handlers get a private copy a hostile peer can't change.</p>
 		</article>
 		<article>
 			<h3>Whole messages</h3>

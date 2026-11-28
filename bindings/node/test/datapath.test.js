@@ -89,6 +89,25 @@ test('8 MiB message intact', async () => {
 	server.close();
 });
 
+for (const [hostShm, connectShm] of [[true, true], [false, true], [true, false]]) {
+	test(`sharedMemory host=${hostShm} connect=${connectShm} echoes intact`, async () => {
+		const { server, client } = await echoPair({
+			host: { sharedMemory: hostShm, sharedMemorySize: 1 << 16 },
+			connect: { sharedMemory: connectShm },
+		});
+		try {
+			const data = Buffer.alloc(200000); // larger than the 64 KiB ring
+			for (let i = 0; i < data.length; i++) data[i] = (i * 31) & 0xff;
+			const reply = nextMessage(client);
+			assert.equal(client.send(data), true);
+			assert.ok(data.equals(await reply));
+		} finally {
+			client.close();
+			server.close();
+		}
+	});
+}
+
 test('connect to a missing server rejects with NotFound', async () => {
 	await assert.rejects(dp.connect(unique()), (err) => {
 		assert.ok(err instanceof dp.DatapathError);

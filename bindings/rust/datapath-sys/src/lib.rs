@@ -86,7 +86,8 @@ pub struct datapath_options {
     pub receive_buffer: u64,
     pub pipe_buffer: u64,
     pub shared_memory: u8,
-    pub reserved: [u8; 7],
+    pub shared_memory_zero_copy: u8,
+    pub reserved: [u8; 6],
     pub shared_memory_size: u64,
 }
 

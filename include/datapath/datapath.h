@@ -160,9 +160,13 @@ typedef struct datapath_options {
 	/* Windows kernel pipe buffer, 0 = receive_buffer; host only. Default 1 MiB. */
 	uint64_t pipe_buffer;
 	/* Windows, Linux, Android: use shared memory when both ends set this (see
-	 * options::shared_memory). Default 0. */
+	 * options::shared_memory). Default 1 (0 before 1.1.0). */
 	uint8_t  shared_memory;
-	uint8_t  reserved[7];
+	/* Deliver shared-memory messages from a same-user peer without copying them
+	 * out first (see options::shared_memory_zero_copy). Default 0. Was reserved,
+	 * so older callers that zeroed it keep the default. */
+	uint8_t  shared_memory_zero_copy;
+	uint8_t  reserved[6];
 	/* Ring size per direction with shared_memory. Default 4 MiB. */
 	uint64_t shared_memory_size;
 } datapath_options;

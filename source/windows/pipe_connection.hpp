@@ -63,6 +63,7 @@ namespace datapath { namespace windows {
 		std::atomic<bool>            _shm_active{false}; // send() writes to the ring itself
 		bool                         _shm_reading = false; // read chain is the liveness read
 		bool                         _shm_allowed;
+		bool                         _shm_zero_copy;
 		size_t                       _shm_size;
 		uint64_t                     _max_queued;
 		io_op                        _wake_op, _space_op;

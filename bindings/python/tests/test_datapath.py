@@ -417,3 +417,23 @@ def test_drop_last_reference_inside_callbacks():
         c3.close()
         assert done.wait(T)
         s3.close()
+
+
+@pytest.mark.parametrize("server_shm,client_shm", [(True, True), (False, True), (True, False), (False, False)])
+def test_shared_memory_option(server_shm, client_shm):
+    # Shared memory is on by default; either side turning it off falls back to
+    # the pipe or socket, and messages arrive intact either way.
+    path = name()
+    server = datapath.host(path, shared_memory=server_shm, shared_memory_size=1 << 16)
+    client = datapath.connect(path, connect_timeout=T, shared_memory=client_shm)
+    peer = server.accept(timeout=T)
+    try:
+        data = os.urandom(200_000)  # larger than the 64 KiB ring
+        client.send(data)
+        assert peer.recv(T) == data
+        peer.send(b"back")
+        assert client.recv(T) == b"back"
+    finally:
+        client.close()
+        peer.close()
+        server.close()

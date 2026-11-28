@@ -57,6 +57,31 @@ namespace {
 		return o;
 	}
 
+	datapath::options socket_options()
+	{
+		datapath::options o;
+		o.shared_memory = false;
+		return o;
+	}
+
+	// Whether `p` points into one of this process's shared-memory sections.
+	bool in_shm_section(const void* p)
+	{
+		auto  a = reinterpret_cast<uintptr_t>(p);
+		FILE* f = std::fopen("/proc/self/maps", "r");
+		if (!f)
+			return false;
+		char line[512];
+		bool hit = false;
+		while (!hit && std::fgets(line, sizeof(line), f)) {
+			unsigned long lo = 0, hi = 0;
+			if (std::strstr(line, "memfd:datapath-shm") && std::sscanf(line, "%lx-%lx", &lo, &hi) == 2)
+				hit = a >= lo && a < hi;
+		}
+		std::fclose(f);
+		return hit;
+	}
+
 	struct waiter {
 		std::mutex              lock;
 		std::condition_variable cv;
@@ -190,10 +215,11 @@ namespace {
 	}
 } // namespace
 
-TEST(options_default_off)
+TEST(options_default_on_with_copy)
 {
 	datapath::options o;
-	CHECK(!o.shared_memory);
+	CHECK(o.shared_memory);
+	CHECK(!o.shared_memory_zero_copy);
 	CHECK(o.shared_memory_size > 0);
 	CHECK(datapath::posix::shm_link::supported());
 }
@@ -276,7 +302,7 @@ TEST(client_only_uses_socket)
 {
 	auto        name = unique_name();
 	echo_server srv;
-	CHECK_EQ(srv.start(name, datapath::options{}), error::Success);
+	CHECK_EQ(srv.start(name, socket_options()), error::Success);
 	auto c = connect_internal(name, shm_options());
 	CHECK(c != nullptr);
 	CHECK(!c->shared_memory_active());
@@ -295,7 +321,7 @@ TEST(server_only_uses_socket)
 	auto        name = unique_name();
 	echo_server srv;
 	CHECK_EQ(srv.start(name), error::Success);
-	auto c = connect_internal(name, datapath::options{});
+	auto c = connect_internal(name, socket_options());
 	CHECK(c != nullptr);
 	CHECK(!c->shared_memory_active());
 	auto   sock = std::make_shared<datapath::socket>(c);
@@ -416,13 +442,15 @@ TEST(server_answers_version_3_with_offer_and_fds)
 }
 
 // A hostile server hands over a memfd it can still shrink: the client must
-// refuse it instead of mapping memory that could raise SIGBUS later.
+// refuse it instead of mapping memory that could raise SIGBUS later, and
+// connect again over the plain socket.
 TEST(client_refuses_unsealed_section)
 {
 	auto name = unique_name();
 	int  lfd  = raw_listen(name);
 	CHECK(lfd >= 0);
-	std::thread server([&] {
+	std::vector<uint32_t> versions;
+	std::thread           server([&] {
 		int fd = ::accept(lfd, nullptr, nullptr);
 		if (fd < 0)
 			return;
@@ -431,6 +459,9 @@ TEST(client_refuses_unsealed_section)
 			::close(fd);
 			return;
 		}
+		datapath::detail::hello in{};
+		datapath::detail::decode_hello_any(req, in);
+		versions.push_back(in.version);
 		const uint64_t cap = datapath::detail::shm::min_ring;
 		int            fds[datapath::posix::shm_fd_count];
 		fds[0] = int(::syscall(SYS_memfd_create, "hostile", MFD_CLOEXEC));
@@ -451,15 +482,62 @@ TEST(client_refuses_unsealed_section)
 		send_with_fds(fd, reply, sizeof(reply), fds, datapath::posix::shm_fd_count);
 		for (int f : fds)
 			::close(f);
-		std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+		// The client gives up on the offer and asks again with version 1.
+		int fd2 = ::accept(lfd, nullptr, nullptr);
+		if (fd2 >= 0) {
+			uint8_t hello[datapath::detail::hello_size] = {};
+			if (read_all(fd2, hello, sizeof(hello))) {
+				datapath::detail::hello in2{};
+				datapath::detail::decode_hello_any(hello, in2);
+				versions.push_back(in2.version);
+				datapath::detail::encode_hello(hello, {datapath::detail::protocol_version, 1024});
+				::send(fd2, hello, sizeof(hello), MSG_NOSIGNAL);
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(200));
+			::close(fd2);
+		}
 		::close(fd);
 	});
 	error ec = error::Success;
 	auto  c  = connect_internal(name, shm_options(), &ec);
 	server.join();
 	::close(lfd);
-	CHECK(c == nullptr);
-	CHECK_EQ(ec, error::VersionMismatch);
+	CHECK_EQ(ec, error::Success);
+	CHECK(c != nullptr);
+	CHECK(!c->shared_memory_active());
+	CHECK_EQ(versions.size(), size_t(2));
+	CHECK_EQ(versions[0], datapath::detail::protocol_version_ext);
+	CHECK_EQ(versions[1], datapath::detail::protocol_version);
+}
+
+// By default a same-user peer's messages reach the handler as a private copy,
+// so the peer can't change them while the handler reads; with
+// shared_memory_zero_copy they come straight from the ring.
+TEST(same_user_messages_copied_unless_zero_copy)
+{
+	for (bool zero_copy : {false, true}) {
+		auto        name = unique_name();
+		echo_server srv;
+		CHECK_EQ(srv.start(name), error::Success);
+		auto o                    = shm_options();
+		o.shared_memory_zero_copy = zero_copy;
+		auto c                    = connect_internal(name, o);
+		CHECK(c != nullptr);
+		CHECK(c->shared_memory_active());
+		auto              sock = std::make_shared<datapath::socket>(c);
+		std::atomic<int>  in_ring{-1};
+		waiter            w;
+		sock->on_message([&](const uint8_t* d, size_t n) {
+			if (n == 4) {
+				in_ring = in_shm_section(d) ? 1 : 0;
+				w.hit();
+			}
+		});
+		CHECK_EQ(sock->send("ping", 4), error::Success);
+		CHECK(w.wait(1));
+		CHECK_EQ(in_ring.load(), zero_copy ? 1 : 0);
+	}
 }
 
 // The peer's process ends without closing anything: the other side is told

@@ -250,7 +250,7 @@ void datapath::windows::shm_channel::wake_self() noexcept
 
 datapath::error datapath::windows::shm_channel::create(std::unique_ptr<shm_channel>& out, HANDLE pipe,
 													   uint64_t ring_size, uint64_t limit, uint64_t max_queued,
-													   uint8_t (&offer)[shm_offer_size])
+													   bool zero_copy, uint8_t (&offer)[shm_offer_size])
 {
 	if (!supported())
 		return datapath::error::NotSupported;
@@ -263,7 +263,7 @@ datapath::error datapath::windows::shm_channel::create(std::unique_ptr<shm_chann
 
 	auto o  = datapath::detail::make_unique<objects>();
 	o->cap  = cap;
-	o->copy = peer != own;
+	o->copy = !zero_copy || peer != own;
 
 	// Owner: everything. Peer: map read/write + query + read control (0x20007)
 	// on the section, modify state + synchronize (0x100002) on the events.
@@ -343,7 +343,7 @@ datapath::error datapath::windows::shm_channel::create(std::unique_ptr<shm_chann
 
 datapath::error datapath::windows::shm_channel::open(std::unique_ptr<shm_channel>& out,
 													 const uint8_t (&offer)[shm_offer_size], uint64_t limit,
-													 uint64_t max_queued)
+													 uint64_t max_queued, bool zero_copy)
 {
 	if (!supported())
 		return datapath::error::NotSupported;
@@ -365,13 +365,14 @@ datapath::error datapath::windows::shm_channel::open(std::unique_ptr<shm_channel
 		if (!(o->events[i] = OpenEventW(EVENT_MODIFY_STATE | SYNCHRONIZE, FALSE, (base + suffixes[i + 1]).c_str())))
 			return datapath::error::AccessDenied;
 
-	// Copy messages out before delivery unless the section's owner is our user.
+	// Copy messages out before delivery unless zero-copy was asked for and the
+	// section's owner is our user.
 	PSID                 owner = nullptr;
 	PSECURITY_DESCRIPTOR sd    = nullptr;
 	if (GetSecurityInfo(o->section, SE_KERNEL_OBJECT, OWNER_SECURITY_INFORMATION, &owner, nullptr, nullptr, nullptr,
 						&sd)
 		== ERROR_SUCCESS) {
-		o->copy = sid_string(owner) != current_user_sid();
+		o->copy = !zero_copy || sid_string(owner) != current_user_sid();
 		LocalFree(sd);
 	}
 	if (!(o->view = MapViewOfFile(o->section, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0)))

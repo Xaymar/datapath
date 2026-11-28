@@ -33,7 +33,7 @@ server.close();
 * `Server` emits `'connection' (socket)` and `'close'`. `close()` stops accepting; connected sockets stay open. A client accepted while no `'connection'` listener is attached is closed right away.
 * `Socket` emits `'message' (Buffer)` and `'close' (reason, hadError)`, which fires exactly once. Its methods are `send(data)` and `sendv(parts)`, which return `false` when the send queue is full (`WouldBlock`) and throw `TooLarge` or `Closed`, plus `close()`, `ref()` and `unref()`. Its properties are `connected` and `maxMessageSize`.
 * `new Context(options)` creates separate I/O threads with their own tuning: `spin`, `ioThreads`, `priority`, `idealCore`, `mmcss`, `alertable`, `yield`, `pairPeer`. Pass it as `options.context`. Without one, everything uses the process-wide default context.
-* Options map 1:1 to the C++ `datapath::options` in camelCase: `maxMessageSize`, `maxQueuedBytes`, `receiveBuffer`, `connectTimeout` (ms), `permissions` (`'user'`, `'group'`, `'world'`), `backlog`, `maxClients`, `pipeBuffer`.
+* Options map 1:1 to the C++ `datapath::options` in camelCase: `maxMessageSize`, `maxQueuedBytes`, `receiveBuffer`, `connectTimeout` (ms), `permissions` (`'user'`, `'group'`, `'world'`), `backlog`, `maxClients`, `pipeBuffer`, `sharedMemory` (default `true`), `sharedMemorySize`.
 * `DatapathError` has `code` (the `datapath::error` name, e.g. `'NotFound'`) and `errno` (its number). `codes` maps names to numbers.
 
 The [root README](../../README.md#semantics-worth-knowing) explains paths, backpressure, closing and tuning. These work the same here.

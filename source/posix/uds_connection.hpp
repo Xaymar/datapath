@@ -57,6 +57,7 @@ namespace datapath { namespace posix {
 		std::atomic<bool>         _shm_active{false}; // send() writes to the ring itself
 		bool                      _shm_reading = false; // loop thread only
 		bool                      _shm_allowed;
+		bool                      _shm_zero_copy;
 		size_t                    _shm_size;
 		uint64_t                  _max_queued;
 		std::shared_ptr<waker>    _data_waker, _space_waker;

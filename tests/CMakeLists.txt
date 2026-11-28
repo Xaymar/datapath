@@ -60,10 +60,11 @@ if(NOT WIN32)
 	datapath_add_test(test_posix)
 endif()
 if(WIN32 OR CMAKE_SYSTEM_NAME MATCHES "Linux|Android")
-	# The same suites with every connection on the shared-memory data path.
-	datapath_add_test_variant(test_integration shm DATAPATH_SHARED_MEMORY=1)
-	datapath_add_test_variant(test_edge_cases shm DATAPATH_SHARED_MEMORY=1)
-	set_tests_properties(test_integration.large_8mib_intact.shm PROPERTIES TIMEOUT 300)
+	# Connections use shared memory by default here; run the same suites again
+	# with every connection on the pipe or socket.
+	datapath_add_test_variant(test_integration noshm DATAPATH_SHARED_MEMORY=0)
+	datapath_add_test_variant(test_edge_cases noshm DATAPATH_SHARED_MEMORY=0)
+	set_tests_properties(test_integration.large_8mib_intact.noshm PROPERTIES TIMEOUT 300)
 endif()
 if(CMAKE_SYSTEM_NAME MATCHES "Linux|Android")
 	datapath_add_test(test_posix_shm INTERNAL)

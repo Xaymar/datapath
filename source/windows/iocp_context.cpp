@@ -697,17 +697,22 @@ datapath::error datapath::windows::iocp_context::connect(std::shared_ptr<datapat
 			CloseHandle(h);
 			return ec;
 		}
+		if (got_shm
+			&& shm_channel::open(shm, offer, std::min(opts.max_message_size, reply.max_message_size),
+								 opts.max_queued_bytes, opts.shared_memory_zero_copy)
+				   != datapath::error::Success) {
+			// The rings the server offered can't be opened here (another logon
+			// session, say): connect again without asking for them.
+			CloseHandle(h);
+			shm.reset();
+			got_shm  = false;
+			pair_cpu = -1;
+			continue;
+		}
 		break;
 	}
 
 	auto limit = std::min(opts.max_message_size, reply.max_message_size);
-	if (got_shm) {
-		auto ec = shm_channel::open(shm, offer, limit, opts.max_queued_bytes);
-		if (ec != datapath::error::Success) {
-			CloseHandle(h);
-			return ec;
-		}
-	}
 	bool skip  = associate(h);
 	auto conn  = std::make_shared<pipe_connection>(shared_from_this(), h, skip, opts, limit);
 	if (shm)
