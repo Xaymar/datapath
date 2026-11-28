@@ -7,7 +7,7 @@ one message on the other end.
 
 ```toml
 [dependencies]
-datapath = { package = "com-xaymar-datapath", version = "2" }
+datapath = { package = "com-xaymar-datapath", version = "1" }
 ```
 
 ```rust
