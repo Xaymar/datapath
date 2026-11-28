@@ -1,76 +1,65 @@
-# DataPath for Python
-**Fast, predictable message passing between processes on the same machine.**
+# com.xaymar.datapath
+DataPath is an IPC library for fast and predictable messaging between processes on the same machine made in C++11 (or newer). Designed from the ground up to care about the worst case it is able to outperform or match existing solutions such as boost interprocess, libuv, Mojo and others. It allows for packets from a few bytes all the way to many megabytes between one server and any number of clients. The exact implementation varies by platform and makes use of the best measured available systems.
 
-Python bindings for [DataPath](https://github.com/Xaymar/datapath), a C++ IPC library built for low tail latency. It moves whole, length-framed messages between one server and any number of clients, over named pipes with I/O completion ports on Windows and Unix domain sockets with epoll on Linux.
+These are the official bindings for [DataPath](https://github.xaymar.com/datapath/)
 
+## Features
+- **Low Latency, High Bandwidth.** Heavily optimized for even the worst of the worst cases, achieving under 100µs even under near 100% system load for up to 4 KiB messages.
+- **Thread-safe by design.** Messages are never interleaved and `send()` can be used from any thread without blocking.
+- **No fragmentation.** Every `send()` message arrives as exactly one `recv()` result or `on_message()` call.
+- **Cross-Platform by default.** Windows, Linux, macOS supported by design.
+- **Access Control built in.** Set `User`, `Group` and `World` access to exactly what you need.
+- **One API. One Standard.** The same API available on every platform and even in the official bindings.
+- **Near Zero Dependencies.** Only the standard C++ library is required and a functional OS.
+- **Built to KISS.** The API is kept as simple as possible so mistakes are much harder to make.
+
+### Python specific Features
+- **Prebuilt wheels.** CPython 3.10 and newer on Windows, Linux and macOS, x86-64 and ARM64. One abi3 wheel covers 3.12+, and free-threaded 3.14t/3.15t builds run without the GIL.
+- **Interoperable with any DataPath client or server.** The same C++ library is included directly and linked statically so no separate protocol.
+- **Type hints included.** The package ships `.pyi` stubs and `py.typed`.
+- **Any bytes-like object.** `send()` takes `bytes`, `bytearray`, `memoryview`, NumPy arrays and anything else with a contiguous buffer.
+- **Pythonic errors.** Every error derives from `DatapathError` and from the closest built-in exception, so `except ConnectionError:` or `except TimeoutError:` just work.
+
+### Python specific Differences
+* **Two ways to receive.** `recv()` and `accept()` are blocking calls for your own thread: the I/O thread copies each message into a queue without touching the interpreter, so a busy Python thread can never stall other connections. `on_message()` and `on_accept()` instead call your function directly on an I/O thread, which is close to the C++ latency but has to take the GIL first (up to `sys.getswitchinterval()` while another thread holds it, no wait on free-threaded Python). Setting `on_message` hands over already queued messages in order, and `on_message(None)` switches back to `recv()`.
+* **Messages are copied.** Every message becomes a new `bytes` object, or is copied into your own buffer with `recv_into()`. The `recv()` queue is not bounded, so read it as fast as messages arrive.
+* **The server accepts at once.** `host()` accepts every client right away and queues it for `accept()`, because a client's `connect()` only completes once the server accepted it. Pass `on_accept=` to `host()` to decide per client instead: returning `False` rejects it.
+* **Dropping the last reference closes.** Sockets, servers and contexts close when garbage collected, so keep accepted sockets somewhere. All of them are context managers too.
+* **Timeouts are in seconds.** `None` waits forever, and waits can be interrupted with Ctrl+C. Spin settings are in microseconds. Run `python bindings/python/benchmarks/pingpong.py local --help` on your machine for numbers that matter.
+
+## Usage
 ```bash
 pip install com.xaymar.datapath
 ```
-The distribution is called `com.xaymar.datapath` (PyPI has no namespaces); the import name is `datapath`. Wheels are built for CPython 3.10 and newer (one abi3 wheel covers 3.12+, and free-threaded 3.14t/3.15t builds run without the GIL) on Windows, Linux and macOS, x86-64 and ARM64.
 
-## Usage
 ```python
 import datapath
 
-# Server
-with datapath.host("my-service") as server:
-    client = server.accept()          # waits for the next client
-    while True:
-        data = client.recv()          # bytes; raises ClosedError when the client leaves
-        client.send(data.upper())
-
-# Client, in another process
-with datapath.connect("my-service") as sock:
-    sock.send(b"hello")
-    print(sock.recv(timeout=1.0))     # b'HELLO'
-```
-
-Callbacks instead of `recv()`/`accept()`:
-```python
+# Server: echo every message.
 clients = []
-
-def on_accept(sock: datapath.Socket) -> None:
-    clients.append(sock)                         # keep it, or the connection closes
-    sock.on_message(lambda data: sock.send(data))  # runs on an I/O thread
+def on_accept(sock):
+    clients.append(sock)                               # keep it, or the connection closes
+    sock.on_message(lambda data: sock.send(data))      # runs on an I/O thread
     sock.on_close(lambda reason: clients.remove(sock))
 
 server = datapath.host("my-service", on_accept=on_accept)
+
+# Client.
+with datapath.connect("my-service") as sock:
+    sock.send(b"hello")                                # any bytes-like object
+    sock.sendv([b"he", b"llo"])                        # one message from several parts, without joining them first
+    print(sock.recv(timeout=1.0))                      # b'hello'
+server.close()
 ```
 
-## Two ways to receive
-* **`recv()` / `accept()`**: the I/O thread copies each message into a queue without touching the interpreter. `recv()` busy-waits for `Socket.recv_spin_us` (default 50 µs) with the GIL released, then sleeps until a message arrives. Use this when your own thread drives the conversation, or when other Python threads are busy: the I/O thread never waits for the GIL, so one slow Python thread can't stall other connections.
-* **`on_message()` / `on_accept()`**: the I/O thread takes the GIL and calls your function. This skips the hand-off between threads and had the lowest latency in our measurements (below), close to the C++ library. The catch: when another Python thread holds the GIL, the I/O thread waits for it, up to `sys.getswitchinterval()` (5 ms by default) on GIL builds. On free-threaded Python there is no such wait.
-
-Setting `on_message` hands over any messages already queued for `recv()`, in order; `on_message(None)` switches back. While a callback is set, `recv()` raises `RuntimeError`.
-
-## Semantics worth knowing
-* **Messages are whole.** Each `send()` arrives as one `recv()` result or callback, never split or merged. `send()` takes any contiguous bytes-like object (`bytes`, `bytearray`, `memoryview`, NumPy arrays…); `sendv([a, b, c])` sends several parts as one message. `recv_into(buffer)` copies into your own buffer.
-* **`send()` never blocks.** It raises `TooLargeError` above the connection's `max_message_size` (default 64 MiB, the smaller of both peers' values), `WouldBlockError` when more than `max_queued_bytes` (default 64 MiB) is waiting, and `ClosedError` after the connection closed. It's thread-safe and can be called from callbacks.
-* **Closing.** `close()` drops unsent messages. Messages already received stay readable: `recv()` returns them, then raises `ClosedError`. `close_reason` tells why the connection ended. A peer's disconnect is noticed while the socket is receiving, which starts with the first `recv()`, `on_message()` or `on_close()`. Dropping the last reference to a socket or server closes it too, so keep accepted sockets somewhere.
-* **The server accepts at once.** A client's `connect()` only completes once the server accepted it, so `host()` accepts every client right away and queues it for `accept()`. Pass `on_accept=` to `host()` to decide per client: returning `False` rejects it, anything else (including `None`) accepts.
-* **Errors** derive from `datapath.DatapathError` (with the native code in `.error`) and from the closest built-in: `ClosedError` is a `ConnectionError`, `TimedOutError` a `TimeoutError`, `NotFoundError` a `FileNotFoundError`, `AccessDeniedError` a `PermissionError`, `WouldBlockError` a `BlockingIOError`, `TooLargeError` and `InvalidPathError` a `ValueError`.
-* **Exceptions in callbacks** go to `sys.unraisablehook` (printed to stderr by default). An exception in `on_accept` rejects the client.
-* **Contexts.** All sockets share one process-wide set of I/O threads unless you pass `context=datapath.Context(spin_us=..., io_threads=..., priority=...)`. The options are those of the C++ `context_options`; see the [main README](https://github.com/Xaymar/datapath#semantics-worth-knowing). Closing a context closes everything on it.
-* **Paths.** A bare name maps to `\\.\pipe\<name>` on Windows and to the abstract socket `datapath.<name>` on Linux; on Linux a path starting with `/` is a filesystem socket. Access is limited to the current user unless you pass `permissions=datapath.Permissions.Group` or `World`.
-* **Timeouts** are in seconds (`None` waits forever); waits can be interrupted with Ctrl+C. Spin settings are in microseconds.
-
-## Latency
-Round trip (send, echo, receive) between two Python processes, from `python/benchmarks/pingpong.py`, median of 3 runs of 20,000 round trips. Measured on 2026-11-19 in a 4-core cloud container (Intel Xeon 2.1 GHz, Linux 6.18, CPython 3.10), so absolute numbers are higher and noisier than on a desktop. p99.9 in µs:
-
-| | 8 B | 64 B | 4 KiB | 64 KiB |
-|---|---|---|---|---|
-| C++ client and server (`datapath-benchmark local`) | 43.5 | 30.0 | 71.1 | 252 |
-| Python, callbacks on both sides | 45.2 | 36.8 | 45.9 | 75 |
-| Python, `recv()` on both sides | 187 | 247 | 217 | 642 |
-
-With four cores, `recv()` mode has four threads spinning at once (an I/O thread and a Python thread per process), which is the oversubscription the main README warns about; expect it to do better with more cores. Run `python python/benchmarks/pingpong.py local --help` to measure your own machine, including against the C++ echo server (`--cpp-server`).
-
-## Building from source
-```bash
-pip install .            # from a checkout of the repository
-pip install pytest && pytest python/tests
-```
-This needs CMake 3.16+ and a C++17 compiler; scikit-build-core and nanobind are fetched automatically.
+### API
+* `host(path, *, on_accept=None, **options) → Server` hosts a server. Raises a `DatapathError` such as `AddressInUseError`.
+* `connect(path, *, connect_timeout=1.0, **options) → Socket` connects and returns after the handshake. Raises a `DatapathError` such as `NotFoundError` or `TimedOutError`.
+* `Server` has `accept(timeout=None)`, `on_accept(callback)` and `close()`, which stops accepting; connected sockets stay open. `accept_spin_us` sets how long `accept()` busy-waits before it sleeps.
+* `Socket` has `send(data)` and `sendv(parts)`, which never block and raise `WouldBlockError` when the send queue is full, `TooLargeError` or `ClosedError`. Receive with `recv(timeout=None)`, `recv_into(buffer, timeout=None)`, or `on_message(callback)`, and get told about the end with `on_close(callback)`. `close()` drops unsent messages; already received ones stay readable. Its properties are `good`, `closed`, `close_reason`, `max_message_size`, `pending` and `recv_spin_us`.
+* `Context(spin_us=50, io_threads=1, priority=2, mmcss=False, ideal_core=-1, alertable=False, yield_=False, pair_peer=False)` creates separate I/O threads with their own tuning. Pass it as `context=`. Without one, everything uses the process-wide default context. Closing a context closes everything on it.
+* Options map 1:1 to the C++ `datapath::options` in snake_case: `max_message_size`, `max_queued_bytes`, `receive_buffer`, `connect_timeout` (seconds, connect only), `permissions` (`Permissions.User`, `Group`, `World`), `backlog`, `max_clients`, `pipe_buffer` (host only).
+* `DatapathError` has `error`, the native `datapath.Error` code. The subclasses are `ClosedError`, `TimedOutError`, `NotFoundError`, `AccessDeniedError`, `AddressInUseError`, `WouldBlockError`, `TooLargeError`, `InvalidPathError`, `NotSupportedError` and `VersionMismatchError`. Exceptions raised in callbacks go to `sys.unraisablehook`; one in `on_accept` rejects the client.
 
 ## License
-BSD 3-Clause License. Copyright (c) 2017 - 2026, Narta Xaymar Dirks.
+BSD 3-Clause License, see `LICENSE`.
