@@ -102,7 +102,7 @@ with datapath.connect("my-service") as sock:
     sock.send(b"hello")
     print(sock.recv(timeout=1.0))
 ```
-Wheels cover CPython 3.10+ (including free-threaded builds) on Windows and Linux. See [python/README.md](python/README.md) for the API, the two ways to receive and their latency.
+Wheels cover CPython 3.10+ (including free-threaded builds) on Windows and Linux. See [bindings/python/README.md](bindings/python/README.md) for the API, the two ways to receive and their latency.
 
 ### Node.js
 ```bash

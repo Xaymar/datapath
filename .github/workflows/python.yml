@@ -11,7 +11,7 @@ on:
       - "CMakeLists.txt"
       - "include/**"
       - "pyproject.toml"
-      - "python/**"
+      - "bindings/python/**"
       - "source/**"
   push:
     branches: [root]
@@ -20,7 +20,7 @@ on:
       - "CMakeLists.txt"
       - "include/**"
       - "pyproject.toml"
-      - "python/**"
+      - "bindings/python/**"
       - "source/**"
   workflow_dispatch:
   workflow_call:
@@ -65,7 +65,7 @@ jobs:
       - name: Build and test a wheel from the sdist
         run: |
           python -m pip install dist/*.tar.gz pytest
-          cd python/tests && python -m pytest -q
+          cd bindings/python/tests && python -m pytest -q
       - uses: actions/upload-artifact@v7
         with:
           name: sdist
