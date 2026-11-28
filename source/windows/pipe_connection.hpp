@@ -19,7 +19,7 @@ namespace datapath { namespace windows {
 	class pipe_listener;
 
 	class pipe_connection : public datapath::detail::connection_base, public io_target, public poll_target {
-		enum op_kind : int { k_read = 1, k_write, k_arm, k_close, k_hello, k_wake, k_space };
+		enum op_kind : int { k_read = 1, k_write, k_arm, k_close, k_hello, k_wake, k_space, k_resume, k_drain };
 		enum class io_result { done, pending, failed };
 
 		std::shared_ptr<iocp_context> _ctx;
@@ -27,7 +27,7 @@ namespace datapath { namespace windows {
 		HANDLE                        _h;
 		bool                          _skip_on_success;
 
-		io_op _rop, _wop, _aop, _cop, _hop;
+		io_op _rop, _wop, _aop, _cop, _hop, _resop, _dop;
 
 		// Writer-slot state.
 		std::vector<uint8_t> _wbatch;
@@ -62,6 +62,10 @@ namespace datapath { namespace windows {
 		std::atomic<bool>            _shm_ready{false};  // the writer slot writes to the ring
 		std::atomic<bool>            _shm_active{false}; // send() writes to the ring itself
 		bool                         _shm_reading = false; // read chain is the liveness read
+		// The liveness read completed (peer gone) while receiving was paused; the
+		// close waits for k_resume. _gone_error is its result.
+		std::atomic<bool>            _shm_gone{false};
+		DWORD                        _gone_error = 0;
 		bool                         _shm_allowed;
 		size_t                       _shm_size;
 		uint64_t                     _max_queued;
@@ -71,6 +75,7 @@ namespace datapath { namespace windows {
 		uint8_t                      _probe   = 0;
 
 		void start_shm_reading();
+		void shm_peer_gone(DWORD err);
 		void activate_shm();
 		void flush_queue_to_shm();
 		void arm_wake();
@@ -91,6 +96,8 @@ namespace datapath { namespace windows {
 		void platform_close() override;
 		void platform_arm() override;
 		void platform_post_close() override;
+		void platform_resume() override;
+		void platform_post_drain() override;
 		void platform_write() override;
 		void after_inline_write() override;
 		void on_finished() override;

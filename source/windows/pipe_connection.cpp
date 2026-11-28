@@ -61,6 +61,8 @@ datapath::windows::pipe_connection::pipe_connection(std::shared_ptr<iocp_context
 	_aop.kind = k_arm;
 	_cop.kind = k_close;
 	_hop.kind = k_hello;
+	_resop.kind = k_resume;
+	_dop.kind   = k_drain;
 }
 
 datapath::windows::pipe_connection::~pipe_connection()
@@ -108,6 +110,13 @@ void datapath::windows::pipe_connection::read_loop()
 			finish_close();
 			return;
 		}
+		if (stall_if_paused())
+			return; // no read pending; resume() restarts the chain
+		if (unparsed()) {
+			if (!resume_buffered())
+				return;
+			continue;
+		}
 		auto  area  = _parser.prepare();
 		DWORD bytes = 0, err = 0;
 		switch (issue(false, area.first, area.second, _rop, bytes, err)) {
@@ -138,6 +147,7 @@ void datapath::windows::pipe_connection::write_loop()
 			if (!_queue.take(_wbatch)) {
 				if (_close_when_flushed)
 					close_with(datapath::error::VersionMismatch);
+				check_drained();
 				return;
 			}
 		}
@@ -292,6 +302,17 @@ void datapath::windows::pipe_connection::platform_post_close()
 		finish_close();
 }
 
+void datapath::windows::pipe_connection::platform_resume()
+{
+	if (!_ctx->post(_resop, self()))
+		close_with(datapath::error::Closed), finish_close();
+}
+
+void datapath::windows::pipe_connection::platform_post_drain()
+{
+	_ctx->post(_dop, self()); // fails only while the context shuts down
+}
+
 void datapath::windows::pipe_connection::platform_write()
 {
 	if (_shm_ready.load(std::memory_order_acquire)) {
@@ -393,14 +414,7 @@ void datapath::windows::pipe_connection::on_io(io_op* op, DWORD bytes, DWORD err
 	case k_read:
 		if (_shm_reading) {
 			// The liveness read: the peer closed its pipe or its process ended.
-			// Messages it put in the ring before that are still delivered.
-			while (_polling.test_and_set(std::memory_order_acquire))
-				SwitchToThread();
-			if (!_closed.load(std::memory_order_acquire))
-				_shm->poll([this](const uint8_t* d, size_t n) { return deliver_message(d, n); });
-			_polling.clear(std::memory_order_release);
-			close_with(err == ERROR_SUCCESS ? datapath::error::Closed : map_error(err));
-			finish_close();
+			shm_peer_gone(err);
 			return;
 		}
 		if (err != ERROR_SUCCESS) {
@@ -438,10 +452,26 @@ void datapath::windows::pipe_connection::on_io(io_op* op, DWORD bytes, DWORD err
 			close_with(datapath::error::Failure);
 		else if (need)
 			arm_space();
+		if (_shm->take_drained())
+			post_drain();
 		return;
 	}
 	case k_close:
 		finish_close();
+		return;
+	case k_resume:
+		if (_shm_reading) {
+			owner.store(iocp_context::thread_index(), std::memory_order_relaxed);
+			if (_shm_gone.exchange(false, std::memory_order_acq_rel))
+				shm_peer_gone(_gone_error);
+			else
+				poll();
+		} else {
+			read_loop();
+		}
+		return;
+	case k_drain:
+		fire_drain();
 		return;
 	case k_hello:
 		if (err != ERROR_SUCCESS) {
@@ -478,6 +508,8 @@ datapath::error datapath::windows::pipe_connection::send(const buffer_view* part
 		close_with(datapath::error::Failure);
 	else if (need)
 		arm_space();
+	if (need && _shm->take_drained()) // arm_space() may have moved everything already
+		post_drain();
 	return ec;
 }
 
@@ -516,6 +548,9 @@ void datapath::windows::pipe_connection::flush_queue_to_shm()
 	_woff = 0;
 	if (need)
 		arm_space();
+	if (need && _shm->take_drained())
+		post_drain();
+	check_drained();
 }
 
 void datapath::windows::pipe_connection::start_shm_reading()
@@ -540,10 +575,40 @@ void datapath::windows::pipe_connection::start_shm_reading()
 	}
 }
 
+void datapath::windows::pipe_connection::shm_peer_gone(DWORD err)
+{
+	// Messages the peer put in the ring before it went away are still delivered,
+	// and while receiving is paused the close waits for them (k_resume).
+	while (_polling.test_and_set(std::memory_order_acquire))
+		SwitchToThread();
+	// Flagged before the stall: the k_resume a stall leads to may run right away.
+	_gone_error = err;
+	_shm_gone.store(true, std::memory_order_release);
+	bool stalled = false;
+	if (!_closed.load(std::memory_order_acquire)) {
+		stalled = stall_if_paused();
+		if (!stalled) {
+			_shm->poll([this](const uint8_t* d, size_t n) { return deliver_message(d, n); });
+			stalled = stall_if_paused();
+		}
+	}
+	if (!stalled)
+		_shm_gone.store(false, std::memory_order_release);
+	_polling.clear(std::memory_order_release);
+	if (stalled)
+		return;
+	close_with(err == ERROR_SUCCESS ? datapath::error::Closed : map_error(err));
+	finish_close();
+}
+
 bool datapath::windows::pipe_connection::poll()
 {
 	if (_closed.load(std::memory_order_acquire) || _polling.test_and_set(std::memory_order_acquire))
 		return false;
+	if (stall_if_paused()) {
+		_polling.clear(std::memory_order_release);
+		return false;
+	}
 	int r = _shm->poll([this](const uint8_t* d, size_t n) { return deliver_message(d, n); });
 	_polling.clear(std::memory_order_release);
 	if (r < 0)
@@ -554,6 +619,9 @@ bool datapath::windows::pipe_connection::poll()
 bool datapath::windows::pipe_connection::prepare_block()
 {
 	if (_closed.load(std::memory_order_acquire))
+		return true;
+	// Paused: block without arming the wake-up; resume() posts k_resume.
+	if (paused() && stall_if_paused())
 		return true;
 	if (!_shm->prepare_block())
 		return false;

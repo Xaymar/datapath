@@ -198,6 +198,9 @@ TEST(invalid_arguments)
 	CHECK_EQ(datapath_host("x", nullptr, nullptr, nullptr), DATAPATH_ERROR_INVALID_ARGUMENT);
 	CHECK_EQ(datapath_context_create(nullptr, nullptr), DATAPATH_ERROR_INVALID_ARGUMENT);
 	CHECK_EQ(datapath_context_get_default(nullptr), DATAPATH_ERROR_INVALID_ARGUMENT);
+	CHECK_EQ(datapath_socket_pause(nullptr), DATAPATH_ERROR_INVALID_ARGUMENT);
+	CHECK_EQ(datapath_socket_resume(nullptr), DATAPATH_ERROR_INVALID_ARGUMENT);
+	CHECK_EQ(datapath_socket_set_on_drain(nullptr, nullptr, nullptr, nullptr), DATAPATH_ERROR_INVALID_ARGUMENT);
 	CHECK_EQ(datapath_socket_send(nullptr, "x", 1), DATAPATH_ERROR_INVALID_ARGUMENT);
 	CHECK_EQ(datapath_socket_sendv(nullptr, nullptr, 0), DATAPATH_ERROR_INVALID_ARGUMENT);
 	CHECK_EQ(datapath_socket_close(nullptr), DATAPATH_ERROR_INVALID_ARGUMENT);

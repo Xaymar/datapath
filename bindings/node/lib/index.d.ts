@@ -78,6 +78,13 @@ export interface Options {
 	maxQueuedBytes?: number | bigint;
 	/** Receive buffer per connection, in bytes. Default 256 KiB. */
 	receiveBuffer?: number;
+	/**
+	 * Bytes of received messages that may wait for 'message' listeners before the
+	 * socket stops reading from the peer (each message counts its size plus 64).
+	 * The peer's sends then back up and return false. Applies to every socket a
+	 * server accepts. Default 1 MiB.
+	 */
+	highWaterMark?: number;
 	/** Context to run on. Default: the process-wide default context. */
 	context?: Context;
 }
@@ -106,6 +113,8 @@ export interface SocketEvents {
 	message: [data: Buffer];
 	/** The connection ended. Fires exactly once. `hadError` is false for a regular close. */
 	close: [reason: ErrorCode, hadError: boolean];
+	/** The send queue ran empty after `send()` returned false: send again. */
+	drain: [];
 }
 
 /**
@@ -116,12 +125,25 @@ export declare class Socket extends EventEmitter<SocketEvents> {
 	private constructor();
 	/**
 	 * Queue one message. Never blocks and copies `data`, so it may be reused right away.
-	 * @returns false when the send queue is full (`WouldBlock`); retry later.
+	 * @returns false when the send queue is full (`WouldBlock`): the message was not
+	 * queued; send it again after `'drain'`.
 	 * @throws DatapathError `TooLarge` or `Closed`.
 	 */
 	send(data: Data): boolean;
 	/** Queue one message assembled from several parts. Same results as `send()`. */
 	sendv(parts: readonly Data[]): boolean;
+	/**
+	 * Stop emitting `'message'` and stop reading from the peer, whose sends then back
+	 * up. Messages already received wait for `resume()`; a remote close is reported
+	 * after them. `close()` while paused drops them and reports `'close'` right away.
+	 */
+	pause(): this;
+	/** Emit `'message'` again, starting with the messages that waited. */
+	resume(): this;
+	/** True between `pause()` and `resume()`. */
+	isPaused(): boolean;
+	/** Bytes of received messages waiting to be emitted (size + 64 each). */
+	readonly receiveQueueBytes: number;
 	/** Close the connection; `'close'` follows asynchronously. */
 	close(): this;
 	/** True until the connection is closed. */

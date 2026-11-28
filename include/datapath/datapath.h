@@ -194,6 +194,8 @@ typedef void (*datapath_message_fn)(void* user, datapath_socket* socket, const u
 /* The connection ended. Called at most once, and never after the socket was
  * released. `reason` is DATAPATH_ERROR_CLOSED for an orderly close. */
 typedef void (*datapath_close_fn)(void* user, datapath_socket* socket, datapath_error reason);
+/* The send queue ran empty after a send returned DATAPATH_ERROR_WOULD_BLOCK. */
+typedef void (*datapath_drain_fn)(void* user, datapath_socket* socket);
 /* Destroys a callback's user data. */
 typedef void (*datapath_free_fn)(void* user);
 
@@ -215,6 +217,19 @@ DATAPATH_C_API datapath_error datapath_socket_set_on_message(datapath_socket* so
 /* Set the close callback; NULL `callback` clears it. */
 DATAPATH_C_API datapath_error datapath_socket_set_on_close(datapath_socket* socket, datapath_close_fn callback,
 														   void* user, datapath_free_fn user_free);
+
+/* Set the drain callback; NULL `callback` clears it. */
+DATAPATH_C_API datapath_error datapath_socket_set_on_drain(datapath_socket* socket, datapath_drain_fn callback,
+														   void* user, datapath_free_fn user_free);
+
+/* Stop delivering messages (receive backpressure). Thread-safe; from inside
+ * the message callback no further message is delivered after the current one.
+ * While paused nothing is read from the peer, so its sends return
+ * DATAPATH_ERROR_WOULD_BLOCK once its queue is full. A remote close is
+ * reported after resuming, behind the messages that came before it. */
+DATAPATH_C_API datapath_error datapath_socket_pause(datapath_socket* socket);
+/* Continue delivering messages, starting with those already received. */
+DATAPATH_C_API datapath_error datapath_socket_resume(datapath_socket* socket);
 
 /* Queue one message. Never blocks, safe from callbacks. Returns
  * DATAPATH_ERROR_TOO_LARGE, _WOULD_BLOCK or _CLOSED when not queued. */

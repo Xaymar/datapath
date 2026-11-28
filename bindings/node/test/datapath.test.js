@@ -195,3 +195,140 @@ test('worker threads can use and tear down sockets', () => {
 	assert.equal(r.status, 0, r.stderr);
 	assert.match(r.stdout, /worker done/);
 });
+
+test('a flooding client is held at the high-water mark and gets backpressure', () => {
+	const r = runFixture('flood.js');
+	assert.equal(r.status, 0, r.stderr);
+	const blocked = /blocked (\d+)/.exec(r.stdout);
+	const sent = /sent (\d+)/.exec(r.stdout);
+	const got = /received (\d+) maxQueued (\d+) misordered (\w+)/.exec(r.stdout);
+	assert.ok(blocked && sent && got, r.stdout);
+	assert.match(r.stdout, /drain/);
+	assert.equal(got[1], sent[1]);
+	assert.equal(got[3], 'false');
+	// At most the high-water mark plus the message that crossed it (and one more
+	// that was being delivered as the pause took effect).
+	assert.ok(Number(got[2]) <= 64 * 1024 + 2 * (4096 + 64), `queued ${got[2]}`);
+});
+
+// Host a server that sends `messages` to each client right after it connects.
+function talker(messages, options) {
+	const name = unique();
+	const server = dp.host(name, options, (sock) => {
+		for (const m of messages) sock.send(m);
+		sock.on('message', () => {});
+	});
+	return { name, server };
+}
+
+function collect(sock, n) {
+	const got = [];
+	return new Promise((resolve) => {
+		sock.on('message', (d) => {
+			got.push(d.toString());
+			if (got.length === n) resolve(got);
+		});
+	});
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+test('pause() holds messages until resume()', async () => {
+	const { name, server } = talker(['a', 'b', 'c']);
+	const client = await dp.connect(name);
+	try {
+		assert.equal(client.pause(), client);
+		assert.equal(client.isPaused(), true);
+		const all = collect(client, 3);
+		let early = 0;
+		client.on('message', () => early++);
+		await sleep(100);
+		assert.equal(early, 0);
+		client.resume();
+		assert.equal(client.isPaused(), false);
+		assert.deepEqual(await all, ['a', 'b', 'c']);
+	} finally {
+		client.close();
+		server.close();
+	}
+});
+
+test('pause() inside a listener stops the rest of the batch', async () => {
+	const { name, server } = talker(['1', '2', '3', '4', '5']);
+	const client = await dp.connect(name);
+	try {
+		const got = [];
+		client.on('message', (d) => {
+			got.push(d.toString());
+			if (got.length === 1) client.pause();
+		});
+		await sleep(100);
+		assert.deepEqual(got, ['1']);
+		client.resume();
+		await sleep(100);
+		assert.deepEqual(got, ['1', '2', '3', '4', '5']);
+	} finally {
+		client.close();
+		server.close();
+	}
+});
+
+test('close() while paused still emits close', async () => {
+	const { name, server } = talker(['x', 'y']);
+	const client = await dp.connect(name);
+	try {
+		client.pause();
+		let got = 0;
+		client.on('message', () => got++);
+		await sleep(50);
+		const closed = once(client, 'close');
+		client.close();
+		const [reason, hadError] = await closed;
+		assert.equal(reason, 'Closed');
+		assert.equal(hadError, false);
+		assert.equal(got, 0);
+	} finally {
+		server.close();
+	}
+});
+
+test("send() returns false while the peer is paused, then 'drain' fires", async () => {
+	const name = unique();
+	let peer;
+	let server;
+	const accepted = new Promise((resolve) => {
+		server = dp.host(name, (sock) => {
+			peer = sock;
+			sock.pause();
+			sock.on('message', () => {});
+			resolve();
+		});
+	});
+	const client = await dp.connect(name, { maxQueuedBytes: 256 * 1024 });
+	await accepted;
+	try {
+		const buf = Buffer.alloc(4096);
+		let sent = 0;
+		while (client.send(buf)) {
+			sent++;
+			assert.ok(sent < 1 << 18, 'never blocked');
+		}
+		const drained = once(client, 'drain');
+		let seen = 0;
+		peer.on('message', () => seen++);
+		peer.resume();
+		await drained;
+		assert.equal(client.send(buf), true);
+		while (seen < sent + 1) await sleep(5);
+		assert.equal(seen, sent + 1);
+	} finally {
+		client.close();
+		peer.close();
+		server.close();
+	}
+});
+
+test('highWaterMark is validated', async () => {
+	await assert.rejects(dp.connect(unique(), { highWaterMark: 0 }), RangeError);
+	assert.throws(() => dp.host(unique(), { highWaterMark: 'big' }), RangeError);
+});

@@ -121,6 +121,7 @@ namespace datapath { namespace detail { namespace shm {
 		std::deque<pending> _pending;
 		uint64_t            _pending_bytes = 0;
 		bool                _broken        = false;
+		bool                _blocked       = false; // send() returned WouldBlock since pending ran empty
 
 		// Reader side (one poller at a time).
 		uint64_t             _tail = 0;
@@ -155,6 +156,9 @@ namespace datapath { namespace detail { namespace shm {
 		bool drain(bool& need_space);
 		// Before waiting for space: set writer_waiting and recheck. True = wait.
 		bool prepare_space_wait();
+		// True once after send() returned WouldBlock and the pending list has
+		// since been moved into the ring completely.
+		bool take_drained();
 
 		// Deliver everything the peer published. Returns 1 if there was work, 0 if
 		// not, -1 when the peer broke the protocol. `deliver` returns false to stop.

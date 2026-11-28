@@ -145,6 +145,30 @@ namespace datapath { namespace detail {
 			} else if (!tail && n < _read_hint / 8 && _read_hint > min_read) {
 				_read_hint /= 2;
 			}
+			return parse(deliver);
+		}
+
+		// Deliver the complete frames that are still buffered because `deliver`
+		// stopped parsing earlier (receiving paused), without reading more.
+		template<typename F>
+		datapath::error resume(F&& deliver)
+		{
+			if (_in_big)
+				return datapath::error::Success;
+			_need = 0;
+			return parse(deliver);
+		}
+
+		// Whether complete or partial frames are buffered but not delivered yet.
+		bool buffered() const noexcept
+		{
+			return _in_big || _wpos != _rpos;
+		}
+
+		private:
+		template<typename F>
+		datapath::error parse(F& deliver)
+		{
 			for (;;) {
 				size_t avail = _wpos - _rpos;
 				if (avail < frame_header_size)

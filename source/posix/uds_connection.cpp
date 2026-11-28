@@ -97,6 +97,13 @@ void datapath::posix::uds_connection::read_loop()
 			finish_close();
 			return;
 		}
+		if (stall_if_paused())
+			return; // resume() restarts the chain; edge-triggered, so read until EAGAIN then
+		if (unparsed()) {
+			if (!resume_buffered())
+				return;
+			continue;
+		}
 		auto    area = _parser.prepare();
 		ssize_t n;
 		int     err = 0;
@@ -143,6 +150,7 @@ void datapath::posix::uds_connection::write_loop()
 			if (!_queue.take(_wbatch)) {
 				if (_close_when_flushed)
 					close_with(datapath::error::VersionMismatch);
+				check_drained();
 				return;
 			}
 		}
@@ -338,6 +346,19 @@ void datapath::posix::uds_connection::platform_post_close()
 	// platform_close() already posted k_closed.
 }
 
+void datapath::posix::uds_connection::platform_resume()
+{
+	if (!_loop.post(self(), k_resume)) {
+		close_with(datapath::error::Closed);
+		finish_close();
+	}
+}
+
+void datapath::posix::uds_connection::platform_post_drain()
+{
+	_loop.post(self(), k_drain); // fails only while the loop shuts down
+}
+
 void datapath::posix::uds_connection::platform_write()
 {
 	if (_shm_ready.load(std::memory_order_acquire)) {
@@ -434,6 +455,19 @@ void datapath::posix::uds_connection::on_post(int kind)
 		update_mask(ev::in, 0);
 		read_loop();
 		break;
+	case k_resume:
+		if (_shm_reading) {
+			if (_shm_gone)
+				shm_peer_gone();
+			else
+				poll();
+		} else {
+			read_loop();
+		}
+		break;
+	case k_drain:
+		fire_drain();
+		break;
 	case k_closed:
 		if (_shm_reading)
 			_loop.remove_poller(this);
@@ -469,8 +503,8 @@ datapath::error datapath::posix::uds_connection::send(const buffer_view* parts, 
 	auto ec   = _shm->send(parts, count, need);
 	if (ec == datapath::error::Closed)
 		close_with(datapath::error::Failure);
-	else if (need)
-		_shm->prepare_space_wait(); // the space eventfd resumes it
+	else if (need && !_shm->prepare_space_wait() && _shm->take_drained()) // else the space eventfd resumes it
+		post_drain();
 	return ec;
 }
 
@@ -511,8 +545,9 @@ void datapath::posix::uds_connection::flush_queue_to_shm()
 	}
 	_wbatch.clear();
 	_woff = 0;
-	if (need)
-		_shm->prepare_space_wait();
+	if (need && !_shm->prepare_space_wait() && _shm->take_drained())
+		post_drain();
+	check_drained();
 }
 
 void datapath::posix::uds_connection::start_shm_reading()
@@ -539,12 +574,21 @@ void datapath::posix::uds_connection::start_shm_reading()
 
 void datapath::posix::uds_connection::shm_peer_gone()
 {
-	// Messages the peer put in the ring before it went away are still delivered.
+	// Messages the peer put in the ring before it went away are still delivered,
+	// and while receiving is paused the close waits for them (k_resume).
 	if (!_closed.load(std::memory_order_acquire)) {
 		while (_polling.test_and_set(std::memory_order_acquire))
 			sched_yield();
-		_shm->poll([this](const uint8_t* d, size_t n) { return deliver_message(d, n); });
+		bool stalled = stall_if_paused();
+		if (!stalled) {
+			_shm->poll([this](const uint8_t* d, size_t n) { return deliver_message(d, n); });
+			stalled = stall_if_paused();
+		}
 		_polling.clear(std::memory_order_release);
+		if (stalled) {
+			_shm_gone = true;
+			return;
+		}
 	}
 	close_with(datapath::error::Closed);
 }
@@ -573,6 +617,8 @@ void datapath::posix::uds_connection::on_wake(bool space, int fd)
 			close_with(datapath::error::Failure);
 		else if (need)
 			_shm->prepare_space_wait();
+		if (_shm->take_drained())
+			post_drain();
 		return;
 	}
 	poll();
@@ -582,6 +628,10 @@ bool datapath::posix::uds_connection::poll()
 {
 	if (_closed.load(std::memory_order_acquire) || _polling.test_and_set(std::memory_order_acquire))
 		return false;
+	if (stall_if_paused()) {
+		_polling.clear(std::memory_order_release);
+		return false;
+	}
 	int r = _shm->poll([this](const uint8_t* d, size_t n) { return deliver_message(d, n); });
 	_polling.clear(std::memory_order_release);
 	if (r < 0)
@@ -592,6 +642,9 @@ bool datapath::posix::uds_connection::poll()
 bool datapath::posix::uds_connection::prepare_block()
 {
 	if (_closed.load(std::memory_order_acquire))
+		return true;
+	// Paused: block without asking the peer to wake us; resume() posts k_resume.
+	if (paused() && stall_if_paused())
 		return true;
 	return _shm->prepare_block();
 }

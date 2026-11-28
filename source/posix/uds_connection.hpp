@@ -20,7 +20,7 @@ namespace datapath { namespace posix {
 	class uds_listener;
 
 	class uds_connection : public datapath::detail::connection_base, public fd_target, public poll_target {
-		enum post_kind : int { k_arm = 1, k_closed };
+		enum post_kind : int { k_arm = 1, k_closed, k_resume, k_drain };
 
 		std::shared_ptr<event_context> _ctx;
 		event_loop&                    _loop;
@@ -56,6 +56,7 @@ namespace datapath { namespace posix {
 		std::atomic<bool>         _shm_ready{false};  // the writer slot writes to the ring
 		std::atomic<bool>         _shm_active{false}; // send() writes to the ring itself
 		bool                      _shm_reading = false; // loop thread only
+		bool                      _shm_gone    = false; // loop thread only: peer gone while paused
 		bool                      _shm_allowed;
 		size_t                    _shm_size;
 		uint64_t                  _max_queued;
@@ -84,6 +85,8 @@ namespace datapath { namespace posix {
 		void platform_close() override;
 		void platform_arm() override;
 		void platform_post_close() override;
+		void platform_resume() override;
+		void platform_post_drain() override;
 		void platform_write() override;
 		void after_inline_write() override;
 		void on_finished() override;
