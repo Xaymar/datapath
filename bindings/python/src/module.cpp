@@ -274,6 +274,18 @@ namespace {
 	// Socket
 
 	struct py_socket;
+
+	// accept(), recv() and recv_into() are deprecated in 1.1.0 and go away in 2.0.0
+	// in favour of the callbacks, which every other binding uses.
+	void warn_deprecated(const char* what)
+	{
+		std::string msg =
+			std::string(what)
+			+ " is deprecated and will be removed in DataPath 2.0; use on_accept/on_message callbacks instead";
+		if (PyErr_WarnEx(PyExc_DeprecationWarning, msg.c_str(), 1) != 0)
+			throw nb::python_error();
+	}
+
 	nb::object wrap_socket(std::shared_ptr<datapath::socket> s, nb::handle context);
 
 	struct message_queue {
@@ -552,6 +564,7 @@ namespace {
 
 		nb::bytes recv(std::optional<double> timeout)
 		{
+			warn_deprecated("Socket.recv()");
 			reject_if_callback("recv()");
 			arm();
 			auto                 deadline = deadline_from(timeout);
@@ -582,6 +595,7 @@ namespace {
 
 		size_t recv_into(nb::handle buffer, std::optional<double> timeout)
 		{
+			warn_deprecated("Socket.recv_into()");
 			reject_if_callback("recv_into()");
 			Py_buffer view;
 			if (PyObject_GetBuffer(buffer.ptr(), &view, PyBUF_SIMPLE | PyBUF_WRITABLE) != 0)
@@ -834,6 +848,7 @@ namespace {
 
 		nb::object accept(std::optional<double> timeout)
 		{
+			warn_deprecated("Server.accept()");
 			if (has_accept_cb.load(std::memory_order_acquire))
 				throw std::runtime_error("accept() can't be used while an on_accept callback is set");
 			arm();
@@ -989,11 +1004,13 @@ NB_MODULE(_core, m)
 			 nb::sig("def sendv(self, parts: collections.abc.Iterable[collections.abc.Buffer], /) -> None"),
 			 "Queue one message assembled from several bytes-like parts.")
 		.def("recv", &py_socket::recv, "timeout"_a = nb::none(),
+			 "Deprecated since 1.1, removed in 2.0: use on_message().\n\n"
 			 "Return the next message. Waits up to `timeout` seconds (None = forever).\n\n"
 			 "Raises TimedOutError on timeout and ClosedError once the connection is closed\n"
 			 "and every received message was returned.")
 		.def("recv_into", &py_socket::recv_into, "buffer"_a, "timeout"_a = nb::none(),
 			 nb::sig("def recv_into(self, buffer: collections.abc.Buffer, /, timeout: float | None = None) -> int"),
+			 "Deprecated since 1.1, removed in 2.0: use on_message().\n\n"
 			 "Copy the next message into a writable buffer and return its size.\n\n"
 			 "Raises ValueError (and keeps the message queued) if the buffer is too small.")
 		.def("on_message", &py_socket::set_on_message, "callback"_a.none(),
@@ -1027,6 +1044,7 @@ NB_MODULE(_core, m)
 						  "A hosted endpoint. Dropping the last reference closes it.")
 		.def("accept", &py_server::accept, "timeout"_a = nb::none(),
 			 nb::sig("def accept(self, timeout: float | None = None) -> Socket"),
+			 "Deprecated since 1.1, removed in 2.0: use on_accept().\n\n"
 			 "Return the next client that completed the handshake. Waits up to `timeout`\n"
 			 "seconds (None = forever). Raises TimedOutError or ClosedError.")
 		.def("on_accept", &py_server::set_on_accept, "callback"_a.none(),

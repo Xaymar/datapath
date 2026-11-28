@@ -139,9 +139,9 @@ def on_accept(client):
 server = datapath.host("my-service", on_accept=on_accept)
 
 # Client
-with datapath.connect("my-service") as sock:
-    sock.send(b"hello")
-    print(sock.recv(timeout=1.0))                      # b'hello'
+sock = datapath.connect("my-service")
+sock.on_message(lambda data: print(data))              # b'hello'
+sock.send(b"hello")
 ```
 
 ### [Node.js](https://www.npmjs.com/package/@xaymar/datapath)
