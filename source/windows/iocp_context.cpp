@@ -698,7 +698,7 @@ datapath::error datapath::windows::iocp_context::connect(std::shared_ptr<datapat
 			return ec;
 		}
 		if (got_shm
-			&& shm_channel::open(shm, offer, std::min(opts.max_message_size, reply.max_message_size),
+			&& shm_channel::open(shm, h, offer, std::min(opts.max_message_size, reply.max_message_size),
 								 opts.max_queued_bytes, opts.shared_memory_zero_copy)
 				   != datapath::error::Success) {
 			// The rings the server offered can't be opened here (another logon

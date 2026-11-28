@@ -125,6 +125,30 @@ namespace {
 		return out;
 	}
 
+	// The user SID of the process at the server end of `pipe`, or empty if it
+	// can't be read (then the peer counts as another user).
+	std::wstring pipe_server_sid(HANDLE pipe)
+	{
+		ULONG pid = 0;
+		if (!GetNamedPipeServerProcessId(pipe, &pid))
+			return {};
+		HANDLE proc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+		if (!proc)
+			return {};
+		HANDLE       token = nullptr;
+		std::wstring out;
+		if (OpenProcessToken(proc, TOKEN_QUERY, &token)) {
+			DWORD size = 0;
+			GetTokenInformation(token, TokenUser, nullptr, 0, &size);
+			std::vector<uint8_t> buf(size ? size : 1);
+			if (GetTokenInformation(token, TokenUser, buf.data(), size, &size))
+				out = sid_string(reinterpret_cast<TOKEN_USER*>(buf.data())->User.Sid);
+			CloseHandle(token);
+		}
+		CloseHandle(proc);
+		return out;
+	}
+
 	bool is_hex_name(const uint8_t* p, size_t n)
 	{
 		for (size_t i = 0; i < n; i++)
@@ -345,8 +369,8 @@ datapath::error datapath::windows::shm_channel::create(std::unique_ptr<shm_chann
 }
 
 datapath::error datapath::windows::shm_channel::open(std::unique_ptr<shm_channel>& out,
-													 const uint8_t (&offer)[shm_offer_size], uint64_t limit,
-													 uint64_t max_queued, bool zero_copy)
+													 HANDLE pipe, const uint8_t (&offer)[shm_offer_size],
+													 uint64_t limit, uint64_t max_queued, bool zero_copy)
 {
 	if (!supported())
 		return datapath::error::NotSupported;
@@ -369,16 +393,12 @@ datapath::error datapath::windows::shm_channel::open(std::unique_ptr<shm_channel
 			return datapath::error::AccessDenied;
 
 	// Copy messages out before delivery unless zero-copy was asked for and the
-	// section's owner is our user (if the owner can't be read: another user).
-	o->zero_copy = zero_copy;
-	PSID                 owner = nullptr;
-	PSECURITY_DESCRIPTOR sd    = nullptr;
-	if (GetSecurityInfo(o->section, SE_KERNEL_OBJECT, OWNER_SECURITY_INFORMATION, &owner, nullptr, nullptr, nullptr,
-						&sd)
-		== ERROR_SUCCESS) {
-		o->other_user = sid_string(owner) != current_user_sid();
-		LocalFree(sd);
-	}
+	// server process runs as our user. (Not the section's owner: for an
+	// elevated server that is the Administrators group.) If the server's user
+	// can't be read, it counts as another user.
+	o->zero_copy      = zero_copy;
+	std::wstring peer = pipe_server_sid(pipe);
+	o->other_user     = peer.empty() || peer != current_user_sid();
 	if (!(o->view = MapViewOfFile(o->section, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0)))
 		return datapath::error::Failure;
 	// The server sized the section: make sure it holds both rings before using it.

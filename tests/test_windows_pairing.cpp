@@ -200,9 +200,11 @@ TEST(falls_back_to_version_1_server)
 			return;
 		}
 	});
-	auto     ctx = pairing_context(true);
-	sock_ptr c;
-	CHECK_EQ(datapath::connect(c, name, {}, ctx), error::Success);
+	auto              ctx = pairing_context(true);
+	sock_ptr          c;
+	datapath::options o;
+	o.shared_memory = false; // a version 2 hello, not version 3
+	CHECK_EQ(datapath::connect(c, name, o, ctx), error::Success);
 	server.join();
 	for (HANDLE h : pipes)
 		CloseHandle(h);
