@@ -45,7 +45,11 @@ set_target_properties(datapath_node PROPERTIES
 	CXX_VISIBILITY_PRESET hidden
 )
 target_include_directories(datapath_node PRIVATE ${CMAKE_JS_INC} "${NODE_ADDON_API_DIR}")
-target_compile_definitions(datapath_node PRIVATE NAPI_VERSION=8 NAPI_CPP_EXCEPTIONS NODE_ADDON_API_DISABLE_DEPRECATED)
+# NODE_API_SWALLOW_UNTHROWABLE_EXCEPTIONS: while a worker is being terminated
+# (Node 18 and older) napi calls fail and the resulting Napi::Error cannot be
+# rethrown into JS, which would std::terminate() the whole process.
+target_compile_definitions(datapath_node PRIVATE NAPI_VERSION=8 NAPI_CPP_EXCEPTIONS NODE_ADDON_API_DISABLE_DEPRECATED
+	NODE_API_SWALLOW_UNTHROWABLE_EXCEPTIONS)
 target_link_libraries(datapath_node PRIVATE datapath::datapath ${CMAKE_JS_LIB})
 
 if(MSVC)

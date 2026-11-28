@@ -1,0 +1,375 @@
+# Low Latency IPC Library for high-speed traffic
+# Copyright (C) 2019 - 2026 Narta Xaymar Dirks <info@xaymar.com>
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+# Builds every release package from one ref and, depending on `target`, uploads
+# them. Nothing reaches a real registry unless all of these hold:
+#   - the run was started by hand with target "release",
+#   - it runs on a tag vX.Y.Z whose version matches every package, and
+#   - the registry's GitHub environment (pypi, npm, crates-io) lets it through,
+#     which can require a reviewer's approval.
+#
+# Targets:
+#   dry-run  build and check everything; `npm publish --dry-run`,
+#            `cargo publish --dry-run`, `twine check`. Uploads nothing. (default)
+#   test     dry-run plus an upload to TestPyPI.
+#   release  upload to PyPI, npm and crates.io (tags only).
+#
+# Pushing a vX.Y.Z tag runs a dry run and creates a *draft* GitHub Release with
+# the source tarball and the prebuilt C/C++ archives; publishing the draft is
+# done by hand.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'What to do with the built packages'
+        type: choice
+        options: [dry-run, test, release]
+        default: dry-run
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TARGET: ${{ inputs.target || 'dry-run' }}
+
+jobs:
+  version:
+    name: Check versions
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      is_tag: ${{ steps.v.outputs.is_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            python3 .github/scripts/check_versions.py --tag "$GITHUB_REF"
+            echo "is_tag=true" >> "$GITHUB_OUTPUT"
+          else
+            python3 .github/scripts/check_versions.py
+            echo "is_tag=false" >> "$GITHUB_OUTPUT"
+            if [[ "$TARGET" == release ]]; then
+              echo "::error::target 'release' only runs on a vX.Y.Z tag"
+              exit 1
+            fi
+          fi
+          echo "version=$(python3 .github/scripts/check_versions.py --print)" >> "$GITHUB_OUTPUT"
+
+  # C and C++ -----------------------------------------------------------------
+
+  source:
+    name: Source tarball
+    needs: version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Archive
+        shell: bash
+        run: |
+          name="datapath-${{ needs.version.outputs.version }}"
+          mkdir -p dist
+          git archive --format=tar.gz --prefix="$name/" -o "dist/$name.tar.gz" HEAD
+          cd dist && sha256sum "$name.tar.gz" | tee "$name.tar.gz.sha256"
+          {
+            echo "### Source tarball"
+            echo '```'
+            cat "$name.tar.gz.sha256"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpp-source
+          path: dist/*
+          if-no-files-found: error
+
+  cpp:
+    name: C/C++ ${{ matrix.platform }}
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Older Ubuntu = older glibc baseline for the prebuilt Linux libraries.
+          - { platform: linux-x64, os: ubuntu-22.04 }
+          - { platform: linux-arm64, os: ubuntu-22.04-arm }
+          - { platform: windows-x64, os: windows-2022 }
+          - { platform: windows-arm64, os: windows-11-arm }
+          - { platform: macos-universal, os: macos-latest, cmake_args: "'-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0" }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build, install and package
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="datapath-${{ needs.version.outputs.version }}-${{ matrix.platform }}"
+          mkdir -p dist
+          for linkage in static shared; do
+            shared=OFF; [[ $linkage == shared ]] && shared=ON
+            prefix="$PWD/stage/$base-$linkage"
+            # Release and Debug go into one prefix (Debug libraries get a "d"
+            # suffix), so MSVC users can link the build matching their runtime.
+            for config in Release Debug; do
+              build="build/$linkage-$config"
+              cmake -S . -B "$build" -DCMAKE_BUILD_TYPE=$config \
+                -DDATAPATH_SHARED=$shared -DDATAPATH_BUILD_TESTS=OFF -DDATAPATH_BUILD_SAMPLES=OFF \
+                -DCMAKE_DEBUG_POSTFIX=d -DCMAKE_INSTALL_PREFIX="$prefix" ${{ matrix.cmake_args }}
+              cmake --build "$build" --config $config --parallel
+              cmake --install "$build" --config $config
+            done
+            # The installed package must be usable from CMake.
+            cmake -S .github/scripts/consumer -B "build/consumer-$linkage" \
+              -DCMAKE_PREFIX_PATH="$prefix" -DCMAKE_BUILD_TYPE=Release ${{ matrix.cmake_args }}
+            cmake --build "build/consumer-$linkage" --config Release
+            ctest --test-dir "build/consumer-$linkage" -C Release --output-on-failure
+            cd stage
+            if [[ "$RUNNER_OS" == Windows ]]; then
+              7z a -bd "../dist/$base-$linkage.zip" "$base-$linkage" > /dev/null
+            else
+              tar -czf "../dist/$base-$linkage.tar.gz" "$base-$linkage"
+            fi
+            cd ..
+          done
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpp-${{ matrix.platform }}
+          path: dist/*
+          if-no-files-found: error
+
+  # Python --------------------------------------------------------------------
+
+  python:
+    name: Python
+    needs: version
+    uses: ./.github/workflows/python.yml
+
+  python-check:
+    name: Check Python distributions
+    needs: python
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: wheels-*
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+      - run: ls -l dist && pipx run twine check --strict dist/*
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    if: inputs.target == 'test' || inputs.target == 'release'
+    needs: python-check
+    runs-on: ubuntu-24.04
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/com.xaymar.datapath/
+    permissions:
+      id-token: write # trusted publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: wheels-*
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+
+  publish-pypi:
+    name: Publish to PyPI
+    if: inputs.target == 'release' && needs.version.outputs.is_tag == 'true'
+    needs: [version, python-check, publish-testpypi]
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/project/com.xaymar.datapath/
+    permissions:
+      id-token: write # trusted publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: wheels-*
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  # Node.js -------------------------------------------------------------------
+
+  node:
+    name: Node.js
+    needs: version
+    uses: ./.github/workflows/node.yml
+
+  npm-dry-run:
+    name: npm publish --dry-run
+    needs: [version, node]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+      # A dry run also fails when the version is already on npm, so check that
+      # separately and only warn: publish-npm skips existing versions.
+      - name: Publish (dry run)
+        shell: bash
+        run: |
+          version="${{ needs.version.outputs.version }}"
+          if npm view "@xaymar/datapath@$version" version > /dev/null 2>&1; then
+            echo "::warning::@xaymar/datapath@$version is already on npm; release.yml will not publish it again"
+            tar -tzf xaymar-datapath-*.tgz
+          else
+            npm publish xaymar-datapath-*.tgz --access public --dry-run
+          fi
+
+  publish-npm:
+    name: Publish to npm
+    if: inputs.target == 'release' && needs.version.outputs.is_tag == 'true'
+    needs: [version, npm-dry-run]
+    runs-on: ubuntu-24.04
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/@xaymar/datapath
+    permissions:
+      id-token: write # trusted publishing and provenance
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: npm 11.5.1 or newer (trusted publishing)
+        run: npm install -g npm@11 && npm --version
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+      # npm versions are immutable; one published by hand is left alone.
+      - name: Publish
+        shell: bash
+        run: |
+          version="${{ needs.version.outputs.version }}"
+          if npm view "@xaymar/datapath@$version" version > /dev/null 2>&1; then
+            echo "::notice::@xaymar/datapath@$version is already on npm; skipping"
+          else
+            npm publish xaymar-datapath-*.tgz --access public
+          fi
+
+  # Rust ----------------------------------------------------------------------
+
+  rust:
+    name: Rust (${{ matrix.os }})
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: bindings/rust
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal && rustup default stable
+      - run: cargo test --workspace
+      # Packages both crates (sys first) and builds them from the packaged
+      # sources, as crates.io users would.
+      - run: ./package.sh publish --workspace --dry-run
+
+  publish-crates:
+    name: Publish to crates.io
+    if: inputs.target == 'release' && needs.version.outputs.is_tag == 'true'
+    needs: [version, rust]
+    runs-on: ubuntu-24.04
+    environment:
+      name: crates-io
+      url: https://crates.io/crates/com-xaymar-datapath
+    permissions:
+      id-token: write # trusted publishing
+    env:
+      # crates.io only allows trusted publishing for crates that already exist:
+      # the very first version needs a CARGO_REGISTRY_TOKEN secret on the
+      # crates-io environment. Delete the secret after that.
+      HAS_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN != '' }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: bindings/rust
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal && rustup default stable
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+        if: env.HAS_TOKEN != 'true'
+      - run: ./package.sh publish --workspace
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token || secrets.CARGO_REGISTRY_TOKEN }}
+
+  # GitHub Release ------------------------------------------------------------
+
+  github-release:
+    name: Draft GitHub Release
+    if: needs.version.outputs.is_tag == 'true'
+    needs: [version, source, cpp, python-check, npm-dry-run, rust]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: 'cpp-*'
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: wheels-*
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          name: sdist
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          name: npm-package
+      - name: Create or update the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          cd dist && sha256sum * > SHA256SUMS && cd ..
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber -R "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" dist/* --draft --verify-tag --generate-notes \
+              --title "DataPath ${{ needs.version.outputs.version }}" -R "$GITHUB_REPOSITORY"
+          fi

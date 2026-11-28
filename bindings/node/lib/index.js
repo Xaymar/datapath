@@ -10,7 +10,22 @@ SPDX-License-Identifier: BSD-3-Clause
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
 
-const native = require('node-gyp-build')(path.join(__dirname, '..'));
+function loadNative() {
+	try {
+		return require('node-gyp-build')(path.join(__dirname, '..'));
+	} catch (err) {
+		// No prebuild for this platform and no local build. npm 12 skips install
+		// scripts by default, so the source build in scripts/install.js may not
+		// have run.
+		err.message += '\n@xaymar/datapath: no prebuilt binary for '
+			+ `${process.platform}-${process.arch}. Build it from source (needs CMake 3.16+ and a C++17 compiler) with\n`
+			+ '  npm explore @xaymar/datapath -- npm run build\n'
+			+ 'or allow this package\'s install script and reinstall it.';
+		throw err;
+	}
+}
+
+const native = loadNative();
 
 // Mirrors datapath::error.
 const codes = Object.freeze({

@@ -40,8 +40,22 @@ endforeach()
 install(TARGETS _core LIBRARY DESTINATION datapath COMPONENT python)
 
 # Type stubs for the native module, generated from its docstrings and signatures.
+# Generating them imports the module. A macOS build for the other architecture
+# (x86_64 wheels built on arm64) is not flagged as cross-compiling, so run
+# Python as that architecture (Rosetta): nanobind_add_stub() runs
+# Python_EXECUTABLE, so point it at a wrapper script for this call only.
+function(datapath_add_stub)
+	if(APPLE AND CMAKE_OSX_ARCHITECTURES MATCHES "^(x86_64|arm64)$"
+		AND NOT CMAKE_OSX_ARCHITECTURES STREQUAL CMAKE_HOST_SYSTEM_PROCESSOR)
+		set(_wrapper "${CMAKE_CURRENT_BINARY_DIR}/python-${CMAKE_OSX_ARCHITECTURES}.sh")
+		file(WRITE "${_wrapper}" "#!/bin/sh\nexec arch -${CMAKE_OSX_ARCHITECTURES} \"${Python_EXECUTABLE}\" \"$@\"\n")
+		execute_process(COMMAND chmod +x "${_wrapper}")
+		set(Python_EXECUTABLE "${_wrapper}")
+	endif()
+	nanobind_add_stub(${ARGN})
+endfunction()
 if(NOT CMAKE_CROSSCOMPILING)
-	nanobind_add_stub(_core_stub
+	datapath_add_stub(_core_stub
 		MODULE datapath._core
 		OUTPUT "${DATAPATH_PY_STAGE}/datapath/_core.pyi"
 		PYTHON_PATH "${DATAPATH_PY_STAGE}"
