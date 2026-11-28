@@ -204,6 +204,7 @@ TEST(invalid_arguments)
 	CHECK_EQ(datapath_server_close(nullptr), DATAPATH_ERROR_INVALID_ARGUMENT);
 	CHECK_EQ(datapath_socket_good(nullptr), 0);
 	CHECK_EQ(datapath_socket_max_message_size(nullptr), uint64_t(0));
+	CHECK_EQ(datapath_socket_set_zero_copy(nullptr, 1), 0);
 	datapath_socket_release(nullptr);
 	datapath_server_release(nullptr);
 	datapath_context_release(nullptr);

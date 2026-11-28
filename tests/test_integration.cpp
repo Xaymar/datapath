@@ -464,6 +464,40 @@ TEST(drop_handle_closes_peer)
 	CHECK_EQ(c->send("x", 1), error::Closed);
 }
 
+// The peer sends, closes, and only then does this side start reading: the
+// message still arrives before the close (on Windows over shared memory it
+// used to be dropped when the liveness read failed right away).
+TEST(send_close_before_reading_starts)
+{
+	auto      name = unique_name();
+	latch     accepted;
+	collector col; // before the handles whose callbacks use it
+	sock_ptr  peer;
+	srv_ptr   server;
+	CHECK_EQ(datapath::host(server, name), error::Success);
+	server->on_accept([&](sock_ptr s) {
+		peer = std::move(s);
+		accepted.notify();
+		return true;
+	});
+	sock_ptr c;
+	CHECK_EQ(datapath::connect(c, name), error::Success);
+	CHECK(accepted.wait(1));
+	CHECK_EQ(c->send("last", 4), error::Success);
+	c->close();
+	std::this_thread::sleep_for(100ms);
+	col.attach(*peer);
+	CHECK(col.closed.wait(1));
+	{
+		std::lock_guard<std::mutex> l(col.lock);
+		CHECK_EQ(col.messages.size(), size_t(1));
+		CHECK(col.messages.size() == 1 && col.messages[0] == bytes({'l', 'a', 's', 't'}));
+	}
+	CHECK_EQ(col.close_reason, error::Closed);
+	peer.reset();
+	server.reset();
+}
+
 TEST(close_inside_callback)
 {
 	auto        name = unique_name();

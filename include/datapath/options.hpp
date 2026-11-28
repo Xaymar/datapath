@@ -124,7 +124,9 @@ namespace datapath {
 		// so a hostile or broken peer can't change the bytes while the handler
 		// reads them. Turn it on only for peers you trust; it saves one memcpy
 		// per message (noticeable from about 64 KiB). Peers of another user are
-		// always copied. Each side decides for the messages it receives.
+		// always copied. Each side decides for the messages it receives, and
+		// socket::set_zero_copy changes it on a live connection (e.g. after the
+		// application's own handshake).
 		bool shared_memory_zero_copy = false;
 		// Ring size per direction with shared_memory, rounded up to a power of two
 		// (64 KiB .. 1 GiB). Messages larger than about the ring size are sent in

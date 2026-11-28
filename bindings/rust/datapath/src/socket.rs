@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: BSD-3-Clause
 
-use core::ffi::c_void;
+use core::ffi::{c_int, c_void};
 use core::marker::PhantomData;
 use core::ops::Deref;
 use core::ptr::NonNull;
@@ -69,6 +69,16 @@ impl SocketRef<'_> {
     /// Negotiated message size limit of this connection.
     pub fn max_message_size(&self) -> u64 {
         unsafe { sys::datapath_socket_max_message_size(self.raw.as_ptr()) }
+    }
+
+    /// Shared memory only: deliver later messages from a same-user peer straight from the
+    /// ring (`true`) instead of as a private copy (`false`, the default from
+    /// `Options::shared_memory_zero_copy`). Turn it on only once the peer is trusted, e.g.
+    /// after your own handshake: until then a hostile peer could change a message while your
+    /// handler reads it. Messages from another user are always copied. Takes effect from the
+    /// next message. Returns whether the connection uses shared memory.
+    pub fn set_zero_copy(&self, enable: bool) -> bool {
+        unsafe { sys::datapath_socket_set_zero_copy(self.raw.as_ptr(), c_int::from(enable)) != 0 }
     }
 }
 

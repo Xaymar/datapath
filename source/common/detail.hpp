@@ -27,6 +27,11 @@ namespace datapath { namespace detail {
 		virtual void            release()                                    = 0;
 		virtual bool            good() const                                 = 0;
 		virtual uint64_t        max_message_size() const                     = 0;
+		// See socket::set_zero_copy. Connections without shared memory ignore it.
+		virtual bool set_zero_copy(bool)
+		{
+			return false;
+		}
 	};
 
 	using accept_fn = std::function<bool(std::shared_ptr<connection>)>;

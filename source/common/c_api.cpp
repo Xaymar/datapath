@@ -361,6 +361,11 @@ uint64_t datapath_socket_max_message_size(const datapath_socket* s)
 	return s ? s->sock->max_message_size() : 0;
 }
 
+int datapath_socket_set_zero_copy(datapath_socket* s, int enable)
+{
+	return s && s->sock->set_zero_copy(enable != 0) ? 1 : 0;
+}
+
 void datapath_socket_release(datapath_socket* s)
 {
 	delete s;

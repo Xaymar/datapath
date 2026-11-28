@@ -43,7 +43,8 @@ namespace datapath { namespace posix {
 		std::unique_ptr<objects>                           _o;
 		std::unique_ptr<datapath::detail::shm::ring_pair> _ring;
 
-		shm_link(std::unique_ptr<objects> o, bool server, bool copy, uint64_t limit, uint64_t max_queued);
+		shm_link(std::unique_ptr<objects> o, bool server, bool other_user, bool zero_copy, uint64_t limit,
+				 uint64_t max_queued);
 
 		public:
 		~shm_link();
@@ -89,6 +90,10 @@ namespace datapath { namespace posix {
 		bool prepare_block()
 		{
 			return _ring->prepare_block();
+		}
+		void set_zero_copy(bool on) noexcept
+		{
+			_ring->set_zero_copy(on);
 		}
 
 		// The eventfds this side waits on.

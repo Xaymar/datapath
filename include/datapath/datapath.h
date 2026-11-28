@@ -234,6 +234,11 @@ DATAPATH_C_API datapath_error datapath_socket_close(datapath_socket* socket);
 DATAPATH_C_API int            datapath_socket_good(const datapath_socket* socket);
 /* Negotiated message size limit of this connection (0 for NULL). */
 DATAPATH_C_API uint64_t       datapath_socket_max_message_size(const datapath_socket* socket);
+/* Shared memory only: deliver later messages from a same-user peer without
+ * copying them out first (non-zero) or as a private copy (0, the default from
+ * shared_memory_zero_copy); see socket::set_zero_copy. Returns 1 if the
+ * connection uses shared memory, else 0 (also for NULL). */
+DATAPATH_C_API int            datapath_socket_set_zero_copy(datapath_socket* socket, int enable);
 /* Close, wait for running callbacks, and free the handle. No callback fires
  * afterwards (not even the close callback); user data is freed. May be called
  * from the socket's own callbacks. NULL is ignored. */

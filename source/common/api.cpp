@@ -118,6 +118,11 @@ uint64_t datapath::socket::max_message_size() const
 	return _impl->max_message_size();
 }
 
+bool datapath::socket::set_zero_copy(bool enable)
+{
+	return _impl->set_zero_copy(enable);
+}
+
 // server -----------------------------------------------------------------------
 
 datapath::server::server(std::shared_ptr<detail::listener> impl) : _impl(std::move(impl)) {}

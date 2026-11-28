@@ -525,9 +525,9 @@ TEST(same_user_messages_copied_unless_zero_copy)
 		auto c                    = connect_internal(name, o);
 		CHECK(c != nullptr);
 		CHECK(c->shared_memory_active());
-		auto              sock = std::make_shared<datapath::socket>(c);
-		std::atomic<int>  in_ring{-1};
-		waiter            w;
+		std::atomic<int> in_ring{-1};
+		waiter           w; // before the socket whose handler uses them
+		auto             sock = std::make_shared<datapath::socket>(c);
 		sock->on_message([&](const uint8_t* d, size_t n) {
 			if (n == 4) {
 				in_ring = in_shm_section(d) ? 1 : 0;
@@ -538,6 +538,41 @@ TEST(same_user_messages_copied_unless_zero_copy)
 		CHECK(w.wait(1));
 		CHECK_EQ(in_ring.load(), zero_copy ? 1 : 0);
 	}
+}
+
+// socket::set_zero_copy switches a live connection between copied and
+// zero-copy delivery, e.g. once the application's own handshake trusts the peer.
+TEST(set_zero_copy_switches_live_connection)
+{
+	auto        name = unique_name();
+	echo_server srv;
+	CHECK_EQ(srv.start(name), error::Success);
+	auto c = connect_internal(name, shm_options());
+	CHECK(c != nullptr);
+	CHECK(c->shared_memory_active());
+	std::atomic<int> in_ring{-1};
+	waiter           w; // before the socket whose handler uses them
+	auto             sock = std::make_shared<datapath::socket>(c);
+	sock->on_message([&](const uint8_t* d, size_t n) {
+		if (n == 4) {
+			in_ring = in_shm_section(d) ? 1 : 0;
+			w.hit();
+		}
+	});
+	int expect[] = {0, 1, 0};
+	for (int i = 0; i < 3; i++) {
+		if (i > 0)
+			CHECK(sock->set_zero_copy(i == 1));
+		CHECK_EQ(sock->send("ping", 4), error::Success);
+		CHECK(w.wait(i + 1));
+		CHECK_EQ(in_ring.load(), expect[i]);
+	}
+
+	// Without shared memory there is nothing to switch.
+	auto c2 = connect_internal(name, socket_options());
+	CHECK(c2 != nullptr);
+	auto sock2 = std::make_shared<datapath::socket>(c2);
+	CHECK(!sock2->set_zero_copy(true));
 }
 
 // The peer's process ends without closing anything: the other side is told

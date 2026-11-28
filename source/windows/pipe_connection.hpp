@@ -72,6 +72,7 @@ namespace datapath { namespace windows {
 		uint8_t                      _probe   = 0;
 
 		void start_shm_reading();
+		void shm_peer_gone(DWORD err);
 		void activate_shm();
 		void flush_queue_to_shm();
 		void arm_wake();
@@ -117,6 +118,13 @@ namespace datapath { namespace windows {
 		// Client side: messages move through `shm` from now on.
 		void use_shared_memory(std::unique_ptr<shm_channel> shm);
 		datapath::error send(const buffer_view* parts, size_t count) override;
+		bool            set_zero_copy(bool enable) override
+		{
+			if (!_shm)
+				return false;
+			_shm->set_zero_copy(enable);
+			return true;
+		}
 
 		// Whether messages move through shared memory (tests).
 		bool shared_memory_active() const noexcept

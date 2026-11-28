@@ -141,7 +141,8 @@ struct datapath::windows::shm_channel::objects {
 	void*       view       = nullptr;
 	uint64_t    cap        = 0;
 	bool        mirrored   = false;
-	bool        copy       = true;
+	bool        other_user = true;
+	bool        zero_copy  = false;
 	mirror_view mirror[2];
 
 	~objects()
@@ -205,7 +206,8 @@ datapath::windows::shm_channel::shm_channel(std::unique_ptr<objects> o, bool ser
 	s.header   = _o->header();
 	s.cap      = _o->cap;
 	s.mirrored = _o->mirrored;
-	s.copy     = _o->copy;
+	s.other_user = _o->other_user;
+	s.zero_copy  = _o->zero_copy;
 	s.server   = server;
 	if (s.mirrored) {
 		s.data[0] = _o->mirror[0].base;
@@ -263,7 +265,8 @@ datapath::error datapath::windows::shm_channel::create(std::unique_ptr<shm_chann
 
 	auto o  = datapath::detail::make_unique<objects>();
 	o->cap  = cap;
-	o->copy = !zero_copy || peer != own;
+	o->other_user = peer != own;
+	o->zero_copy  = zero_copy;
 
 	// Owner: everything. Peer: map read/write + query + read control (0x20007)
 	// on the section, modify state + synchronize (0x100002) on the events.
@@ -366,13 +369,14 @@ datapath::error datapath::windows::shm_channel::open(std::unique_ptr<shm_channel
 			return datapath::error::AccessDenied;
 
 	// Copy messages out before delivery unless zero-copy was asked for and the
-	// section's owner is our user.
+	// section's owner is our user (if the owner can't be read: another user).
+	o->zero_copy = zero_copy;
 	PSID                 owner = nullptr;
 	PSECURITY_DESCRIPTOR sd    = nullptr;
 	if (GetSecurityInfo(o->section, SE_KERNEL_OBJECT, OWNER_SECURITY_INFORMATION, &owner, nullptr, nullptr, nullptr,
 						&sd)
 		== ERROR_SUCCESS) {
-		o->copy = !zero_copy || sid_string(owner) != current_user_sid();
+		o->other_user = sid_string(owner) != current_user_sid();
 		LocalFree(sd);
 	}
 	if (!(o->view = MapViewOfFile(o->section, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0)))

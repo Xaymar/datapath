@@ -394,14 +394,7 @@ void datapath::windows::pipe_connection::on_io(io_op* op, DWORD bytes, DWORD err
 	case k_read:
 		if (_shm_reading) {
 			// The liveness read: the peer closed its pipe or its process ended.
-			// Messages it put in the ring before that are still delivered.
-			while (_polling.test_and_set(std::memory_order_acquire))
-				SwitchToThread();
-			if (!_closed.load(std::memory_order_acquire))
-				_shm->poll([this](const uint8_t* d, size_t n) { return deliver_message(d, n); });
-			_polling.clear(std::memory_order_release);
-			close_with(err == ERROR_SUCCESS ? datapath::error::Closed : map_error(err));
-			finish_close();
+			shm_peer_gone(err);
 			return;
 		}
 		if (err != ERROR_SUCCESS) {
@@ -535,10 +528,22 @@ void datapath::windows::pipe_connection::start_shm_reading()
 		finish_close();
 		break;
 	case io_result::failed:
-		close_with(map_error(err));
-		finish_close();
+		// The peer closed before reading started (e.g. send() then close()).
+		shm_peer_gone(err);
 		break;
 	}
+}
+
+void datapath::windows::pipe_connection::shm_peer_gone(DWORD err)
+{
+	// Messages the peer put in the ring before it went away are still delivered.
+	while (_polling.test_and_set(std::memory_order_acquire))
+		SwitchToThread();
+	if (!_closed.load(std::memory_order_acquire))
+		_shm->poll([this](const uint8_t* d, size_t n) { return deliver_message(d, n); });
+	_polling.clear(std::memory_order_release);
+	close_with(err == ERROR_SUCCESS ? datapath::error::Closed : map_error(err));
+	finish_close();
 }
 
 bool datapath::windows::pipe_connection::poll()

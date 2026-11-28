@@ -59,6 +59,14 @@ namespace datapath {
 		bool            good() const;
 		// Negotiated message size limit of this connection.
 		uint64_t max_message_size() const;
+		// Shared memory only: deliver later messages from a same-user peer
+		// straight from the ring (true) instead of as a private copy (false, the
+		// default from options::shared_memory_zero_copy). Use it once the peer is
+		// trusted, e.g. after the application's own handshake: until then a
+		// hostile peer could change a message while the handler reads it.
+		// Messages from another user are always copied. Thread-safe; takes effect
+		// from the next message. Returns whether the connection uses shared memory.
+		bool set_zero_copy(bool enable);
 	};
 #ifdef _MSC_VER
 #pragma warning(pop)

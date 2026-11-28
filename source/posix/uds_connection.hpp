@@ -113,6 +113,13 @@ namespace datapath { namespace posix {
 			return _shm_active.load(std::memory_order_acquire);
 		}
 		datapath::error send(const buffer_view* parts, size_t count) override;
+		bool            set_zero_copy(bool enable) override
+		{
+			if (!_shm)
+				return false;
+			_shm->set_zero_copy(enable);
+			return true;
+		}
 
 		void on_event(uint32_t events) override;
 		void on_post(int kind) override;

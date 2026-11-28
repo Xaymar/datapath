@@ -89,6 +89,10 @@ namespace datapath { namespace windows {
 		{
 			return _ring->prepare_block();
 		}
+		void set_zero_copy(bool on) noexcept
+		{
+			_ring->set_zero_copy(on);
+		}
 
 		// Wait completion packets and the events they wait on.
 		HANDLE data_packet() const noexcept;
