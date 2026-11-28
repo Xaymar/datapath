@@ -21,6 +21,9 @@ namespace datapath { namespace detail {
 
 		virtual void            set_message_handler(message_handler handler) = 0;
 		virtual void            set_close_handler(close_handler handler)     = 0;
+		virtual void            set_drain_handler(drain_handler handler)     = 0;
+		virtual void            pause()                                      = 0;
+		virtual void            resume()                                     = 0;
 		virtual datapath::error send(const buffer_view* parts, size_t count) = 0;
 		virtual datapath::error close()                                      = 0;
 		// The user dropped their handle: close, wait for running callbacks, and

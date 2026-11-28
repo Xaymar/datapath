@@ -401,6 +401,210 @@ TEST(would_block_when_peer_stalls)
 	CHECK(c->good());
 }
 
+// Receive backpressure: a paused receiver reads nothing more, so a flooding
+// peer runs into WouldBlock instead of making the receiver buffer without bound.
+TEST(pause_backpressures_sender)
+{
+	auto                  name = unique_name();
+	srv_ptr               server;
+	sock_ptr              keep;
+	latch                 accepted, first;
+	std::mutex            m;
+	std::vector<uint32_t> seen;
+	CHECK_EQ(datapath::host(server, name), error::Success);
+	server->on_accept([&](sock_ptr s) {
+		keep                  = s;
+		datapath::socket* raw = s.get();
+		s->on_message([&, raw](const uint8_t* d, size_t n) {
+			uint32_t seq = 0;
+			if (n >= 4)
+				std::memcpy(&seq, d, 4);
+			size_t count;
+			{
+				std::lock_guard<std::mutex> l(m);
+				seen.push_back(seq);
+				count = seen.size();
+			}
+			if (count == 1) {
+				raw->pause(); // from the handler: nothing after this message
+				first.notify();
+			}
+		});
+		accepted.notify();
+		return true;
+	});
+	datapath::options co;
+	co.max_queued_bytes = 1 << 20;
+	sock_ptr c;
+	CHECK_EQ(datapath::connect(c, name, co), error::Success);
+	latch drained;
+	c->on_drain([&] { drained.notify(); });
+	CHECK(accepted.wait(1));
+	bytes    p(4096);
+	error    ec   = error::Success;
+	uint32_t sent = 0;
+	// Without backpressure this would run until the 1 GiB cap.
+	while (size_t(sent) * p.size() < (size_t(1) << 30)) {
+		std::memcpy(p.data(), &sent, 4);
+		ec = c->send(p.data(), p.size());
+		if (ec == error::WouldBlock) {
+			// The peer's buffers may still be filling: give them a moment once.
+			std::this_thread::sleep_for(20ms);
+			ec = c->send(p.data(), p.size());
+		}
+		if (ec != error::Success)
+			break;
+		sent++;
+	}
+	CHECK_EQ(ec, error::WouldBlock);
+	CHECK(first.wait(1));
+	std::this_thread::sleep_for(100ms);
+	{
+		std::lock_guard<std::mutex> l(m);
+		CHECK_EQ(seen.size(), size_t(1));
+	}
+	CHECK_EQ(drained.value(), 0);
+	keep->resume();
+	auto deadline = std::chrono::steady_clock::now() + 10s;
+	for (;;) {
+		{
+			std::lock_guard<std::mutex> l(m);
+			if (seen.size() >= sent)
+				break;
+		}
+		CHECK(std::chrono::steady_clock::now() < deadline);
+		std::this_thread::sleep_for(1ms);
+	}
+	{
+		std::lock_guard<std::mutex> l(m);
+		CHECK_EQ(seen.size(), size_t(sent));
+		for (uint32_t i = 0; i < sent; i++)
+			CHECK_EQ(seen[i], i);
+	}
+	// The queue that returned WouldBlock ran empty: on_drain fired once.
+	CHECK(drained.wait(1));
+	CHECK_EQ(c->send(p.data(), p.size()), error::Success);
+}
+
+// Paused before the handler is set, from another thread: nothing is delivered,
+// and a remote close waits behind the messages that came before it.
+TEST(pause_defers_remote_close)
+{
+	auto                     name = unique_name();
+	srv_ptr                  server;
+	sock_ptr                 keep;
+	latch                    accepted, closed;
+	std::mutex               m;
+	std::vector<std::string> events;
+	CHECK_EQ(datapath::host(server, name), error::Success);
+	server->on_accept([&](sock_ptr s) {
+		keep = s;
+		s->pause();
+		s->on_close([&](error) {
+			{
+				std::lock_guard<std::mutex> l(m);
+				events.push_back("close");
+			}
+			closed.notify();
+		});
+		s->on_message([&](const uint8_t* d, size_t n) {
+			std::lock_guard<std::mutex> l(m);
+			events.emplace_back(reinterpret_cast<const char*>(d), n);
+		});
+		accepted.notify();
+		return true;
+	});
+	{
+		sock_ptr c;
+		CHECK_EQ(datapath::connect(c, name), error::Success);
+		CHECK_EQ(c->send("one", 3), error::Success);
+		CHECK_EQ(c->send("two", 3), error::Success);
+		CHECK_EQ(c->send("three", 5), error::Success);
+		CHECK(accepted.wait(1));
+		std::this_thread::sleep_for(50ms);
+	} // the client goes away
+	std::this_thread::sleep_for(100ms);
+	{
+		std::lock_guard<std::mutex> l(m);
+		CHECK(events.empty());
+	}
+	keep->resume();
+	CHECK(closed.wait(1));
+	std::lock_guard<std::mutex> l(m);
+	CHECK_EQ(events.size(), size_t(4));
+	CHECK_EQ(events[0], std::string("one"));
+	CHECK_EQ(events[1], std::string("two"));
+	CHECK_EQ(events[2], std::string("three"));
+	CHECK_EQ(events[3], std::string("close"));
+}
+
+// A local close of a paused (stalled) connection still fires on_close.
+TEST(close_while_paused)
+{
+	echo_server srv;
+	auto        name = unique_name();
+	CHECK_EQ(srv.start(name), error::Success);
+	collector col; // outlives the socket whose handlers use it
+	sock_ptr  c;
+	CHECK_EQ(datapath::connect(c, name), error::Success);
+	col.attach(*c);
+	CHECK_EQ(c->send("x", 1), error::Success);
+	CHECK(col.received.wait(1));
+	c->pause();
+	CHECK_EQ(c->send("y", 1), error::Success);
+	std::this_thread::sleep_for(50ms);
+	CHECK_EQ(col.received.value(), 1);
+	CHECK_EQ(c->close(), error::Success);
+	CHECK(col.closed.wait(1));
+	CHECK_EQ(col.close_calls.load(), 1);
+	c->resume(); // harmless after close
+	std::this_thread::sleep_for(20ms);
+	CHECK_EQ(col.close_calls.load(), 1);
+}
+
+// Pause and resume many times while echoing: nothing lost, nothing reordered.
+TEST(pause_resume_churn)
+{
+	echo_server srv;
+	auto        name = unique_name();
+	CHECK_EQ(srv.start(name), error::Success);
+	collector col; // outlives the socket whose handlers use it
+	sock_ptr  c;
+	CHECK_EQ(datapath::connect(c, name), error::Success);
+	col.attach(*c);
+	constexpr uint32_t n = 20000;
+	std::atomic<bool>  stop{false};
+	std::thread        toggler([&] {
+        while (!stop.load()) {
+            c->pause();
+            std::this_thread::yield();
+            c->resume();
+        }
+    });
+	for (uint32_t i = 0; i < n; i++) {
+		while (c->send(&i, 4) == error::WouldBlock)
+			std::this_thread::yield();
+	}
+	bool ok = col.received.wait(int(n));
+	stop    = true;
+	toggler.join();
+	c->resume();
+	if (!ok) {
+		// Tell a lost wake-up (stuck until more data arrives) from a slow run.
+		int before = col.received.value();
+		bool late  = col.received.wait(int(n), 5s);
+		std::printf("received %d of %u at the deadline, %d after resume (%s)\n", before, n,
+					col.received.value(), late ? "slow" : "stuck");
+	}
+	CHECK(ok);
+	std::lock_guard<std::mutex> l(col.lock);
+	for (uint32_t i = 0; i < n; i++) {
+		uint32_t v = 0;
+		std::memcpy(&v, col.messages[i].data(), 4);
+		CHECK_EQ(v, i);
+	}
+}
+
 TEST(messages_wait_for_handler)
 {
 	collector col;

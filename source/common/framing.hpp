@@ -126,17 +126,18 @@ namespace datapath { namespace detail {
 		template<typename F>
 		datapath::error commit(size_t n, F&& deliver)
 		{
+			store(n);
+			return resume(deliver);
+		}
+
+		// Account for `n` bytes read into the area returned by prepare() without
+		// delivering anything (receiving paused); resume() delivers them later.
+		void store(size_t n) noexcept
+		{
 			if (_in_big) {
 				_big_filled += n;
-				if (_big_filled < _big_size)
-					return datapath::error::Success;
-				_in_big     = false;
-				_big_filled = 0;
-				if (!call(deliver, _big.get(), _big_size))
-					return datapath::error::Closed;
-				return datapath::error::Success;
+				return;
 			}
-
 			_wpos += n;
 			bool tail = _need != 0 && n <= _need;
 			_need     = 0;
@@ -145,6 +146,29 @@ namespace datapath { namespace detail {
 			} else if (!tail && n < _read_hint / 8 && _read_hint > min_read) {
 				_read_hint /= 2;
 			}
+		}
+
+		// Deliver the complete frames that are buffered: after store(), or because
+		// `deliver` stopped parsing earlier (receiving paused). Reads nothing.
+		template<typename F>
+		datapath::error resume(F&& deliver)
+		{
+			if (_in_big) {
+				if (_big_filled < _big_size)
+					return datapath::error::Success;
+				_in_big     = false;
+				_big_filled = 0;
+				if (!call(deliver, _big.get(), _big_size))
+					return datapath::error::Closed;
+				return datapath::error::Success;
+			}
+			return parse(deliver);
+		}
+
+		private:
+		template<typename F>
+		datapath::error parse(F& deliver)
+		{
 			for (;;) {
 				size_t avail = _wpos - _rpos;
 				if (avail < frame_header_size)

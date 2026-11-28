@@ -213,10 +213,13 @@ datapath::error datapath::detail::shm::ring_pair::send(const buffer_view* parts,
 		if (complete)
 			return datapath::error::Success;
 	} else if (_pending_bytes + total > _max_queued) {
+		_blocked = true;
 		return datapath::error::WouldBlock;
 	}
-	if (written == 0 && _pending_bytes + total > _max_queued)
+	if (written == 0 && _pending_bytes + total > _max_queued) {
+		_blocked = true;
 		return datapath::error::WouldBlock;
+	}
 	// Keep the rest (a started message must be finished whatever the limit).
 	pending p;
 	p.bytes.resize(size_t(total - written));
@@ -245,6 +248,15 @@ bool datapath::detail::shm::ring_pair::drain(bool& need_space)
 	}
 	need_space = !_pending.empty() && !_broken;
 	return !_broken;
+}
+
+bool datapath::detail::shm::ring_pair::take_drained()
+{
+	std::lock_guard<std::mutex> l(_send_lock);
+	if (!_blocked || !_pending.empty() || _broken)
+		return false;
+	_blocked = false;
+	return true;
 }
 
 bool datapath::detail::shm::ring_pair::prepare_space_wait()

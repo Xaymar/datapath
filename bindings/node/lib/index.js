@@ -48,6 +48,7 @@ const codes = Object.freeze({
 const EV_MESSAGE = 0;
 const EV_CLOSE = 1;
 const EV_ACCEPT = 2;
+const EV_DRAIN = 3;
 
 function codeName(errno) {
 	return native.errorName(errno);
@@ -77,18 +78,28 @@ class Context {
 	}
 }
 
+function checkHighWaterMark(value) {
+	if (value === undefined) return undefined;
+	if (typeof value !== 'number' || !(value >= 1)) {
+		throw new RangeError('options.highWaterMark must be a number >= 1 (bytes)');
+	}
+	return value;
+}
+
 class Socket extends EventEmitter {
 	#native;
 	#open = true;
 	#reading = false;
+	#paused = false;
 
 	/** @internal Created by connect() and Server; not for direct use. */
-	constructor(nativeSocket) {
+	constructor(nativeSocket, highWaterMark) {
 		super();
 		if (!(nativeSocket instanceof native.NativeSocket)) {
 			throw new TypeError('use datapath.connect() to create a Socket');
 		}
 		this.#native = nativeSocket;
+		if (highWaterMark !== undefined) this.#native.setHighWaterMark(highWaterMark);
 		// Receiving starts with the first 'message' listener, like the C++ API's
 		// first on_message(); until then messages wait in the kernel.
 		this.on('newListener', (event) => {
@@ -100,6 +111,8 @@ class Socket extends EventEmitter {
 		this.#native.attach((kind, payload) => {
 			if (kind === EV_MESSAGE) {
 				this.emit('message', payload);
+			} else if (kind === EV_DRAIN) {
+				this.emit('drain');
 			} else if (kind === EV_CLOSE) {
 				this.#open = false;
 				const reason = codeName(payload);
@@ -108,7 +121,10 @@ class Socket extends EventEmitter {
 		});
 	}
 
-	/** Queue one message. Returns false when the send queue is full (WouldBlock). */
+	/**
+	 * Queue one message. Returns false when the send queue is full (WouldBlock):
+	 * the message was not queued; send it again after 'drain'.
+	 */
 	send(data) {
 		return this.#result(this.#native.send(data));
 	}
@@ -122,6 +138,41 @@ class Socket extends EventEmitter {
 		if (errno === codes.Success) return true;
 		if (errno === codes.WouldBlock) return false;
 		throw new DatapathError(errno, 'send failed');
+	}
+
+	/**
+	 * Stop emitting 'message' events and stop reading from the peer, whose sends
+	 * then back up. Messages already received wait for resume().
+	 */
+	pause() {
+		if (!this.#paused) {
+			this.#paused = true;
+			if (this.#open) this.#native.pause();
+		}
+		return this;
+	}
+
+	/** Emit 'message' events again, starting with those that waited. */
+	resume() {
+		if (this.#paused) {
+			this.#paused = false;
+			if (this.#open) this.#native.resume();
+		}
+		return this;
+	}
+
+	/** True between pause() and resume(). */
+	isPaused() {
+		return this.#paused;
+	}
+
+	/**
+	 * Bytes of received messages waiting to be emitted (each message counts its
+	 * size plus a small fixed overhead). Reading stops while this is at or above
+	 * the high-water mark.
+	 */
+	get receiveQueueBytes() {
+		return this.#native.queuedBytes();
 	}
 
 	/** Close the connection. 'close' follows asynchronously. */
@@ -158,12 +209,12 @@ class Server extends EventEmitter {
 	#open = true;
 
 	/** @internal Created by host(); not for direct use. */
-	constructor(nativeServer) {
+	constructor(nativeServer, highWaterMark) {
 		super();
 		this.#native = nativeServer;
 		this.#native.attach((kind, nativeSocket) => {
 			if (kind !== EV_ACCEPT) return;
-			const socket = new Socket(nativeSocket);
+			const socket = new Socket(nativeSocket, highWaterMark);
 			if (!this.#open || this.listenerCount('connection') === 0) {
 				socket.close();
 				return;
@@ -197,16 +248,16 @@ class Server extends EventEmitter {
 }
 
 function splitOptions(options) {
-	if (options === undefined || options === null) return [{}, undefined];
+	if (options === undefined || options === null) return [{}, undefined, undefined];
 	if (typeof options !== 'object') throw new TypeError('options must be an object');
-	const { context, ...rest } = options;
-	return [rest, Context._native(context)];
+	const { context, highWaterMark, ...rest } = options;
+	return [rest, Context._native(context), checkHighWaterMark(highWaterMark)];
 }
 
 /** Connect to a server. Resolves once the handshake completed. */
 async function connect(path, options) {
 	if (typeof path !== 'string') throw new TypeError('path must be a string');
-	const [opts, ctx] = splitOptions(options);
+	const [opts, ctx, highWaterMark] = splitOptions(options);
 	let nativeSocket;
 	try {
 		nativeSocket = await native.connect(path, opts, ctx);
@@ -214,7 +265,7 @@ async function connect(path, options) {
 		if (typeof errno === 'number') throw new DatapathError(errno, `connect to "${path}" failed`);
 		throw errno;
 	}
-	return new Socket(nativeSocket);
+	return new Socket(nativeSocket, highWaterMark);
 }
 
 /** Host a server at `path`. Throws a DatapathError when it cannot. */
@@ -224,10 +275,10 @@ function host(path, options, onConnection) {
 		options = undefined;
 	}
 	if (typeof path !== 'string') throw new TypeError('path must be a string');
-	const [opts, ctx] = splitOptions(options);
+	const [opts, ctx, highWaterMark] = splitOptions(options);
 	const result = native.host(path, opts, ctx);
 	if (typeof result === 'number') throw new DatapathError(result, `host "${path}" failed`);
-	const server = new Server(result);
+	const server = new Server(result, highWaterMark);
 	if (onConnection) server.on('connection', onConnection);
 	return server;
 }

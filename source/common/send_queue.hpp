@@ -32,6 +32,10 @@ namespace datapath { namespace detail {
 		uint64_t                          _max_queued;
 		bool                              _writing = false;
 		bool                              _closed  = false;
+		// A push returned WouldBlock since the queue last ran empty.
+		bool                              _blocked = false;
+		// The queue ran empty after _blocked was set; take_drained() reports it.
+		bool                              _drained = false;
 
 		std::vector<uint8_t> new_block_locked(size_t reserve);
 
@@ -63,6 +67,10 @@ namespace datapath { namespace detail {
 		// anything other threads queued meanwhile. Does nothing once closed.
 		void push_front_rest(const uint8_t* header, size_t header_size, const buffer_view* parts, size_t count,
 							 size_t sent);
+
+		// True once after a push returned WouldBlock and the writer has since
+		// emptied the queue (take() returned false): time to tell the user.
+		bool take_drained();
 
 		void recycle(std::vector<uint8_t>&& buffer);
 		void set_limit(uint64_t max_message_size);

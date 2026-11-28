@@ -50,8 +50,10 @@ datapath::error datapath::detail::send_queue::push(const buffer_view* parts, siz
 		return datapath::error::Closed;
 	if (total > _limit)
 		return datapath::error::TooLarge;
-	if (_queued > 0 && _queued + frame > _max_queued)
+	if (_queued > 0 && _queued + frame > _max_queued) {
+		_blocked = true;
 		return datapath::error::WouldBlock;
+	}
 
 	if (frame <= coalesce_limit) {
 		if (_spare_large.capacity())
@@ -105,6 +107,10 @@ bool datapath::detail::send_queue::take(std::vector<uint8_t>& batch)
 	batch = std::vector<uint8_t>();
 	if (_blocks.empty() || _closed) {
 		_writing = false;
+		if (_blocked && !_closed) {
+			_blocked = false;
+			_drained = true;
+		}
 		return false;
 	}
 	batch = std::move(_blocks.front());
@@ -171,6 +177,14 @@ void datapath::detail::send_queue::push_front_rest(const uint8_t* header, size_t
 		return;
 	_queued += block.size();
 	_blocks.push_front(std::move(block));
+}
+
+bool datapath::detail::send_queue::take_drained()
+{
+	std::unique_lock<std::mutex> ul(_lock);
+	bool                         d = _drained;
+	_drained                       = false;
+	return d;
 }
 
 void datapath::detail::send_queue::recycle(std::vector<uint8_t>&& buffer)

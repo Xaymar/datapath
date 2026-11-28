@@ -28,6 +28,10 @@ namespace datapath {
 	// Called exactly once, on an I/O thread, when the connection ends.
 	using close_handler = std::function<void(datapath::error reason)>;
 
+	// Called on an I/O thread once the send queue ran empty after a send()
+	// returned WouldBlock: sending makes progress again.
+	using drain_handler = std::function<void()>;
+
 	// One end of a connection. Destroying the last reference closes the connection.
 #ifdef _MSC_VER
 // C4251 (std::shared_ptr member without dll-interface) is harmless: a C++ API
@@ -48,6 +52,22 @@ namespace datapath {
 		// arrive earlier wait in the kernel.
 		void on_message(message_handler handler);
 		void on_close(close_handler handler);
+		// Set the handler called when the send queue ran empty after WouldBlock.
+		void on_drain(drain_handler handler);
+
+		// Stop delivering messages. Thread-safe; from inside the message handler
+		// no further message is delivered after the current one, from another
+		// thread at most the message being delivered right now completes. While
+		// paused nothing is read from the peer, so its sends back up and return
+		// WouldBlock to it: a peer that sends faster than the handler keeps up
+		// cannot make this side buffer without bound. The connection closing is
+		// noticed (and on_close fires) once receiving resumes, after the messages
+		// that came before it, unless this side closes it. Other connections
+		// keep running on the same I/O thread.
+		void pause();
+		// Continue delivering messages, starting with those that were already
+		// received. Thread-safe.
+		void resume();
 
 		// Queue one message. Thread-safe, never blocks, and is safe to call from
 		// handlers. Returns TooLarge, WouldBlock or Closed when not queued.

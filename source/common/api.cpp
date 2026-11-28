@@ -92,6 +92,21 @@ void datapath::socket::on_close(close_handler handler)
 	_impl->set_close_handler(std::move(handler));
 }
 
+void datapath::socket::on_drain(drain_handler handler)
+{
+	_impl->set_drain_handler(std::move(handler));
+}
+
+void datapath::socket::pause()
+{
+	_impl->pause();
+}
+
+void datapath::socket::resume()
+{
+	_impl->resume();
+}
+
 datapath::error datapath::socket::send(const void* data, size_t size)
 {
 	buffer_view part{data, size};

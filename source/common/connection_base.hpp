@@ -14,6 +14,13 @@ SPDX-License-Identifier: BSD-3-Clause
 // - finish_close() is called either by the read chain (once it observes the
 //   connection closed) or, when reads were never armed, by a posted close event.
 //   on_close therefore never races with on_message.
+// - pause() stops the read chain at the next message boundary: it delivers no
+//   further message and marks itself stalled (stall_if_paused()). resume()
+//   takes the stall back and has platform_resume() restart the chain on an I/O
+//   thread, which first delivers what is still buffered (resume_buffered()).
+//   While stalled, nothing is read, so the peer's sends back up into its own
+//   send queue and it gets WouldBlock: backpressure without blocking the I/O
+//   thread that other connections share.
 
 #pragma once
 #include <atomic>
@@ -30,9 +37,18 @@ namespace datapath { namespace detail {
 		std::recursive_mutex             _callback_lock;
 		std::shared_ptr<message_handler> _on_message;
 		std::shared_ptr<close_handler>   _on_close;
+		std::shared_ptr<drain_handler>   _on_drain;
 		std::atomic<bool>                _armed{false};
 		std::atomic<bool>                _close_fired{false};
 		std::atomic<int32_t>             _reason{int32_t(datapath::error::Closed)};
+		// Receiving paused by the user.
+		std::atomic<bool>                _paused{false};
+		// The read chain stopped because of _paused; whoever clears it restarts it.
+		std::atomic<bool>                _stalled{false};
+		// Read chain only: parsing stopped for a pause with frames left buffered.
+		bool                             _unparsed = false;
+		// A drain notification is posted and has not run yet.
+		std::atomic<bool>                _drain_posted{false};
 		// Server-side handshake deadline: 0 none, 1 waiting for the hello, 2 expired.
 		std::atomic<int>                 _handshake{0};
 
@@ -54,6 +70,11 @@ namespace datapath { namespace detail {
 		// The calling thread holds the send queue's writer slot: write until empty
 		// or until the OS reports pending.
 		virtual void platform_write() = 0;
+		// Arrange for the read chain to continue on an I/O thread after a stall.
+		// Called once per stall.
+		virtual void platform_resume() = 0;
+		// Arrange for fire_drain() to run on an I/O thread. Called once per post.
+		virtual void platform_post_drain() = 0;
 		// Called after send() wrote data from the caller's thread.
 		virtual void after_inline_write() {}
 		// Direct send, caller holds the writer slot and nothing is queued: write
@@ -81,6 +102,77 @@ namespace datapath { namespace detail {
 			return _armed.load(std::memory_order_acquire);
 		}
 
+		bool paused() const noexcept
+		{
+			return _paused.load(std::memory_order_acquire);
+		}
+
+		// Read chain: true when it must stop because receiving is paused. It is
+		// then stalled and resume() restarts it via platform_resume().
+		bool stall_if_paused()
+		{
+			if (!_paused.load(std::memory_order_seq_cst))
+				return false;
+			_stalled.store(true, std::memory_order_seq_cst);
+			if (_paused.load(std::memory_order_seq_cst))
+				return true;
+			// resume() ran meanwhile. Unless it already took the stall (and posted
+			// a restart), take it back and keep going.
+			return !_stalled.exchange(false, std::memory_order_seq_cst);
+		}
+
+		// Read chain: frames are left in the receive buffer because parsing stopped
+		// for a pause. Deliver them with resume_buffered() before reading more:
+		// the OS may have nothing new to report (edge-triggered readiness).
+		bool unparsed() const noexcept
+		{
+			return _unparsed;
+		}
+
+		// Read chain: deliver complete frames that were left in the receive buffer
+		// when parsing stopped for a pause. Same result as consume().
+		bool resume_buffered()
+		{
+			std::lock_guard<std::recursive_mutex> cb(_callback_lock);
+			if (_closed.load(std::memory_order_acquire)) {
+				finish_close();
+				return false;
+			}
+			_unparsed = false;
+			return parsed(_parser.resume([this](const uint8_t* d, size_t s) { return deliver(d, s); }));
+		}
+
+		// After the send queue (or shared-memory pending list) may have run empty:
+		// notify on_drain if a send returned WouldBlock before.
+		void check_drained()
+		{
+			if (_queue.take_drained())
+				post_drain();
+		}
+
+		// Any thread: have fire_drain() run on an I/O thread.
+		void post_drain()
+		{
+			if (!_drain_posted.exchange(true, std::memory_order_acq_rel))
+				platform_post_drain();
+		}
+
+		// I/O thread: call on_drain.
+		void fire_drain()
+		{
+			_drain_posted.store(false, std::memory_order_release);
+			std::lock_guard<std::recursive_mutex> cb(_callback_lock);
+			if (_closed.load(std::memory_order_acquire))
+				return;
+			std::shared_ptr<drain_handler> h;
+			{
+				std::lock_guard<std::mutex> l(_handler_lock);
+				h = _on_drain;
+			}
+			if (h && *h)
+				(*h)();
+		}
+
 		// Deliver one message; returns false when the connection got closed.
 		bool deliver(const uint8_t* data, size_t size)
 		{
@@ -91,11 +183,13 @@ namespace datapath { namespace detail {
 			}
 			if (h && *h)
 				(*h)(data, size);
-			return !_closed.load(std::memory_order_acquire);
+			// Paused (also from inside the handler): stop after this message.
+			return !_closed.load(std::memory_order_acquire) && !_paused.load(std::memory_order_acquire);
 		}
 
 		// Deliver one message that did not come through the parser (shared memory).
-		// Same rules as consume(): only from the read chain. False once closed.
+		// Same rules as consume(): only from the read chain. False once closed or
+		// paused.
 		bool deliver_message(const uint8_t* data, size_t size)
 		{
 			std::lock_guard<std::recursive_mutex> cb(_callback_lock);
@@ -109,7 +203,24 @@ namespace datapath { namespace detail {
 		bool consume(size_t n)
 		{
 			std::lock_guard<std::recursive_mutex> cb(_callback_lock);
-			auto ec = _parser.commit(n, [this](const uint8_t* d, size_t s) { return deliver(d, s); });
+			if (_paused.load(std::memory_order_acquire)) {
+				// Paused while this read was in flight (always the case for the
+				// read Windows keeps pending): keep the bytes, deliver on resume.
+				_parser.store(n);
+				_unparsed = true;
+				return true;
+			}
+			return parsed(_parser.commit(n, [this](const uint8_t* d, size_t s) { return deliver(d, s); }));
+		}
+
+		bool parsed(datapath::error ec)
+		{
+			// Closed without a close: deliver() stopped because receiving got paused.
+			// The rest stays buffered; the chain stalls at its next step.
+			if (ec == datapath::error::Closed && !_closed.load(std::memory_order_acquire)) {
+				ec        = datapath::error::Success;
+				_unparsed = true;
+			}
 			if (ec == datapath::error::Success && !_closed.load(std::memory_order_acquire))
 				return true;
 			if (ec != datapath::error::Success && ec != datapath::error::Closed)
@@ -129,6 +240,7 @@ namespace datapath { namespace detail {
 				std::lock_guard<std::mutex> l(_handler_lock);
 				h = std::move(_on_close);
 				_on_message.reset();
+				_on_drain.reset();
 			}
 			if (h && *h)
 				(*h)(datapath::error(_reason.load()));
@@ -167,7 +279,9 @@ namespace datapath { namespace detail {
 			_reason = int32_t(reason);
 			_queue.close();
 			platform_close();
-			if (!_armed.load(std::memory_order_acquire))
+			// Nothing is in flight for a chain that was never armed or that is
+			// stalled, so nothing would notice the close: post it.
+			if (!_armed.load(std::memory_order_acquire) || _stalled.exchange(false, std::memory_order_seq_cst))
 				platform_post_close();
 			return datapath::error::Success;
 		}
@@ -183,6 +297,27 @@ namespace datapath { namespace detail {
 			}
 			if (has && !_armed.exchange(true, std::memory_order_acq_rel))
 				platform_arm();
+		}
+
+		void set_drain_handler(drain_handler handler) override
+		{
+			std::lock_guard<std::mutex> l(_handler_lock);
+			if (_close_fired)
+				return;
+			_on_drain = std::make_shared<drain_handler>(std::move(handler));
+		}
+
+		void pause() override
+		{
+			_paused.store(true, std::memory_order_seq_cst);
+		}
+
+		void resume() override
+		{
+			_paused.store(false, std::memory_order_seq_cst);
+			// The restarted chain notices a close that came meanwhile.
+			if (_stalled.exchange(false, std::memory_order_seq_cst))
+				platform_resume();
 		}
 
 		void set_close_handler(close_handler handler) override
@@ -242,6 +377,7 @@ namespace datapath { namespace detail {
 				std::lock_guard<std::mutex> l(_handler_lock);
 				_on_close.reset();
 				_on_message.reset();
+				_on_drain.reset();
 			}
 			on_finished();
 		}

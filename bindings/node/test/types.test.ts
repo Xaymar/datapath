@@ -20,6 +20,10 @@ async function main(): Promise<void> {
 	client.on('close', (reason: ErrorCode, hadError: boolean) => console.log(reason, hadError));
 	const queued: boolean = client.sendv(['a', Buffer.from('b'), new Uint8Array(1), new ArrayBuffer(2)]);
 	const limit: number = client.maxMessageSize;
+	client.on('drain', () => client.send('again'));
+	const paused: boolean = client.pause().resume().isPaused();
+	const waiting: number = client.receiveQueueBytes;
+	void (await connect('typed', { highWaterMark: 1 << 16 }));
 	client.unref().ref().close();
 	server.close();
 	try {
@@ -29,6 +33,8 @@ async function main(): Promise<void> {
 	}
 	void queued;
 	void limit;
+	void paused;
+	void waiting;
 	// @ts-expect-error numbers are not sendable
 	client.send(42);
 	// @ts-expect-error unknown event

@@ -328,6 +328,41 @@ datapath_error datapath_socket_set_on_close(datapath_socket* s, datapath_close_f
 	});
 }
 
+datapath_error datapath_socket_set_on_drain(datapath_socket* s, datapath_drain_fn fn, void* user,
+											datapath_free_fn user_free)
+{
+	if (!s) {
+		if (user_free)
+			user_free(user);
+		return DATAPATH_ERROR_INVALID_ARGUMENT;
+	}
+	return guarded([&]() -> datapath_error {
+		auto owner = own(user, user_free);
+		if (!fn) {
+			s->sock->on_drain(nullptr);
+			return DATAPATH_SUCCESS;
+		}
+		s->sock->on_drain([fn, user, s, owner]() { fn(user, s); });
+		return DATAPATH_SUCCESS;
+	});
+}
+
+datapath_error datapath_socket_pause(datapath_socket* s)
+{
+	if (!s)
+		return DATAPATH_ERROR_INVALID_ARGUMENT;
+	s->sock->pause();
+	return DATAPATH_SUCCESS;
+}
+
+datapath_error datapath_socket_resume(datapath_socket* s)
+{
+	if (!s)
+		return DATAPATH_ERROR_INVALID_ARGUMENT;
+	s->sock->resume();
+	return DATAPATH_SUCCESS;
+}
+
 datapath_error datapath_socket_send(datapath_socket* s, const void* data, size_t size)
 {
 	if (!s || (!data && size))

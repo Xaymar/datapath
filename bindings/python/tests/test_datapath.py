@@ -460,6 +460,58 @@ def test_drop_last_reference_inside_callbacks():
         s3.close()
 
 
+def _flood(client: datapath.Socket, size: int, sent: int = 0) -> int:
+    """Send numbered messages from `sent` until the send queue is full; return the next number."""
+    buf = bytearray(size)
+    while True:
+        buf[0:4] = sent.to_bytes(4, "little")
+        try:
+            client.send(buf)
+        except datapath.WouldBlockError:
+            return sent
+        sent += 1
+        assert sent * size < 1 << 30, "never blocked"
+
+
+def test_recv_queue_is_bounded():
+    # A client sending faster than the server calls recv() is held at the
+    # high-water mark: its sends fail with WouldBlockError instead of growing
+    # the server's queue without bound. Nothing is lost or reordered.
+    path = name()
+    server = datapath.host(path)
+    client = datapath.connect(path, connect_timeout=T, max_queued_bytes=256 * 1024)
+    peer = server.accept(timeout=T)
+    try:
+        peer.recv_high_water_mark = 64 * 1024
+        with pytest.raises(datapath.TimedOutError):
+            peer.recv(timeout=0.01)  # starts reading
+        sent = _flood(client, 4096)
+        threading.Event().wait(0.1)
+        sent = _flood(client, 4096, sent)  # anything that drained meanwhile
+        assert peer.pending_bytes <= 64 * 1024 + 2 * (4096 + 64)
+        for i in range(sent):
+            assert int.from_bytes(peer.recv(timeout=T)[0:4], "little") == i
+        client.send(b"after")
+        assert peer.recv(timeout=T) == b"after"
+    finally:
+        client.close()
+        peer.close()
+        server.close()
+
+
+def test_pause_resume(pair):
+    _, peer, client = pair
+    with pytest.raises(datapath.TimedOutError):
+        peer.recv(timeout=0.01)
+    peer.pause()
+    threading.Event().wait(0.05)
+    client.send(b"held")
+    with pytest.raises(datapath.TimedOutError):
+        peer.recv(timeout=0.1)
+    peer.resume()
+    assert peer.recv(timeout=T) == b"held"
+    with pytest.raises(ValueError):
+        peer.recv_high_water_mark = 0
 def test_blocking_api_is_deprecated():
     path = name()
     server = datapath.host(path)

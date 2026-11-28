@@ -77,6 +77,10 @@ namespace datapath { namespace windows {
 		{
 			return _ring->prepare_space_wait();
 		}
+		bool take_drained()
+		{
+			return _ring->take_drained();
+		}
 		template<typename F>
 		int poll(F&& deliver)
 		{

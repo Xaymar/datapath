@@ -17,7 +17,16 @@ SPDX-License-Identifier: BSD-3-Clause
 //
 // Events pushed before JavaScript attached its dispatcher (an accepted socket
 // whose JS object does not exist yet) wait in the queue until attach().
+//
+// Backpressure: a socket's queue is bounded by a high-water mark in bytes. Once
+// the messages waiting for the JS thread reach it, the I/O thread pauses the
+// native socket, which stops reading from the peer; its sends then back up and
+// return WouldBlock to it. The JS thread resumes reading once it has dispatched
+// them. A peer that sends faster than JavaScript handles messages therefore
+// cannot grow this process's memory without bound. socket.pause() holds
+// 'message' events (and reading) until socket.resume().
 
+#include <atomic>
 #include <cstring>
 #include <datapath/datapath.hpp>
 #include <memory>
@@ -32,12 +41,18 @@ namespace {
 		Message = 0,
 		Close   = 1,
 		Accept  = 2,
+		Drain   = 3,
 	};
 
 	class socket_state;
 
 	// Messages up to this size are copied into a regular Buffer on the JS thread.
 	constexpr size_t copy_threshold = size_t(64) * 1024;
+
+	// Default receive high-water mark, and what each message counts on top of
+	// its payload (so that a flood of empty messages is bounded too).
+	constexpr size_t default_high_water = size_t(1) << 20;
+	constexpr size_t message_overhead   = 64;
 
 	struct event {
 		explicit event(event_kind k) : kind(k) {}
@@ -65,6 +80,10 @@ namespace {
 		bool _live = false;
 		// No more events are accepted (released or torn down).
 		bool                     _done = false;
+		// Message events are held back (socket.pause()); other events still go.
+		bool                     _hold = false;
+		// Held messages are dropped (closed locally while paused).
+		bool                     _drop_held = false;
 		napi_threadsafe_function _tsfn = nullptr;
 
 		static void call_js(napi_env env, napi_value js_cb, void* context, void* /*data*/)
@@ -100,23 +119,71 @@ namespace {
 			}
 			napi_value recv;
 			napi_get_undefined(env, &recv);
-			for (size_t i = 0; i < batch.size(); i++) {
+			// Messages held back by pause(), and everything after them except
+			// 'drain' (which is about sending and may overtake), in order.
+			std::vector<event> kept;
+			size_t             i = 0;
+			for (; i < batch.size(); i++) {
+				event& ev = batch[i];
+				if (ev.kind != event_kind::Drain) {
+					bool hold, drop;
+					{
+						std::lock_guard<std::mutex> l(_lock);
+						hold = _hold;
+						drop = _drop_held;
+					}
+					if (hold && drop && ev.kind == event_kind::Message) {
+						dropped(ev);
+						continue;
+					}
+					if ((hold && ev.kind == event_kind::Message) || !kept.empty()) {
+						kept.push_back(std::move(ev));
+						continue;
+					}
+				}
 				napi_handle_scope scope;
 				napi_open_handle_scope(env, &scope);
-				bool ok = dispatch(env, js_cb, recv, batch[i]);
+				bool ok = dispatch(env, js_cb, recv, ev);
 				napi_close_handle_scope(env, scope);
 				if (!ok) {
 					// A listener threw. Keep the remaining events for the next
 					// wake-up and let Node report the exception.
-					std::lock_guard<std::mutex> l(_lock);
-					_events.insert(_events.begin(), std::make_move_iterator(batch.begin() + i + 1),
-								   std::make_move_iterator(batch.end()));
-					if (!_events.empty() && _live) {
-						_signaled = true;
-						napi_call_threadsafe_function(_tsfn, nullptr, napi_tsfn_nonblocking);
-					}
-					return;
+					i++;
+					break;
 				}
+			}
+			{
+				std::lock_guard<std::mutex> l(_lock);
+				if (_done)
+					return; // released by a close event of this batch
+				kept.insert(kept.end(), std::make_move_iterator(batch.begin() + i),
+							std::make_move_iterator(batch.end()));
+				_events.insert(_events.begin(), std::make_move_iterator(kept.begin()),
+							   std::make_move_iterator(kept.end()));
+				// Resumed meanwhile, or a listener threw: go again. Held messages
+				// wait for resume() to signal.
+				signal_locked();
+			}
+			after_drain();
+		}
+
+		// Whether a drain would dispatch anything now.
+		bool dispatchable_locked() const
+		{
+			if (!_hold || _drop_held)
+				return !_events.empty();
+			for (auto& ev : _events)
+				if (ev.kind == event_kind::Drain)
+					return true;
+			return !_events.empty() && _events.front().kind != event_kind::Message;
+		}
+
+		// Wake the JS thread if events wait (after the hold was lifted).
+		void signal_locked()
+		{
+			if (_live && !_signaled && dispatchable_locked()) {
+				_signaled = true;
+				napi_call_threadsafe_function(_tsfn, nullptr, napi_tsfn_nonblocking);
 			}
 		}
 
@@ -124,9 +191,31 @@ namespace {
 		// Convert one event and call the JS dispatcher. Returns false if it threw.
 		virtual bool dispatch(napi_env env, napi_value js_cb, napi_value recv, event& ev) = 0;
 		virtual void on_finalize() {}
+		// JS thread, after a batch was dispatched.
+		virtual void after_drain() {}
+		// JS thread: a held message was dropped without dispatch.
+		virtual void dropped(event&) {}
 
 		public:
 		virtual ~channel() = default;
+
+		// JS thread: hold back or release message events.
+		void hold(bool on)
+		{
+			std::lock_guard<std::mutex> l(_lock);
+			_hold = on;
+			if (!on)
+				signal_locked();
+		}
+
+		// JS thread, closing locally: messages held by pause() are dropped so that
+		// 'close' is not stuck behind them.
+		void drop_held()
+		{
+			std::lock_guard<std::mutex> l(_lock);
+			_drop_held = true;
+			signal_locked();
+		}
 
 		// Any thread. Returns false when the event was dropped.
 		bool push(event&& ev)
@@ -134,8 +223,11 @@ namespace {
 			std::lock_guard<std::mutex> l(_lock);
 			if (_done)
 				return false;
+			bool held = _hold && ev.kind == event_kind::Message;
 			_events.push_back(std::move(ev));
-			if (_live && !_signaled) {
+			if (held)
+				return true; // resume() signals
+			if (_live && !_signaled && (!_hold || dispatchable_locked())) {
 				_signaled = true;
 				napi_call_threadsafe_function(_tsfn, nullptr, napi_tsfn_nonblocking);
 			}
@@ -201,6 +293,33 @@ namespace {
 		std::shared_ptr<datapath::socket> sock;
 		bool                              receiving = false;
 
+		// Bytes of messages queued for the JS thread (payload + message_overhead).
+		std::atomic<size_t> queued{0};
+		std::atomic<size_t> high_water{default_high_water};
+
+		private:
+		// Flow state; flow_lock orders pause()/resume() calls on the native socket.
+		std::mutex flow_lock;
+		bool       user_paused   = false; // socket.pause()
+		bool       native_paused = false; // sock->pause() is in effect
+
+		// Pause the native socket while the user paused or the queue is at the
+		// high-water mark; resume it otherwise.
+		void update_flow()
+		{
+			std::lock_guard<std::mutex> l(flow_lock);
+			bool want = user_paused
+						|| queued.load(std::memory_order_acquire) >= high_water.load(std::memory_order_relaxed);
+			if (want == native_paused)
+				return;
+			native_paused = want;
+			if (want)
+				sock->pause();
+			else
+				sock->resume();
+		}
+
+		public:
 		explicit socket_state(std::shared_ptr<datapath::socket> s) : sock(std::move(s)) {}
 
 		~socket_state() override
@@ -222,6 +341,10 @@ namespace {
 					self->push(std::move(ev));
 				}
 			});
+			st->sock->on_drain([weak]() {
+				if (auto self = weak.lock())
+					self->push(event{event_kind::Drain});
+			});
 			return st;
 		}
 
@@ -240,9 +363,38 @@ namespace {
 					ev.data.reset(new uint8_t[size]);
 					std::memcpy(ev.data.get(), data, size);
 				}
-				ev.size = size;
-				self->push(std::move(ev));
+				ev.size     = size;
+				size_t cost = size + message_overhead;
+				size_t now  = self->queued.fetch_add(cost, std::memory_order_acq_rel) + cost;
+				if (!self->push(std::move(ev))) {
+					self->queued.fetch_sub(cost, std::memory_order_acq_rel);
+					return;
+				}
+				if (now >= self->high_water.load(std::memory_order_relaxed))
+					self->update_flow(); // stop reading until JavaScript caught up
 			});
+		}
+
+		// JS thread: socket.pause() / socket.resume().
+		void set_paused(bool on)
+		{
+			{
+				std::lock_guard<std::mutex> l(flow_lock);
+				user_paused = on;
+			}
+			if (on) {
+				hold(true);
+				update_flow();
+			} else {
+				update_flow();
+				hold(false);
+			}
+		}
+
+		// JS thread, before closing locally.
+		void closing()
+		{
+			drop_held();
 		}
 
 		protected:
@@ -253,6 +405,7 @@ namespace {
 			bool close = false;
 			if (ev.kind == event_kind::Message) {
 				size_t size = ev.size;
+				queued.fetch_sub(size + message_overhead, std::memory_order_acq_rel);
 				try {
 					if (size <= copy_threshold) {
 						// Small: a copy into a V8-owned buffer is cheaper than an
@@ -266,6 +419,8 @@ namespace {
 				} catch (const Napi::Error&) {
 					return false;
 				}
+			} else if (ev.kind == event_kind::Drain) {
+				napi_get_undefined(env, &args[1]);
 			} else {
 				napi_create_int32(env, int32_t(ev.reason), &args[1]);
 				close = true;
@@ -282,6 +437,18 @@ namespace {
 			// Env teardown (worker exit, process.exit): stop the connection.
 			if (sock)
 				sock->close();
+		}
+
+		void after_drain() override
+		{
+			if (sock)
+				update_flow();
+		}
+
+		void dropped(event& ev) override
+		{
+			if (ev.kind == event_kind::Message)
+				queued.fetch_sub(ev.size + message_overhead, std::memory_order_acq_rel);
 		}
 	};
 
@@ -361,6 +528,10 @@ namespace {
 								   InstanceMethod<&socket_wrap::send>("send"),
 								   InstanceMethod<&socket_wrap::sendv>("sendv"),
 								   InstanceMethod<&socket_wrap::close>("close"),
+								   InstanceMethod<&socket_wrap::pause>("pause"),
+								   InstanceMethod<&socket_wrap::resume>("resume"),
+								   InstanceMethod<&socket_wrap::set_high_water_mark>("setHighWaterMark"),
+								   InstanceMethod<&socket_wrap::queued_bytes>("queuedBytes"),
 								   InstanceMethod<&socket_wrap::good>("good"),
 								   InstanceMethod<&socket_wrap::max_message_size>("maxMessageSize"),
 								   InstanceMethod<&socket_wrap::ref>("ref"),
@@ -478,7 +649,39 @@ namespace {
 		{
 			if (!check(info))
 				return info.Env().Undefined();
+			state->closing();
 			return Napi::Number::New(info.Env(), int32_t(state->sock->close()));
+		}
+
+		void pause(const Napi::CallbackInfo& info)
+		{
+			if (check(info))
+				state->set_paused(true);
+		}
+
+		void resume(const Napi::CallbackInfo& info)
+		{
+			if (check(info))
+				state->set_paused(false);
+		}
+
+		void set_high_water_mark(const Napi::CallbackInfo& info)
+		{
+			if (!check(info))
+				return;
+			if (info.Length() < 1 || !info[0].IsNumber())
+				NAPI_THROW_VOID(Napi::TypeError::New(info.Env(), "highWaterMark must be a number"));
+			double v = info[0].As<Napi::Number>().DoubleValue();
+			if (!(v >= 1))
+				NAPI_THROW_VOID(Napi::RangeError::New(info.Env(), "highWaterMark must be at least 1"));
+			state->high_water.store(v >= 9007199254740992.0 ? SIZE_MAX : size_t(v), std::memory_order_relaxed);
+		}
+
+		Napi::Value queued_bytes(const Napi::CallbackInfo& info)
+		{
+			if (!check(info))
+				return info.Env().Undefined();
+			return Napi::Number::New(info.Env(), double(state->queued.load(std::memory_order_relaxed)));
 		}
 
 		Napi::Value good(const Napi::CallbackInfo& info)
