@@ -201,7 +201,6 @@ jobs:
           # The tag push already uploaded this version; a later "release" run
           # must not fail here, or it never reaches PyPI.
           skip-existing: true
-          skip-existing: true
 
   publish-pypi:
     name: Publish to PyPI
