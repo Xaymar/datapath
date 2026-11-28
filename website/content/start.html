@@ -43,10 +43,11 @@ if (datapath::connect(sock, "my-service") == datapath::error::Success) {
     sock-&gt;on_message([](const uint8_t* data, size_t size) { /* valid during the call */ });
     sock-&gt;send("hello", 5);
 }</code></pre>
-<h3>Turn on shared memory</h3>
-<p>Both ends opt in; a peer without it, or on macOS, connects over the pipe or socket as usual.</p>
+<h3>Shared memory</h3>
+<p>On by default on Windows and Linux. A peer with it off, or on macOS, connects over the pipe or socket as usual. To turn it off for a connection, or to skip the copy out of the ring for a peer you trust:</p>
 <pre><code class="language-cpp">datapath::options opts;
-opts.shared_memory = true;
+opts.shared_memory = false;            // pipe or socket only
+// opts.shared_memory_zero_copy = true; // trusted same-user peer: no copy before on_message
 datapath::host(server, "my-service", opts);
 datapath::connect(sock, "my-service", opts);</code></pre>
 <p class="next">Next: <a href="../docs/semantics/">semantics and tuning</a>, the headers in <a href="https://github.com/Xaymar/datapath/tree/root/include/datapath"><code>include/datapath</code></a>, and <a href="https://github.com/Xaymar/datapath/blob/root/samples/echo/main.cpp">a complete echo program</a>.</p>
@@ -100,7 +101,7 @@ int main(void)
     datapath_server_release(server);
     return 0;
 }</code></pre>
-<p>Initialise option structs with <code>datapath_options_init()</code> before changing fields (set <code>shared_memory = 1</code> for the shared-memory transport), or pass <code>NULL</code> for the defaults.</p>
+<p>Initialise option structs with <code>datapath_options_init()</code> before changing fields (shared memory is on by default; set <code>shared_memory = 0</code> to turn it off), or pass <code>NULL</code> for the defaults.</p>
 <p class="next">Next: <a href="https://github.com/Xaymar/datapath/blob/root/include/datapath/datapath.h"><code>datapath.h</code></a> documents threading and ownership for every call.</p>
 </section>
 
@@ -126,7 +127,7 @@ server.on_accept(move |client: Socket| {
 let socket = datapath::connect("my-service")?;
 socket.on_message(|_, data| println!("got {} bytes", data.len()))?;
 socket.send(b"hello")?;</code></pre>
-<p>For shared memory, pass <code>Options { shared_memory: true, ..Default::default() }</code> to <code>Server::host</code> and <code>Socket::connect</code>.</p>
+<p>Shared memory is on by default. To turn it off, set <code>shared_memory = false</code> on an <code>Options::default()</code> and pass it to <code>Server::host</code> and <code>Socket::connect</code>.</p>
 <p class="next">Next: <a href="../docs/rust/">the Rust guide</a>.</p>
 </section>
 
@@ -150,7 +151,7 @@ server = datapath.host("my-service", on_accept=on_accept)
 sock = datapath.connect("my-service")
 sock.on_message(lambda data: print(data))          # b'hello'
 sock.send(b"hello")</code></pre>
-<p>The blocking <code>accept()</code>, <code>recv()</code> and <code>recv_into()</code> are deprecated since 1.1 and go away in 2.0. Set <code>DATAPATH_SHARED_MEMORY=1</code> in the environment of both processes for the shared-memory transport.</p>
+<p>The blocking <code>accept()</code>, <code>recv()</code> and <code>recv_into()</code> are deprecated since 1.1 and go away in 2.0. Shared memory is on by default; pass <code>shared_memory=False</code> to <code>connect()</code> or <code>host()</code> to turn it off.</p>
 <p class="next">Next: <a href="../docs/python/">the Python guide</a>.</p>
 </section>
 
@@ -171,7 +172,7 @@ const server = datapath.host('my-service', (socket) =&gt; {
 const socket = await datapath.connect('my-service');
 socket.on('message', (data) =&gt; console.log(data.toString()));
 socket.send('hello');</code></pre>
-<p>Set <code>DATAPATH_SHARED_MEMORY=1</code> in the environment of both processes for the shared-memory transport.</p>
+<p>Shared memory is on by default; pass <code>sharedMemory: false</code> in the options to turn it off.</p>
 <p class="next">Next: <a href="../docs/node/">the Node.js guide</a> and how it differs from C++.</p>
 </section>
 

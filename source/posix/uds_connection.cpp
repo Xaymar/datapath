@@ -37,7 +37,8 @@ namespace {
 datapath::posix::uds_connection::uds_connection(std::shared_ptr<event_context> ctx, event_loop& loop, int fd,
 												 const datapath::options& opts, uint64_t negotiated_limit)
 	: connection_base(opts, negotiated_limit), _ctx(std::move(ctx)), _loop(loop), _fd(fd),
-	  _mask(ev::rdhup), _shm_allowed(shm_link::wanted(opts)), _shm_size(opts.shared_memory_size),
+	  _mask(ev::rdhup), _shm_allowed(shm_link::wanted(opts)),
+	  _shm_zero_copy(opts.shared_memory_zero_copy), _shm_size(opts.shared_memory_size),
 	  _max_queued(opts.max_queued_bytes)
 {}
 
@@ -223,7 +224,7 @@ void datapath::posix::uds_connection::hello_read()
 					// objects can't be made, the connection stays on the socket.
 					datapath::detail::shared_lock<datapath::detail::shared_mutex> fl(_fd_lock);
 					if (_fd >= 0
-						&& shm_link::create(_shm, _fd, _shm_size, limit, _max_queued, _offer, _offer_fds)
+						&& shm_link::create(_shm, _fd, _shm_size, limit, _max_queued, _shm_zero_copy, _offer, _offer_fds)
 							   == datapath::error::Success)
 						_ext_accepted |= datapath::detail::ext_shared_memory;
 					else

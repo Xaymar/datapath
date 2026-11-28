@@ -57,6 +57,7 @@ namespace datapath { namespace posix {
 		std::atomic<bool>         _shm_active{false}; // send() writes to the ring itself
 		bool                      _shm_reading = false; // loop thread only
 		bool                      _shm_allowed;
+		bool                      _shm_zero_copy;
 		size_t                    _shm_size;
 		uint64_t                  _max_queued;
 		std::shared_ptr<waker>    _data_waker, _space_waker;
@@ -112,6 +113,13 @@ namespace datapath { namespace posix {
 			return _shm_active.load(std::memory_order_acquire);
 		}
 		datapath::error send(const buffer_view* parts, size_t count) override;
+		bool            set_zero_copy(bool enable) override
+		{
+			if (!_shm)
+				return false;
+			_shm->set_zero_copy(enable);
+			return true;
+		}
 
 		void on_event(uint32_t events) override;
 		void on_post(int kind) override;

@@ -6,8 +6,8 @@ SPDX-License-Identifier: BSD-3-Clause
 */
 
 // options::shared_memory: the version 3 handshake, the data path itself, and
-// what happens when the peer's process ends. The rest of the integration suite
-// also runs over shared memory (the *.shm tests).
+// what happens when the peer's process ends. Shared memory is the default, so
+// the rest of the suites run over it too (and again over the pipe: *.noshm).
 
 #include <datapath/datapath.hpp>
 #include <atomic>
@@ -21,7 +21,9 @@ SPDX-License-Identifier: BSD-3-Clause
 #include <thread>
 #include <vector>
 #include "check.hpp"
+#include "common/endian.hpp"
 #include "common/handshake.hpp"
+#include "common/shm_ring.hpp"
 #include "windows/pipe_connection.hpp"
 #include "windows/shm.hpp"
 #include "windows/win.hpp"
@@ -42,6 +44,21 @@ namespace {
 		datapath::options o;
 		o.shared_memory = true;
 		return o;
+	}
+
+	datapath::options pipe_options()
+	{
+		datapath::options o;
+		o.shared_memory = false;
+		return o;
+	}
+
+	// Whether `p` points into a mapped view (the shared-memory rings), not
+	// private memory such as a heap copy.
+	bool in_mapped_view(const void* p)
+	{
+		MEMORY_BASIC_INFORMATION mbi{};
+		return VirtualQuery(p, &mbi, sizeof(mbi)) == sizeof(mbi) && mbi.Type == MEM_MAPPED;
 	}
 
 	struct waiter {
@@ -115,10 +132,11 @@ namespace {
 	}
 } // namespace
 
-TEST(options_default_off)
+TEST(options_default_on_with_copy)
 {
 	datapath::options o;
-	CHECK(!o.shared_memory);
+	CHECK(o.shared_memory);
+	CHECK(!o.shared_memory_zero_copy);
 	CHECK(o.shared_memory_size > 0);
 }
 
@@ -207,7 +225,7 @@ TEST(client_only_uses_pipe)
 {
 	auto        name = unique_name();
 	echo_server srv;
-	CHECK_EQ(srv.start(name, datapath::options{}), error::Success);
+	CHECK_EQ(srv.start(name, pipe_options()), error::Success);
 	auto c = connect_internal(name, shm_options());
 	CHECK(c != nullptr);
 	CHECK(!c->shared_memory_active());
@@ -226,7 +244,7 @@ TEST(server_only_uses_pipe)
 	auto        name = unique_name();
 	echo_server srv;
 	CHECK_EQ(srv.start(name), error::Success);
-	auto c = connect_internal(name, datapath::options{});
+	auto c = connect_internal(name, pipe_options());
 	CHECK(c != nullptr);
 	CHECK(!c->shared_memory_active());
 	auto   sock = std::make_shared<datapath::socket>(c);
@@ -281,6 +299,140 @@ TEST(falls_back_to_version_1_server)
 	CHECK_EQ(versions.size(), size_t(2));
 	CHECK_EQ(versions[0], datapath::detail::protocol_version_ext);
 	CHECK_EQ(versions[1], datapath::detail::protocol_version);
+}
+
+// The server offers rings the client can't open (here: objects that don't
+// exist, in practice another logon session): the client connects again over
+// the pipe instead of failing.
+TEST(unopenable_offer_falls_back_to_pipe)
+{
+	std::string  name = unique_name();
+	std::wstring path = L"\\\\.\\pipe\\" + std::wstring(name.begin(), name.end());
+	std::vector<uint32_t> versions;
+	HANDLE                pipes[2];
+	for (auto& h : pipes) {
+		h = CreateNamedPipeW(path.c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_WAIT, 2, 4096, 4096, 0, nullptr);
+		CHECK(h != INVALID_HANDLE_VALUE);
+	}
+	std::thread server([&] {
+		for (HANDLE h : pipes) {
+			if (!ConnectNamedPipe(h, nullptr) && GetLastError() != ERROR_PIPE_CONNECTED)
+				return;
+			uint8_t hello[datapath::detail::hello_size] = {};
+			DWORD   got                                  = 0;
+			ReadFile(h, hello, sizeof(hello), &got, nullptr);
+			datapath::detail::hello in{};
+			datapath::detail::decode_hello_any(hello, in);
+			versions.push_back(in.version);
+			if (in.version == datapath::detail::protocol_version_ext) {
+				uint8_t trailer[datapath::detail::ext_trailer_size];
+				ReadFile(h, trailer, sizeof(trailer), &got, nullptr);
+				uint8_t reply[datapath::detail::hello_size + datapath::detail::ext_trailer_size
+							  + datapath::windows::shm_offer_size] = {};
+				datapath::detail::encode_hello(reply, {datapath::detail::protocol_version_ext, 1024});
+				datapath::detail::encode_ext_trailer(reply + datapath::detail::hello_size, uint32_t(-1),
+													 datapath::detail::ext_shared_memory);
+				uint8_t* offer = reply + datapath::detail::hello_size + datapath::detail::ext_trailer_size;
+				std::memcpy(offer, "DPSM", 4);
+				datapath::detail::store_le32(offer + 4, datapath::detail::shm::version);
+				datapath::detail::store_le64(offer + 8, datapath::detail::shm::min_ring);
+				datapath::detail::store_le32(offer + 16, 0);
+				offer[24] = 'L';
+				std::memset(offer + 25, '0', 32); // no such objects
+				WriteFile(h, reply, sizeof(reply), &got, nullptr);
+				FlushFileBuffers(h);
+				Sleep(100);
+				DisconnectNamedPipe(h);
+				continue;
+			}
+			datapath::detail::encode_hello(hello, {datapath::detail::protocol_version, 1024});
+			WriteFile(h, hello, sizeof(hello), &got, nullptr);
+			FlushFileBuffers(h);
+			Sleep(200);
+			return;
+		}
+	});
+	auto c = connect_internal(name, shm_options());
+	server.join();
+	for (HANDLE h : pipes)
+		CloseHandle(h);
+	CHECK(c != nullptr);
+	CHECK(!c->shared_memory_active());
+	CHECK_EQ(versions.size(), size_t(2));
+	CHECK_EQ(versions[0], datapath::detail::protocol_version_ext);
+	CHECK_EQ(versions[1], datapath::detail::protocol_version);
+}
+
+// By default a same-user peer's messages reach the handler as a private copy,
+// so the peer can't change them while the handler reads; with
+// shared_memory_zero_copy they come straight from the ring.
+TEST(same_user_messages_copied_unless_zero_copy)
+{
+	if (!datapath::windows::shm_channel::supported()) {
+		std::printf("SKIP: wait completion packets unavailable\n");
+		return;
+	}
+	for (bool zero_copy : {false, true}) {
+		auto        name = unique_name();
+		echo_server srv;
+		CHECK_EQ(srv.start(name), error::Success);
+		auto o                    = shm_options();
+		o.shared_memory_zero_copy = zero_copy;
+		auto c                    = connect_internal(name, o);
+		CHECK(c != nullptr);
+		CHECK(c->shared_memory_active());
+		std::atomic<int> in_ring{-1};
+		waiter           w; // before the socket whose handler uses them
+		auto             sock = std::make_shared<datapath::socket>(c);
+		sock->on_message([&](const uint8_t* d, size_t n) {
+			if (n == 4) {
+				in_ring = in_mapped_view(d) ? 1 : 0;
+				w.hit();
+			}
+		});
+		CHECK_EQ(sock->send("ping", 4), error::Success);
+		CHECK(w.wait(1));
+		CHECK_EQ(in_ring.load(), zero_copy ? 1 : 0);
+	}
+}
+
+// socket::set_zero_copy switches a live connection between copied and
+// zero-copy delivery, e.g. once the application's own handshake trusts the peer.
+TEST(set_zero_copy_switches_live_connection)
+{
+	if (!datapath::windows::shm_channel::supported()) {
+		std::printf("SKIP: wait completion packets unavailable\n");
+		return;
+	}
+	auto        name = unique_name();
+	echo_server srv;
+	CHECK_EQ(srv.start(name), error::Success);
+	auto c = connect_internal(name, shm_options());
+	CHECK(c != nullptr);
+	CHECK(c->shared_memory_active());
+	std::atomic<int> in_ring{-1};
+	waiter           w; // before the socket whose handler uses them
+	auto             sock = std::make_shared<datapath::socket>(c);
+	sock->on_message([&](const uint8_t* d, size_t n) {
+		if (n == 4) {
+			in_ring = in_mapped_view(d) ? 1 : 0;
+			w.hit();
+		}
+	});
+	int expect[] = {0, 1, 0};
+	for (int i = 0; i < 3; i++) {
+		if (i > 0)
+			CHECK(sock->set_zero_copy(i == 1));
+		CHECK_EQ(sock->send("ping", 4), error::Success);
+		CHECK(w.wait(i + 1));
+		CHECK_EQ(in_ring.load(), expect[i]);
+	}
+
+	// Without shared memory there is nothing to switch.
+	auto c2 = connect_internal(name, pipe_options());
+	CHECK(c2 != nullptr);
+	auto sock2 = std::make_shared<datapath::socket>(c2);
+	CHECK(!sock2->set_zero_copy(true));
 }
 
 // The peer's process ends without closing anything: the other side is told

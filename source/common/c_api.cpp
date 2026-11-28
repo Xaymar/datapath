@@ -155,9 +155,10 @@ namespace {
 		out.connect_timeout  = std::chrono::milliseconds(o.connect_timeout_ms);
 		out.receive_buffer   = size_t(o.receive_buffer);
 		out.pipe_buffer      = size_t(o.pipe_buffer);
-		out.shared_memory      = o.shared_memory != 0;
-		out.shared_memory_size = size_t(o.shared_memory_size);
-		out.handshake_timeout  = std::chrono::milliseconds(o.handshake_timeout_ms);
+		out.shared_memory           = o.shared_memory != 0;
+		out.shared_memory_zero_copy = o.shared_memory_zero_copy != 0;
+		out.shared_memory_size      = size_t(o.shared_memory_size);
+		out.handshake_timeout       = std::chrono::milliseconds(o.handshake_timeout_ms);
 		return true;
 	}
 
@@ -229,9 +230,10 @@ void datapath_options_init(datapath_options* o)
 	o->connect_timeout_ms = int64_t(d.connect_timeout.count());
 	o->receive_buffer     = uint64_t(d.receive_buffer);
 	o->pipe_buffer        = uint64_t(d.pipe_buffer);
-	o->shared_memory      = d.shared_memory ? 1 : 0;
-	o->shared_memory_size = uint64_t(d.shared_memory_size);
-	o->handshake_timeout_ms = int64_t(d.handshake_timeout.count());
+	o->shared_memory           = d.shared_memory ? 1 : 0;
+	o->shared_memory_zero_copy = d.shared_memory_zero_copy ? 1 : 0;
+	o->shared_memory_size      = uint64_t(d.shared_memory_size);
+	o->handshake_timeout_ms    = int64_t(d.handshake_timeout.count());
 }
 
 // context ----------------------------------------------------------------------
@@ -359,6 +361,11 @@ int datapath_socket_good(const datapath_socket* s)
 uint64_t datapath_socket_max_message_size(const datapath_socket* s)
 {
 	return s ? s->sock->max_message_size() : 0;
+}
+
+int datapath_socket_set_zero_copy(datapath_socket* s, int enable)
+{
+	return s && s->sock->set_zero_copy(enable != 0) ? 1 : 0;
 }
 
 void datapath_socket_release(datapath_socket* s)

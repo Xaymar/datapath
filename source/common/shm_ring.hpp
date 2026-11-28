@@ -13,8 +13,9 @@ SPDX-License-Identifier: BSD-3-Clause
 //
 // Nothing the peer writes into shared memory is trusted: each side keeps its own
 // ring position, checks every record against the ring bounds and the negotiated
-// message limit, and copies a message out before delivery when the peer is
-// another user (so it can't change the bytes while the handler reads them).
+// message limit, and copies a message out before delivery (so the peer can't
+// change the bytes while the handler reads them), unless zero-copy was asked
+// for and the peer is the same user.
 //
 // Records: uint64 header (low 32 bits payload length, rec_more = more fragments
 // follow, rec_pad = padding) then the payload, padded to 8 bytes. Rings mapped
@@ -87,7 +88,8 @@ namespace datapath { namespace detail { namespace shm {
 			uint8_t*        data[2]; // ring 0, ring 1 (mirrored: each mapped twice)
 			uint64_t        cap;
 			bool            mirrored;
-			bool            copy; // copy messages out before delivery
+			bool            other_user; // peer is another user: always copy messages out
+			bool            zero_copy;  // same user: deliver straight from the ring
 			bool            server;
 			uint64_t        limit;
 			uint64_t        max_queued;
@@ -103,8 +105,9 @@ namespace datapath { namespace detail { namespace shm {
 		uint8_t*        _data[2];
 		uint64_t        _cap;
 		bool            _mirror;
-		bool            _copy;
-		int             _tx, _rx;
+		bool              _other_user;
+		std::atomic<bool> _copy;
+		int               _tx, _rx;
 		uint64_t        _limit;
 		uint64_t        _max_queued;
 		signal_fn       _signal;
@@ -167,5 +170,11 @@ namespace datapath { namespace detail { namespace shm {
 		}
 		// Before blocking: set reader_waiting and recheck. True = may block.
 		bool prepare_block();
+		// Deliver later messages from a same-user peer straight from the ring
+		// (true) or as a private copy (false). Another user's are always copied.
+		void set_zero_copy(bool on) noexcept
+		{
+			_copy.store(_other_user || !on, std::memory_order_relaxed);
+		}
 	};
 }}} // namespace datapath::detail::shm

@@ -69,7 +69,8 @@ bool datapath::detail::shm::header_matches(const void* view, uint64_t cap, uint3
 }
 
 datapath::detail::shm::ring_pair::ring_pair(const setup& s)
-	: _hdr(s.header), _data{s.data[0], s.data[1]}, _cap(s.cap), _mirror(s.mirrored), _copy(s.copy),
+	: _hdr(s.header), _data{s.data[0], s.data[1]}, _cap(s.cap), _mirror(s.mirrored),
+	  _other_user(s.other_user), _copy(s.other_user || !s.zero_copy),
 	  _tx(s.server ? 0 : 1), _rx(s.server ? 1 : 0), _limit(s.limit), _max_queued(s.max_queued), _signal(s.signal),
 	  _signal_ctx(s.signal_ctx), _sync_key{s.sync_key[0], s.sync_key[1]}
 {}
@@ -322,7 +323,7 @@ int datapath::detail::shm::ring_pair::poll_impl(bool (*deliver)(void*, const uin
 			} else {
 				if (len > _limit)
 					return -1;
-				if (_copy) {
+				if (_copy.load(std::memory_order_relaxed)) {
 					_scratch.assign(p, p + len);
 					p = _scratch.data();
 				}

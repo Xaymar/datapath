@@ -43,7 +43,8 @@ namespace datapath { namespace posix {
 		std::unique_ptr<objects>                           _o;
 		std::unique_ptr<datapath::detail::shm::ring_pair> _ring;
 
-		shm_link(std::unique_ptr<objects> o, bool server, bool copy, uint64_t limit, uint64_t max_queued);
+		shm_link(std::unique_ptr<objects> o, bool server, bool other_user, bool zero_copy, uint64_t limit,
+				 uint64_t max_queued);
 
 		public:
 		~shm_link();
@@ -59,12 +60,14 @@ namespace datapath { namespace posix {
 		// Server: create the objects for the peer of socket `sock`, fill `offer`
 		// and the descriptors to send with it (owned by the link).
 		static datapath::error create(std::unique_ptr<shm_link>& out, int sock, uint64_t ring_size, uint64_t limit,
-									  uint64_t max_queued, uint8_t (&offer)[shm_offer_size],
+									  uint64_t max_queued, bool zero_copy, uint8_t (&offer)[shm_offer_size],
 									  int (&fds)[shm_fd_count]);
 		// Client: open what the server offered. Takes ownership of `fds` (also on
 		// failure).
+		// zero_copy (options::shared_memory_zero_copy): deliver messages straight
+		// from the ring when the peer is the same user; otherwise always copy.
 		static datapath::error open(std::unique_ptr<shm_link>& out, int sock, const uint8_t (&offer)[shm_offer_size],
-									int (&fds)[shm_fd_count], uint64_t limit, uint64_t max_queued);
+									int (&fds)[shm_fd_count], uint64_t limit, uint64_t max_queued, bool zero_copy);
 
 		// See datapath::detail::shm::ring_pair.
 		datapath::error send(const buffer_view* parts, size_t count, bool& need_space)
@@ -87,6 +90,10 @@ namespace datapath { namespace posix {
 		bool prepare_block()
 		{
 			return _ring->prepare_block();
+		}
+		void set_zero_copy(bool on) noexcept
+		{
+			_ring->set_zero_copy(on);
 		}
 
 		// The eventfds this side waits on.

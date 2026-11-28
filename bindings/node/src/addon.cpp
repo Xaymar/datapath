@@ -587,6 +587,10 @@ namespace {
 	datapath::options parse_options(const Napi::Value& value)
 	{
 		datapath::options opts;
+		// Every message is copied into a Buffer of its own before JavaScript sees
+		// it, so the peer can't change the bytes afterwards: skip the library's
+		// own copy out of the shared-memory ring.
+		opts.shared_memory_zero_copy = true;
 		if (!value.IsObject())
 			return opts;
 		auto o = value.As<Napi::Object>();
@@ -615,6 +619,10 @@ namespace {
 			opts.receive_buffer = size_t(to_u64(o.Get("receiveBuffer")));
 		if (has(o, "pipeBuffer"))
 			opts.pipe_buffer = size_t(to_u64(o.Get("pipeBuffer")));
+		if (has(o, "sharedMemory"))
+			opts.shared_memory = o.Get("sharedMemory").ToBoolean().Value();
+		if (has(o, "sharedMemorySize"))
+			opts.shared_memory_size = size_t(to_u64(o.Get("sharedMemorySize")));
 		return opts;
 	}
 

@@ -911,9 +911,18 @@ namespace {
 	// Options
 
 	datapath::options make_options(std::optional<uint64_t> max_message_size, std::optional<uint64_t> max_queued_bytes,
-								   std::optional<size_t> receive_buffer)
+								   std::optional<size_t> receive_buffer, std::optional<bool> shared_memory,
+								   std::optional<size_t> shared_memory_size)
 	{
 		datapath::options o;
+		// Every message is copied into bytes of its own before Python sees it, so
+		// the peer can't change it afterwards: skip the library's own copy out of
+		// the shared-memory ring.
+		o.shared_memory_zero_copy = true;
+		if (shared_memory)
+			o.shared_memory = *shared_memory;
+		if (shared_memory_size)
+			o.shared_memory_size = *shared_memory_size;
 		if (max_message_size)
 			o.max_message_size = *max_message_size;
 		if (max_queued_bytes)
@@ -1066,8 +1075,9 @@ NB_MODULE(_core, m)
 	m.def(
 		"connect",
 		[](const std::string& path, double connect_timeout, std::optional<uint64_t> max_message_size,
-		   std::optional<uint64_t> max_queued_bytes, std::optional<size_t> receive_buffer, nb::object context) {
-			auto o = make_options(max_message_size, max_queued_bytes, receive_buffer);
+		   std::optional<uint64_t> max_queued_bytes, std::optional<size_t> receive_buffer,
+		   std::optional<bool> shared_memory, std::optional<size_t> shared_memory_size, nb::object context) {
+			auto o = make_options(max_message_size, max_queued_bytes, receive_buffer, shared_memory, shared_memory_size);
 			if (connect_timeout < 0)
 				throw nb::value_error("connect_timeout must be non-negative");
 			o.connect_timeout                     = std::chrono::milliseconds(int64_t(connect_timeout * 1000.0 + 0.5));
@@ -1082,22 +1092,27 @@ NB_MODULE(_core, m)
 			return wrap_socket(std::move(s), context);
 		},
 		"path"_a, nb::kw_only(), "connect_timeout"_a = 1.0, "max_message_size"_a = nb::none(),
-		"max_queued_bytes"_a = nb::none(), "receive_buffer"_a = nb::none(), "context"_a = nb::none(),
+		"max_queued_bytes"_a = nb::none(), "receive_buffer"_a = nb::none(), "shared_memory"_a = nb::none(),
+		"shared_memory_size"_a = nb::none(), "context"_a = nb::none(),
 		nb::sig("def connect(path: str, *, connect_timeout: float = 1.0, max_message_size: int | None = None, "
 				"max_queued_bytes: int | None = None, receive_buffer: int | None = None, "
+				"shared_memory: bool | None = None, shared_memory_size: int | None = None, "
 				"context: Context | None = None) -> Socket"),
 		"Connect to a server. Blocks until the handshake completes or `connect_timeout`\n"
-		"seconds pass. Without `context`, the process-wide default context is used.");
+		"seconds pass. Without `context`, the process-wide default context is used.\n\n"
+		"`shared_memory` (default True on Windows and Linux) moves messages through\n"
+		"shared memory when the server allows it too; otherwise the pipe or socket is used.");
 
 	m.def(
 		"host",
 		[](const std::string& path, datapath::permissions permissions, size_t backlog, size_t max_clients,
 		   double handshake_timeout, std::optional<uint64_t> max_message_size,
 		   std::optional<uint64_t> max_queued_bytes, std::optional<size_t> receive_buffer,
-		   std::optional<size_t> pipe_buffer, nb::object context, nb::object on_accept) {
+		   std::optional<size_t> pipe_buffer, std::optional<bool> shared_memory,
+		   std::optional<size_t> shared_memory_size, nb::object context, nb::object on_accept) {
 			if (!(handshake_timeout >= 0))
 				throw nb::value_error("handshake_timeout must be non-negative");
-			auto o        = make_options(max_message_size, max_queued_bytes, receive_buffer);
+			auto o = make_options(max_message_size, max_queued_bytes, receive_buffer, shared_memory, shared_memory_size);
 			o.permissions = permissions;
 			o.backlog     = backlog;
 			o.max_clients = max_clients;
@@ -1123,12 +1138,14 @@ NB_MODULE(_core, m)
 			return out;
 		},
 		"path"_a, nb::kw_only(), "permissions"_a = datapath::permissions::User, "backlog"_a = 8, "max_clients"_a = 0,
-		"handshake_timeout"_a = 5.0, "max_message_size"_a = nb::none(), "max_queued_bytes"_a = nb::none(), "receive_buffer"_a = nb::none(),
-		"pipe_buffer"_a = nb::none(), "context"_a = nb::none(), "on_accept"_a = nb::none(),
+		"handshake_timeout"_a = 5.0, "max_message_size"_a = nb::none(), "max_queued_bytes"_a = nb::none(),
+		"receive_buffer"_a = nb::none(), "pipe_buffer"_a = nb::none(), "shared_memory"_a = nb::none(),
+		"shared_memory_size"_a = nb::none(), "context"_a = nb::none(), "on_accept"_a = nb::none(),
 		nb::sig("def host(path: str, *, permissions: Permissions = ..., backlog: int = 8, "
 				"max_clients: int = 0, handshake_timeout: float = 5.0, max_message_size: int | None = None, "
 				"max_queued_bytes: int | None = None, receive_buffer: int | None = None, "
-				"pipe_buffer: int | None = None, context: Context | None = None, "
+				"pipe_buffer: int | None = None, shared_memory: bool | None = None, "
+				"shared_memory_size: int | None = None, context: Context | None = None, "
 				"on_accept: collections.abc.Callable[[Socket], object] | None = None) -> Server"),
 		"Host a server at `path`. A bare name maps to \\\\.\\pipe\\<name> on Windows and to\n"
 		"the abstract socket datapath.<name> on Linux; on Linux a path starting with / is\n"

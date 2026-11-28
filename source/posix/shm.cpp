@@ -135,8 +135,8 @@ bool datapath::posix::shm_link::wanted(const datapath::options& opts) noexcept
 	return want && supported();
 }
 
-datapath::posix::shm_link::shm_link(std::unique_ptr<objects> o, bool server, bool copy, uint64_t limit,
-									 uint64_t max_queued)
+datapath::posix::shm_link::shm_link(std::unique_ptr<objects> o, bool server, bool other_user, bool zero_copy,
+									 uint64_t limit, uint64_t max_queued)
 	: _o(std::move(o))
 {
 	ring_pair::setup s{};
@@ -145,7 +145,8 @@ datapath::posix::shm_link::shm_link(std::unique_ptr<objects> o, bool server, boo
 	s.data[1]    = _o->mirror[1];
 	s.cap        = _o->cap;
 	s.mirrored   = true;
-	s.copy       = copy;
+	s.other_user = other_user;
+	s.zero_copy  = zero_copy;
 	s.server     = server;
 	s.limit      = limit;
 	s.max_queued = max_queued;
@@ -185,7 +186,7 @@ void datapath::posix::shm_link::clear(int efd) noexcept
 }
 
 datapath::error datapath::posix::shm_link::create(std::unique_ptr<shm_link>& out, int sock, uint64_t ring_size,
-												  uint64_t limit, uint64_t max_queued,
+												  uint64_t limit, uint64_t max_queued, bool zero_copy,
 												  uint8_t (&offer)[shm_offer_size], int (&fds)[shm_fd_count])
 {
 #if DATAPATH_SHM_POSIX
@@ -216,18 +217,17 @@ datapath::error datapath::posix::shm_link::create(std::unique_ptr<shm_link>& out
 	datapath::detail::store_le32(offer + 16, flag_mirror);
 	for (int i = 0; i < shm_fd_count; i++)
 		fds[i] = o->fds[i];
-	bool copy = uid != ::geteuid();
-	out.reset(new shm_link(std::move(o), true, copy, limit, max_queued));
+	out.reset(new shm_link(std::move(o), true, uid != ::geteuid(), zero_copy, limit, max_queued));
 	return datapath::error::Success;
 #else
-	(void)out, (void)sock, (void)ring_size, (void)limit, (void)max_queued, (void)offer, (void)fds;
+	(void)out, (void)sock, (void)ring_size, (void)limit, (void)max_queued, (void)zero_copy, (void)offer, (void)fds;
 	return datapath::error::NotSupported;
 #endif
 }
 
 datapath::error datapath::posix::shm_link::open(std::unique_ptr<shm_link>& out, int sock,
 												const uint8_t (&offer)[shm_offer_size], int (&fds)[shm_fd_count],
-												uint64_t limit, uint64_t max_queued)
+												uint64_t limit, uint64_t max_queued, bool zero_copy)
 {
 	auto o = datapath::detail::make_unique<objects>();
 	for (int i = 0; i < shm_fd_count; i++) {
@@ -264,11 +264,10 @@ datapath::error datapath::posix::shm_link::open(std::unique_ptr<shm_link>& out, 
 	gid_t gid = 0;
 	if (!peer_credentials(sock, uid, gid))
 		return datapath::error::AccessDenied;
-	bool copy = uid != ::geteuid();
-	out.reset(new shm_link(std::move(o), false, copy, limit, max_queued));
+	out.reset(new shm_link(std::move(o), false, uid != ::geteuid(), zero_copy, limit, max_queued));
 	return datapath::error::Success;
 #else
-	(void)out, (void)sock, (void)offer, (void)limit, (void)max_queued;
+	(void)out, (void)sock, (void)offer, (void)limit, (void)max_queued, (void)zero_copy;
 	return datapath::error::NotSupported;
 #endif
 }

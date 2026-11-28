@@ -74,7 +74,9 @@ TEST(client_limits_server_to_identification)
 	});
 	std::shared_ptr<datapath::socket> c;
 	std::string                       name = "dp-test-sqos-" + std::to_string(GetCurrentProcessId());
-	CHECK_EQ(datapath::connect(c, name), datapath::error::Success);
+	datapath::options                 o;
+	o.shared_memory = false; // the raw server above answers a version 1 hello only
+	CHECK_EQ(datapath::connect(c, name, o), datapath::error::Success);
 	server.join();
 	CloseHandle(h);
 	std::printf("impersonation level seen by server: %d\n", level);

@@ -86,7 +86,8 @@ pub struct datapath_options {
     pub receive_buffer: u64,
     pub pipe_buffer: u64,
     pub shared_memory: u8,
-    pub reserved: [u8; 7],
+    pub shared_memory_zero_copy: u8,
+    pub reserved: [u8; 6],
     pub shared_memory_size: u64,
     pub handshake_timeout_ms: i64,
 }
@@ -152,6 +153,7 @@ extern "C" {
     pub fn datapath_socket_close(socket: *mut datapath_socket) -> datapath_error;
     pub fn datapath_socket_good(socket: *const datapath_socket) -> c_int;
     pub fn datapath_socket_max_message_size(socket: *const datapath_socket) -> u64;
+    pub fn datapath_socket_set_zero_copy(socket: *mut datapath_socket, enable: c_int) -> c_int;
     pub fn datapath_socket_release(socket: *mut datapath_socket);
 
     pub fn datapath_host(

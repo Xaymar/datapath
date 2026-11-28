@@ -485,10 +485,13 @@ datapath::error datapath::posix::event_context::connect(std::shared_ptr<datapath
 		auto                      limit = std::min(opts.max_message_size, reply.max_message_size);
 		std::unique_ptr<shm_link> shm;
 		if (got_shm) {
-			ec = shm_link::open(shm, fd, offer, fds, limit, opts.max_queued_bytes);
+			ec = shm_link::open(shm, fd, offer, fds, limit, opts.max_queued_bytes, opts.shared_memory_zero_copy);
 			if (ec != datapath::error::Success) {
+				// The rings the server offered can't be used here: connect
+				// again without asking for them, like a server without them.
 				::close(fd);
-				return ec;
+				want_ext = false;
+				continue;
 			}
 		}
 		drop_fds(); // sent without being offered

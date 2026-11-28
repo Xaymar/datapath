@@ -148,7 +148,12 @@ pub struct Options {
     /// Windows kernel pipe buffer, 0 = same as `receive_buffer` (host only).
     pub pipe_buffer: usize,
     /// Windows, Linux, Android: move messages through shared memory when both ends set this.
+    /// On by default since 1.1.0; peers without it (or macOS) use the pipe or socket.
     pub shared_memory: bool,
+    /// Deliver shared-memory messages from a same-user peer straight from the ring instead
+    /// of a private copy. Off by default: only turn it on for peers you trust, since the
+    /// peer could otherwise change the bytes while your handler reads them.
+    pub shared_memory_zero_copy: bool,
     /// Ring size per direction with `shared_memory` (the server's value is used).
     pub shared_memory_size: usize,
 }
@@ -176,6 +181,7 @@ impl Default for Options {
             receive_buffer: raw.receive_buffer as usize,
             pipe_buffer: raw.pipe_buffer as usize,
             shared_memory: raw.shared_memory != 0,
+            shared_memory_zero_copy: raw.shared_memory_zero_copy != 0,
             shared_memory_size: raw.shared_memory_size as usize,
         }
     }
@@ -203,6 +209,7 @@ impl Options {
         raw.receive_buffer = self.receive_buffer as u64;
         raw.pipe_buffer = self.pipe_buffer as u64;
         raw.shared_memory = u8::from(self.shared_memory);
+        raw.shared_memory_zero_copy = u8::from(self.shared_memory_zero_copy);
         raw.shared_memory_size = self.shared_memory_size as u64;
         raw
     }
